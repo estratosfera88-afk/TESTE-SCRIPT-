@@ -1,0 +1,1722 @@
+-- [[
+--     AKAT MM2 SCRIPT [BETA] - GLOBAL LOCALIZATION & PROCEDURAL ICONS (RESOLVED SCOPE UPDATE)
+-- ]]
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local Lighting = game:GetService("Lighting")
+
+local player = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- ==================== 1. CONFIGURAÇÕES E LOCALES ESTÁTICOS ====================
+local Configs = {
+    ESP = false,
+    AutoShoot = false,
+    Speed = false,
+    Reach = false,
+    AntiFling = false,
+    TpToGun = false,
+    SafeSpot = false,
+    AutoCollect = false,
+    ChatRoles = false
+}
+
+local Locales = {
+    PT = {
+        Title = "AKAT SCRIPTS",
+        Subtitle = "MM2 SCRIPT [VERSÃO BETA]",
+        SearchPlaceholder = "Pesquisar...",
+        ConfirmCloseTitle = "Deseja fechar o script?",
+        ConfirmBtn = "Confirmar",
+        CancelBtn = "Cancelar",
+        Tabs = {
+            Combat = "Combate",
+            Visuals = "Visuais",
+            Movement = "Movimento",
+            Teleports = "Teleportes",
+            Misc = "Diversos"
+        },
+        Options = {
+            AutoShoot = {
+                Title = "Atirar no Murder",
+                Desc = "Mira e dispara a arma automaticamente no Assassino ao equipá-la."
+            },
+            Reach = {
+                Title = "Alcance da Faca",
+                Desc = "Aumenta consideravelmente o alcance de ataque com a sua faca."
+            },
+            ESP = {
+                Title = "ESP Jogadores",
+                Desc = "Destaca na parede os jogadores de acordo com suas funções."
+            },
+            Speed = {
+                Title = "Velocidade",
+                Desc = "Aumenta levemente a velocidade do personagem para 23."
+            },
+            AntiFling = {
+                Title = "Anti-Arremesso",
+                Desc = "Bloqueia colisões que tentem te empurrar ou arremessar."
+            },
+            TpToGun = {
+                Title = "Teleportar p/ Arma",
+                Desc = "Teletransporta instantaneamente para a arma dropada se o Sheriff morrer."
+            },
+            SafeSpot = {
+                Title = "Lugar Seguro",
+                Desc = "Cria uma plataforma invisível no céu para ficar totalmente seguro."
+            },
+            AutoCollect = {
+                Title = "Coletar Moedas",
+                Desc = "Coleta moedas automaticamente teletransportando-se pelo mapa."
+            },
+            ChatRoles = {
+                Title = "Revelar Funções",
+                Desc = "Envia de forma limpa no chat quem é o Assassino e o Xerife."
+            }
+        },
+        Intro = '<font color="#FFFFFF">Scripts por | </font><font color="#8B0000">Comunidade AKAT</font>'
+    },
+    EN = {
+        Title = "AKAT SCRIPTS",
+        Subtitle = "MM2 SCRIPT [BETA VERSION]",
+        SearchPlaceholder = "Search...",
+        ConfirmCloseTitle = "Do you want to close the script?",
+        ConfirmBtn = "Confirm",
+        CancelBtn = "Cancel",
+        Tabs = {
+            Combat = "Combat",
+            Visuals = "Visuals",
+            Movement = "Movement",
+            Teleports = "Teleports",
+            Misc = "Misc"
+        },
+        Options = {
+            AutoShoot = {
+                Title = "Shoot Murderer",
+                Desc = "Automatically aims and fires the gun at the Murderer when held."
+            },
+            Reach = {
+                Title = "Knife Reach",
+                Desc = "Significantly increases your knife attack reach."
+            },
+            ESP = {
+                Title = "Player ESP",
+                Desc = "Highlights players through walls based on their active roles."
+            },
+            Speed = {
+                Title = "WalkSpeed",
+                Desc = "Slightly increases player walkspeed up to 23."
+            },
+            AntiFling = {
+                Title = "Anti-Fling",
+                Desc = "Disables collisions to prevent other players from flinging you."
+            },
+            TpToGun = {
+                Title = "TP to Gun",
+                Desc = "Automatically teleports to the dropped gun if the Sheriff dies."
+            },
+            SafeSpot = {
+                Title = "Safe Spot",
+                Desc = "Teleports you to an invisible sky platform to remain completely safe."
+            },
+            AutoCollect = {
+                Title = "Auto Collect",
+                Desc = "Automatically teleports and collects spawned coins around the map."
+            },
+            ChatRoles = {
+                Title = "Reveal Roles",
+                Desc = "Automatically sends a message in public chat revealing active roles."
+            }
+        },
+        Intro = '<font color="#FFFFFF">Scripts by | </font><font color="#8B0000">AKAT Community</font>'
+    },
+    ES = {
+        Title = "AKAT SCRIPTS",
+        Subtitle = "MM2 SCRIPT [VERSIÓN BETA]",
+        SearchPlaceholder = "Buscar...",
+        ConfirmCloseTitle = "¿Deseas cerrar el script?",
+        ConfirmBtn = "Confirmar",
+        CancelBtn = "Cancelar",
+        Tabs = {
+            Combat = "Combate",
+            Visuales = "Visuales",
+            Movement = "Movimiento",
+            Teleports = "Teleportes",
+            Misc = "Varios"
+        },
+        Options = {
+            AutoShoot = {
+                Title = "Disparar al Asesino",
+                Desc = "Apunta y dispara la pistola automáticamente al Asesino al equiparla."
+            },
+            Reach = {
+                Title = "Alcance del Cuchillo",
+                Desc = "Aumenta considerablemente el alcance de ataque con tu cuchillo."
+            },
+            ESP = {
+                Title = "ESP Jugadores",
+                Desc = "Resalta a los jugadores a través de las paredes según sus roles."
+            },
+            Speed = {
+                Title = "Velocidad",
+                Desc = "Aumenta ligeramente la velocidad del personaje a 23."
+            },
+            AntiFling = {
+                Title = "Anti-Fling",
+                Desc = "Bloquea colisiones para evitar que te empujen o lancen."
+            },
+            TpToGun = {
+                Title = "TP a la Arma",
+                Desc = "Te teletransporta automáticamente a la pistola tirada si el Sheriff muere."
+            },
+            SafeSpot = {
+                Title = "Lugar Seguro",
+                Desc = "Te teletransporta a una plataforma invisible en el cielo para estar a salvo."
+            },
+            AutoCollect = {
+                Title = "Auto Monedas",
+                Desc = "Colecciona monedas automáticamente teletransportándose por el mapa."
+            },
+            ChatRoles = {
+                Title = "Revelar Roles",
+                Desc = "Envía automáticamente en el chat quién es el Asesino y el Sheriff."
+            }
+        },
+        Intro = '<font color="#FFFFFF">Scripts por | </font><font color="#8B0000">Comunidad AKAT</font>'
+    }
+}
+
+-- ==================== 2. VARIÁVEIS DE ESTADO GLOBAIS ====================
+local currentLanguage = "EN"
+local activeTab = "Combat"
+local tabButtons = {} 
+local menuAberto = true
+local isMinimized = false
+local hbConnection = nil 
+local renderConnection = nil
+local PlayerRoles = {}
+local originalTrans = {}
+local confirmBlur = nil
+local isConfirmOpen = false
+local wasMinimizedBeforeConfirm = false
+
+-- Estados adicionais para recursos novos
+local safePlatform = nil
+local lastPositionBeforeSafeSpot = nil
+local lastCoinCollect = 0
+local announcedThisRound = false
+local lastShootTime = 0
+
+-- ==================== 3. CRIAÇÃO DE TODA A ESTRUTURA DE INTERFACE (UI) ====================
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "DeltaAkatUniversalUI"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true 
+
+local uiParent = player:FindFirstChild("PlayerGui")
+if gethui then 
+    uiParent = gethui()
+else
+    local successCore, coreGui = pcall(function() return game:GetService("CoreGui") end)
+    if successCore and coreGui then uiParent = coreGui end
+end
+
+if uiParent:FindFirstChild("DeltaAkatUniversalUI") then 
+    pcall(function() uiParent.DeltaAkatUniversalUI:Destroy() end) 
+end
+screenGui.Parent = uiParent
+
+-- Botão Flutuante (AKAT)
+local FloatBtn = Instance.new("ImageButton", screenGui)
+FloatBtn.Name = "FloatBtn"
+FloatBtn.AnchorPoint = Vector2.new(0.5, 0.5) 
+FloatBtn.Size = UDim2.new(0, 44, 0, 44)
+FloatBtn.Position = UDim2.new(0.05, 22, 0.5, 0)
+FloatBtn.Image = "rbxthumb://type=Asset&id=74407434556912&w=420&h=420"
+FloatBtn.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+FloatBtn.Visible = false 
+FloatBtn.ZIndex = 30
+
+local floatCorner = Instance.new("UICorner", FloatBtn)
+floatCorner.CornerRadius = UDim.new(0, 8) 
+local FloatStroke = Instance.new("UIStroke", FloatBtn)
+FloatStroke.Color = Color3.fromHex("#8B0000")
+FloatStroke.Thickness = 1
+
+-- Wrapper Principal
+local mainWrapper = Instance.new("Frame")
+mainWrapper.Name = "MainWrapper"
+mainWrapper.AnchorPoint = Vector2.new(0.5, 0)
+mainWrapper.Size = UDim2.new(0, 520, 0, 300)
+mainWrapper.Position = UDim2.new(0.5, 0, 0.5, -150)
+mainWrapper.BackgroundTransparency = 1
+mainWrapper.ClipsDescendants = false
+mainWrapper.Visible = false
+mainWrapper.Parent = screenGui
+
+local shadow3D = Instance.new("ImageLabel")
+shadow3D.Name = "Shadow3D"
+shadow3D.AnchorPoint = Vector2.new(0.5, 0.5)
+shadow3D.Position = UDim2.new(0.5, 0, 0.5, 4)
+shadow3D.Size = UDim2.new(1, 40, 1, 40)
+shadow3D.BackgroundTransparency = 1
+shadow3D.Image = "rbxassetid://6014261993"
+shadow3D.ImageColor3 = Color3.fromRGB(0, 0, 0)
+shadow3D.ImageTransparency = 0.5 
+shadow3D.ScaleType = Enum.ScaleType.Slice
+shadow3D.SliceCenter = Rect.new(49, 49, 450, 450)
+shadow3D.ZIndex = 1
+shadow3D.Parent = mainWrapper
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(1, 0, 1, 0)
+mainFrame.BackgroundColor3 = Color3.fromHex("#0A0A0A")
+mainFrame.BorderSizePixel = 0
+mainFrame.ClipsDescendants = true 
+mainFrame.ZIndex = 5
+local mainCorner = Instance.new("UICorner", mainFrame)
+mainCorner.CornerRadius = UDim.new(0, 9)
+
+local frameStroke = Instance.new("UIStroke", mainFrame)
+frameStroke.Color = Color3.fromHex("#161616")
+frameStroke.Thickness = 1
+mainFrame.Parent = mainWrapper
+
+-- TopBar
+local topBar = Instance.new("Frame", mainFrame)
+topBar.Name = "TopBar"
+topBar.Size = UDim2.new(1, 0, 0, 52)
+topBar.BackgroundTransparency = 1
+topBar.ZIndex = 6
+
+local title = Instance.new("TextLabel", topBar)
+title.Name = "Title"
+title.Size = UDim2.new(0, 200, 0, 22)
+title.Position = UDim2.new(0, 16, 0, 10)
+title.BackgroundTransparency = 1
+title.Text = "AKAT SCRIPTS"
+title.TextColor3 = Color3.fromHex("#8B0000")
+title.TextSize = 16
+title.Font = Enum.Font.GothamBold
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.ZIndex = 6
+
+local subtitle = Instance.new("TextLabel", topBar)
+subtitle.Name = "Subtitle"
+subtitle.Size = UDim2.new(0, 200, 0, 14)
+subtitle.Position = UDim2.new(0, 16, 0, 28)
+subtitle.BackgroundTransparency = 1
+subtitle.Text = "MM2 SCRIPT [BETA]"
+subtitle.TextColor3 = Color3.fromHex("#555555")
+subtitle.TextSize = 10
+subtitle.Font = Enum.Font.Gotham
+subtitle.TextXAlignment = Enum.TextXAlignment.Left
+subtitle.ZIndex = 6
+
+-- Barra de Pesquisa Animada
+local searchBarFrame = Instance.new("Frame", topBar)
+searchBarFrame.Name = "SearchBarFrame"
+searchBarFrame.AnchorPoint = Vector2.new(1, 0.5)
+searchBarFrame.Position = UDim2.new(1, -154, 0.5, 0)
+searchBarFrame.Size = UDim2.new(0, 0, 0, 26) 
+searchBarFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+searchBarFrame.ClipsDescendants = true
+searchBarFrame.ZIndex = 7
+
+local searchCorner = Instance.new("UICorner", searchBarFrame)
+searchCorner.CornerRadius = UDim.new(0, 13) 
+local searchStroke = Instance.new("UIStroke", searchBarFrame)
+searchStroke.Color = Color3.fromHex("#1F1F1F")
+searchStroke.Thickness = 1
+
+local searchTextBox = Instance.new("TextBox", searchBarFrame)
+searchTextBox.Name = "SearchTextBox"
+searchTextBox.Size = UDim2.new(1, -20, 1, 0)
+searchTextBox.Position = UDim2.new(0, 12, 0, 0)
+searchTextBox.BackgroundTransparency = 1
+searchTextBox.PlaceholderText = "Pesquisar..."
+searchTextBox.PlaceholderColor3 = Color3.fromRGB(100, 100, 100)
+searchTextBox.Text = ""
+searchTextBox.TextColor3 = Color3.fromRGB(230, 230, 230)
+searchTextBox.Font = Enum.Font.Gotham
+searchTextBox.TextSize = 11
+searchTextBox.TextXAlignment = Enum.TextXAlignment.Left
+searchTextBox.ZIndex = 8
+
+-- Alinhamento de Todos os Botões Superiores
+local topButtons = Instance.new("Frame", topBar)
+topButtons.Size = UDim2.new(0, 128, 0, 26) 
+topButtons.Position = UDim2.new(1, -144, 0.5, -13) 
+topButtons.BackgroundTransparency = 1
+topButtons.ZIndex = 6
+
+local UIListTop = Instance.new("UIListLayout", topButtons)
+UIListTop.FillDirection = Enum.FillDirection.Horizontal
+UIListTop.HorizontalAlignment = Enum.HorizontalAlignment.Right
+UIListTop.VerticalAlignment = Enum.VerticalAlignment.Center
+UIListTop.Padding = UDim.new(0, 8)
+UIListTop.SortOrder = Enum.SortOrder.LayoutOrder
+
+-- Botão de Idioma
+local LanguageBtn = Instance.new("TextButton", topButtons)
+LanguageBtn.Name = "LanguageBtn"
+LanguageBtn.LayoutOrder = 0
+LanguageBtn.Size = UDim2.new(0, 26, 0, 26)
+LanguageBtn.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
+LanguageBtn.Text = currentLanguage
+LanguageBtn.TextColor3 = Color3.fromRGB(160, 160, 160)
+LanguageBtn.Font = Enum.Font.GothamBold
+LanguageBtn.TextSize = 10
+LanguageBtn.ZIndex = 7
+Instance.new("UICorner", LanguageBtn).CornerRadius = UDim.new(0, 5)
+
+-- Botão da Lupa de Pesquisa
+local SearchBtn = Instance.new("TextButton", topButtons)
+SearchBtn.Name = "SearchBtn"
+SearchBtn.LayoutOrder = 1
+SearchBtn.Size = UDim2.new(0, 26, 0, 26)
+SearchBtn.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
+SearchBtn.Text = ""
+SearchBtn.ZIndex = 7
+Instance.new("UICorner", SearchBtn).CornerRadius = UDim.new(0, 5)
+
+local SearchIcon = Instance.new("Frame", SearchBtn)
+SearchIcon.Name = "Icon"
+SearchIcon.Size = UDim2.new(0, 14, 0, 14)
+SearchIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+SearchIcon.Position = UDim2.new(0.5, 0, 0.5, 0)
+SearchIcon.BackgroundTransparency = 1
+SearchIcon.ZIndex = 8
+
+local SearchCircle = Instance.new("Frame", SearchIcon)
+SearchCircle.Name = "Circle"
+SearchCircle.Size = UDim2.new(0, 8, 0, 8)
+SearchCircle.Position = UDim2.new(0, 1, 0, 1)
+SearchCircle.BackgroundTransparency = 1
+SearchCircle.ZIndex = 8
+Instance.new("UICorner", SearchCircle).CornerRadius = UDim.new(1, 0)
+local circleStroke = Instance.new("UIStroke", SearchCircle)
+circleStroke.Color = Color3.fromHex("#A0A0A0")
+circleStroke.Thickness = 1 
+
+local SearchHandle = Instance.new("Frame", SearchIcon)
+SearchHandle.Name = "Handle"
+SearchHandle.Size = UDim2.new(0, 1, 0, 5) 
+SearchHandle.Position = UDim2.new(0, 9, 0, 8)
+SearchHandle.Rotation = -45
+SearchHandle.BackgroundColor3 = Color3.fromHex("#A0A0A0")
+SearchHandle.BorderSizePixel = 0
+SearchHandle.ZIndex = 8
+
+-- Botão de Minimizar
+local MinimizeBtn = Instance.new("TextButton", topButtons)
+MinimizeBtn.Name = "MinimizeBtn"
+MinimizeBtn.LayoutOrder = 2
+MinimizeBtn.Size = UDim2.new(0, 26, 0, 26)
+MinimizeBtn.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
+MinimizeBtn.Text = "" 
+MinimizeBtn.ZIndex = 7
+Instance.new("UICorner", MinimizeBtn).CornerRadius = UDim.new(0, 5)
+
+local MinimizeLine = Instance.new("Frame", MinimizeBtn)
+MinimizeLine.Name = "Line"
+MinimizeLine.AnchorPoint = Vector2.new(0.5, 0.5)
+MinimizeLine.Position = UDim2.new(0.5, 0, 0.5, 0)
+MinimizeLine.Size = UDim2.new(0, 10, 0, 1)
+MinimizeLine.BackgroundColor3 = Color3.fromHex("#A0A0A0")
+MinimizeLine.BorderSizePixel = 0
+MinimizeLine.ZIndex = 8
+
+-- Botão de Fechar
+local CloseBtn = Instance.new("TextButton", topButtons)
+CloseBtn.Name = "CloseBtn"
+CloseBtn.LayoutOrder = 3 
+CloseBtn.Size = UDim2.new(0, 26, 0, 26)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
+CloseBtn.Text = ""
+CloseBtn.ZIndex = 7
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 5)
+
+local CloseLine1 = Instance.new("Frame", CloseBtn)
+CloseLine1.Name = "Line1"
+CloseLine1.AnchorPoint = Vector2.new(0.5, 0.5)
+CloseLine1.Position = UDim2.new(0.5, 0, 0.5, 0)
+CloseLine1.Size = UDim2.new(0, 10, 0, 1)
+CloseLine1.Rotation = 45
+CloseLine1.BackgroundColor3 = Color3.fromHex("#A0A0A0")
+CloseLine1.BorderSizePixel = 0
+CloseLine1.ZIndex = 8
+
+local CloseLine2 = Instance.new("Frame", CloseBtn)
+CloseLine2.Name = "Line2"
+CloseLine2.AnchorPoint = Vector2.new(0.5, 0.5)
+CloseLine2.Position = UDim2.new(0.5, 0, 0.5, 0)
+CloseLine2.Size = UDim2.new(0, 10, 0, 1)
+CloseLine2.Rotation = -45
+CloseLine2.BackgroundColor3 = Color3.fromHex("#A0A0A0")
+CloseLine2.BorderSizePixel = 0
+CloseLine2.ZIndex = 8
+
+-- Divisor Horizontal
+local div = Instance.new("Frame", mainFrame)
+div.Size = UDim2.new(1, 0, 0, 1)
+div.Position = UDim2.new(0, 0, 0, 52)
+div.BackgroundColor3 = Color3.fromHex("#121212")
+div.BorderSizePixel = 0
+div.ZIndex = 6
+
+-- Painel Lateral (Sidebar)
+local SidebarFrame = Instance.new("Frame", mainFrame)
+SidebarFrame.Name = "SidebarFrame"
+SidebarFrame.Size = UDim2.new(0, 140, 1, -53)
+SidebarFrame.Position = UDim2.new(0, 0, 0, 53)
+SidebarFrame.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
+SidebarFrame.BorderSizePixel = 0
+SidebarFrame.ZIndex = 6
+
+local SidebarCorner = Instance.new("UICorner", SidebarFrame)
+SidebarCorner.CornerRadius = UDim.new(0, 9)
+
+local SidebarSeparator = Instance.new("Frame", SidebarFrame)
+SidebarSeparator.Size = UDim2.new(0, 1, 1, 0)
+SidebarSeparator.Position = UDim2.new(1, 0, 0, 0)
+SidebarSeparator.BackgroundColor3 = Color3.fromHex("#121212")
+SidebarSeparator.BorderSizePixel = 0
+SidebarSeparator.ZIndex = 6
+
+local ProfileDiv = Instance.new("Frame", SidebarFrame)
+ProfileDiv.Size = UDim2.new(1, 0, 0, 1)
+ProfileDiv.Position = UDim2.new(0, 0, 1, -66)
+ProfileDiv.BackgroundColor3 = Color3.fromHex("#121212")
+ProfileDiv.BorderSizePixel = 0
+ProfileDiv.ZIndex = 6
+
+local TabsContainer = Instance.new("ScrollingFrame", SidebarFrame)
+TabsContainer.Name = "TabsContainer"
+TabsContainer.Size = UDim2.new(1, 0, 1, -65)
+TabsContainer.Position = UDim2.new(0, 0, 0, 5)
+TabsContainer.BackgroundTransparency = 1
+TabsContainer.BorderSizePixel = 0
+TabsContainer.ScrollBarThickness = 0
+TabsContainer.ZIndex = 7
+TabsContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
+TabsContainer.ElasticBehavior = Enum.ElasticBehavior.Never 
+pcall(function() TabsContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y end)
+
+local TabsLayout = Instance.new("UIListLayout", TabsContainer)
+TabsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+TabsLayout.Padding = UDim.new(0, 6)
+TabsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+-- Perfil de Usuário
+local UserProfileFrame = Instance.new("Frame", SidebarFrame)
+UserProfileFrame.Name = "UserProfileFrame"
+UserProfileFrame.Size = UDim2.new(1, -16, 0, 50)
+UserProfileFrame.Position = UDim2.new(0, 8, 1, -58)
+UserProfileFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15) 
+UserProfileFrame.BorderSizePixel = 0
+UserProfileFrame.ZIndex = 7
+
+local ProfileCorner = Instance.new("UICorner", UserProfileFrame)
+ProfileCorner.CornerRadius = UDim.new(0, 6)
+local ProfileBorder = Instance.new("UIStroke", UserProfileFrame)
+ProfileBorder.Color = Color3.fromRGB(24, 24, 24)
+ProfileBorder.Thickness = 1
+
+local AvatarImage = Instance.new("ImageLabel", UserProfileFrame)
+AvatarImage.Name = "AvatarImage"
+AvatarImage.Size = UDim2.new(0, 32, 0, 32)
+AvatarImage.Position = UDim2.new(0, 10, 0.5, -16)
+AvatarImage.BackgroundTransparency = 1
+AvatarImage.Image = "rbxthumb://type=AvatarHeadShot&id=" .. player.UserId .. "&w=150&h=150"
+AvatarImage.ZIndex = 8
+Instance.new("UICorner", AvatarImage).CornerRadius = UDim.new(1, 0)
+
+local DisplayNameLabel = Instance.new("TextLabel", UserProfileFrame)
+DisplayNameLabel.Name = "DisplayNameLabel"
+DisplayNameLabel.Size = UDim2.new(1, -54, 0, 14)
+DisplayNameLabel.Position = UDim2.new(0, 48, 0.5, -14)
+DisplayNameLabel.BackgroundTransparency = 1
+DisplayNameLabel.Text = player.DisplayName
+DisplayNameLabel.TextColor3 = Color3.fromRGB(235, 235, 235)
+DisplayNameLabel.Font = Enum.Font.GothamBold
+DisplayNameLabel.TextSize = 11
+DisplayNameLabel.TextXAlignment = Enum.TextXAlignment.Left
+DisplayNameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+DisplayNameLabel.ZIndex = 8
+
+local UsernameLabel = Instance.new("TextLabel", UserProfileFrame)
+UsernameLabel.Name = "UsernameLabel"
+UsernameLabel.Size = UDim2.new(1, -54, 0, 12)
+UsernameLabel.Position = UDim2.new(0, 48, 0.5, 0)
+UsernameLabel.BackgroundTransparency = 1
+UsernameLabel.Text = "@" .. player.Name
+UsernameLabel.TextColor3 = Color3.fromRGB(130, 130, 130)
+UsernameLabel.Font = Enum.Font.Gotham
+UsernameLabel.TextSize = 9
+UsernameLabel.TextXAlignment = Enum.TextXAlignment.Left
+UsernameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+UsernameLabel.ZIndex = 8
+
+-- Container Principal de Toggles
+local togglesContainer = Instance.new("ScrollingFrame", mainFrame)
+togglesContainer.Name = "TogglesContainer"
+togglesContainer.Size = UDim2.new(1, -156, 1, -66)
+togglesContainer.Position = UDim2.new(0, 148, 0, 58)
+togglesContainer.BackgroundTransparency = 1
+togglesContainer.BorderSizePixel = 0
+togglesContainer.ScrollBarThickness = 0
+togglesContainer.ZIndex = 6
+togglesContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
+togglesContainer.ElasticBehavior = Enum.ElasticBehavior.Never 
+pcall(function() togglesContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y end)
+
+local containerLayout = Instance.new("UIListLayout", togglesContainer)
+containerLayout.SortOrder = Enum.SortOrder.LayoutOrder
+containerLayout.Padding = UDim.new(0, 6)
+containerLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+local uiPadding = Instance.new("UIPadding", togglesContainer)
+uiPadding.PaddingBottom = UDim.new(0, 8)
+
+-- Painel de Confirmação para Fechar
+local confirmFrame = Instance.new("Frame", mainFrame)
+confirmFrame.Name = "ConfirmFrame"
+confirmFrame.Size = UDim2.new(1, 0, 1, 0)
+confirmFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+confirmFrame.BackgroundTransparency = 0.4
+confirmFrame.Visible = false
+confirmFrame.ZIndex = 50
+Instance.new("UICorner", confirmFrame).CornerRadius = UDim.new(0, 9)
+
+local confirmLabel = Instance.new("TextLabel", confirmFrame)
+confirmLabel.Size = UDim2.new(1, 0, 0, 30)
+confirmLabel.Position = UDim2.new(0, 0, 0.35, -10)
+confirmLabel.BackgroundTransparency = 1
+confirmLabel.Text = "Deseja fechar o script?"
+confirmLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
+confirmLabel.Font = Enum.Font.GothamBold
+confirmLabel.TextSize = 14
+confirmLabel.ZIndex = 51
+
+local btnYes = Instance.new("TextButton", confirmFrame)
+btnYes.Size = UDim2.new(0, 110, 0, 34)
+btnYes.Position = UDim2.new(0.5, -115, 0.55, 0)
+btnYes.BackgroundColor3 = Color3.fromHex("#8B0000")
+btnYes.Text = "Confirmar"
+btnYes.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnYes.Font = Enum.Font.GothamMedium
+btnYes.TextSize = 12
+btnYes.ZIndex = 51
+Instance.new("UICorner", btnYes).CornerRadius = UDim.new(0, 6)
+
+local btnNo = Instance.new("TextButton", confirmFrame)
+btnNo.Size = UDim2.new(0, 110, 0, 34)
+btnNo.Position = UDim2.new(0.5, 5, 0.55, 0)
+btnNo.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
+btnNo.Text = "Cancelar"
+btnNo.TextColor3 = Color3.fromRGB(180, 180, 180)
+btnNo.Font = Enum.Font.GothamMedium
+btnNo.TextSize = 12
+btnNo.ZIndex = 51
+Instance.new("UICorner", btnNo).CornerRadius = UDim.new(0, 6)
+
+
+-- ==================== 4. FUNÇÕES DE SUPORTE E DE EXECUÇÃO ====================
+
+local function DetectarRoleReal(p)
+    if not p or not p.Parent then return "Survivor" end
+    local char = p.Character
+    local backpack = p:FindFirstChild("Backpack")
+    
+    local function checarPasta(pasta)
+        if not pasta then return nil end
+        if pasta:FindFirstChild("Knife") then return "Murderer" end
+        if pasta:FindFirstChild("Gun") or pasta:FindFirstChild("Sheriff") then return "Sheriff" end
+        for _, item in ipairs(pasta:GetChildren()) do
+            if item:IsA("Tool") then
+                local nome = item.Name:lower()
+                if nome:find("knife") or nome:find("faca") or nome:find("sword") or nome:find("cutelo") then
+                    return "Murderer"
+                elseif nome:find("gun") or nome:find("pistol") or nome:find("revolver") or nome:find("sheriff") or nome:find("arma") then
+                    return "Sheriff"
+                end
+            end
+        end
+        return nil
+    end
+    
+    local roleChar = checarPasta(char)
+    if roleChar then return roleChar end
+    local roleBP = checarPasta(backpack)
+    if roleBP then return roleBP end
+    
+    local nativeRole = p:GetAttribute("Role") or p:GetAttribute("role") or p:GetAttribute("Funcao")
+    local roleStr = nativeRole and string.lower(tostring(nativeRole)) or ""
+    if string.find(roleStr, "murder") or string.find(roleStr, "assassino") then return "Murderer" end
+    if string.find(roleStr, "sheriff") or string.find(roleStr, "xerife") or string.find(roleStr, "hero") then return "Sheriff" end
+    return "Survivor"
+end
+
+local function ObterMurderer()
+    local closestMurderer = nil
+    local closestDistance = math.huge
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            local targetHum = p.Character:FindFirstChildOfClass("Humanoid")
+            if targetHum and targetHum.Health > 0 and (PlayerRoles[p] == "Murderer") then
+                local playerRoot = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+                if playerRoot then
+                    local dist = (playerRoot.Position - p.Character.HumanoidRootPart.Position).Magnitude
+                    if dist < closestDistance then
+                        closestDistance = dist
+                        closestMurderer = p
+                    end
+                end
+            end
+        end
+    end
+    return closestMurderer, closestDistance
+end
+
+local function RegistrarTransparencias(objeto)
+    if originalTrans[objeto] then return end
+    if objeto:IsA("Frame") or objeto:IsA("ScrollingFrame") then
+        originalTrans[objeto] = { BackgroundTransparency = objeto.BackgroundTransparency }
+    elseif objeto:IsA("TextLabel") or objeto:IsA("TextButton") or objeto:IsA("TextBox") then
+        originalTrans[objeto] = { 
+            TextTransparency = objeto.TextTransparency, 
+            BackgroundTransparency = objeto.BackgroundTransparency,
+            TextStrokeTransparency = objeto.TextStrokeTransparency or 1
+        }
+    elseif objeto:IsA("ImageLabel") or objeto:IsA("ImageButton") then
+        originalTrans[objeto] = { 
+            ImageTransparency = objeto.ImageTransparency, 
+            BackgroundTransparency = objeto.BackgroundTransparency 
+        }
+    elseif objeto:IsA("UIStroke") then
+        originalTrans[objeto] = { Transparency = objeto.Transparency }
+    end
+end
+
+local function AplicarFadeSincronizado(raiz, fadeOut, duracao)
+    local info = TweenInfo.new(duracao, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    local function tratarObjeto(obj)
+        RegistrarTransparencias(obj)
+        local orig = originalTrans[obj]
+        if not orig then return end
+        
+        if orig.BackgroundTransparency then
+            local target = fadeOut and 1 or orig.BackgroundTransparency
+            if duracao == 0 then obj.BackgroundTransparency = target else TweenService:Create(obj, info, {BackgroundTransparency = target}):Play() end
+        end
+        if orig.TextTransparency then
+            local target = fadeOut and 1 or orig.TextTransparency
+            if duracao == 0 then obj.TextTransparency = target else TweenService:Create(obj, info, {TextTransparency = target}):Play() end
+        end
+        if orig.TextStrokeTransparency then
+            local target = fadeOut and 1 or orig.TextStrokeTransparency
+            if duracao == 0 then obj.TextStrokeTransparency = target else TweenService:Create(obj, info, {TextStrokeTransparency = target}):Play() end
+        end
+        if orig.ImageTransparency then
+            local target = fadeOut and 1 or (obj.Name == "Shadow3D" and 0.5 or orig.ImageTransparency)
+            if duracao == 0 then obj.ImageTransparency = target else TweenService:Create(obj, info, {ImageTransparency = target}):Play() end
+        end
+        if orig.Transparency then
+            local target = fadeOut and 1 or orig.Transparency
+            if duracao == 0 then obj.Transparency = target else TweenService:Create(obj, info, {Transparency = target}):Play() end
+        end
+    end
+    tratarObjeto(raiz)
+    for _, desc in ipairs(raiz:GetDescendants()) do tratarObjeto(desc) end
+end
+
+local function CriarIconeProcedural(parent, tabName)
+    local iconContainer = Instance.new("Frame", parent)
+    iconContainer.Name = "Icon"
+    iconContainer.Size = UDim2.new(0, 16, 0, 16)
+    iconContainer.Position = UDim2.new(0, 12, 0.5, -8)
+    iconContainer.BackgroundTransparency = 1
+    iconContainer.ZIndex = 9
+    
+    if tabName == "Combat" then
+        local circle = Instance.new("Frame", iconContainer)
+        circle.Size = UDim2.new(0, 10, 0, 10)
+        circle.Position = UDim2.new(0.5, -5, 0.5, -5)
+        circle.BackgroundTransparency = 1
+        circle.ZIndex = 9
+        Instance.new("UICorner", circle).CornerRadius = UDim.new(1, 0)
+        
+        local stroke = Instance.new("UIStroke", circle)
+        stroke.Color = Color3.fromRGB(180, 180, 180)
+        stroke.Thickness = 1.5
+        stroke.Name = "AccentStroke"
+        
+        local dot = Instance.new("Frame", iconContainer)
+        dot.Size = UDim2.new(0, 4, 0, 4)
+        dot.Position = UDim2.new(0.5, -2, 0.5, -2)
+        dot.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
+        dot.BorderSizePixel = 0
+        dot.ZIndex = 10
+        Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
+        dot.Name = "AccentFill"
+        
+        local function rLine(x, y, w, h)
+            local l = Instance.new("Frame", iconContainer)
+            l.Size = UDim2.new(0, w, 0, h)
+            l.Position = UDim2.new(0.5, x, 0.5, y)
+            l.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
+            l.BorderSizePixel = 0
+            l.ZIndex = 10
+            l.Name = "AccentFill"
+        end
+        rLine(-1, -8, 2, 2)
+        rLine(-1, 6, 2, 2)
+        rLine(-8, -1, 2, 2)
+        rLine(6, -1, 2, 2)
+        
+    elseif tabName == "Visuals" then
+        local eyeContour = Instance.new("Frame", iconContainer)
+        eyeContour.Size = UDim2.new(0, 14, 0, 8)
+        eyeContour.Position = UDim2.new(0.5, -7, 0.5, -4)
+        eyeContour.BackgroundTransparency = 1
+        eyeContour.ZIndex = 9
+        Instance.new("UICorner", eyeContour).CornerRadius = UDim.new(0.5, 0)
+        
+        local stroke = Instance.new("UIStroke", eyeContour)
+        stroke.Color = Color3.fromRGB(180, 180, 180)
+        stroke.Thickness = 1.5
+        stroke.Name = "AccentStroke"
+        
+        local pupil = Instance.new("Frame", eyeContour)
+        pupil.Size = UDim2.new(0, 6, 0, 6)
+        pupil.Position = UDim2.new(0.5, -3, 0.5, -3)
+        pupil.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
+        pupil.BorderSizePixel = 0
+        pupil.ZIndex = 10
+        Instance.new("UICorner", pupil).CornerRadius = UDim.new(1, 0)
+        pupil.Name = "AccentFill"
+        
+        local reflection = Instance.new("Frame", pupil)
+        reflection.Size = UDim2.new(0, 2, 0, 2)
+        reflection.Position = UDim2.new(0.5, -2, 0.5, -2)
+        reflection.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        reflection.BorderSizePixel = 0
+        reflection.ZIndex = 11
+        reflection.Name = "StaticWhite"
+        Instance.new("UICorner", reflection).CornerRadius = UDim.new(1, 0)
+        
+    elseif tabName == "Movement" then
+        local function buildTrail(x, y, w)
+            local t = Instance.new("Frame", iconContainer)
+            t.Size = UDim2.new(0, w, 0, 2)
+            t.Position = UDim2.new(0, x, 0, y)
+            t.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
+            t.BorderSizePixel = 0
+            t.ZIndex = 9
+            t.Name = "AccentFill"
+            Instance.new("UICorner", t).CornerRadius = UDim.new(1, 0)
+        end
+        buildTrail(3, 3, 10)
+        buildTrail(0, 7, 14)
+        buildTrail(5, 11, 8)
+
+    elseif tabName == "Teleports" then
+        local line1 = Instance.new("Frame", iconContainer)
+        line1.Size = UDim2.new(0, 10, 0, 2)
+        line1.Position = UDim2.new(0.5, -5, 0.5, 3)
+        line1.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
+        line1.BorderSizePixel = 0
+        line1.ZIndex = 9
+        line1.Name = "AccentFill"
+        
+        local line2 = Instance.new("Frame", iconContainer)
+        line2.Size = UDim2.new(0, 2, 0, 8)
+        line2.Position = UDim2.new(0.5, 3, 0.5, -5)
+        line2.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
+        line2.BorderSizePixel = 0
+        line2.ZIndex = 9
+        line2.Name = "AccentFill"
+        
+        local arrow = Instance.new("Frame", iconContainer)
+        arrow.Size = UDim2.new(0, 6, 0, 6)
+        arrow.Position = UDim2.new(0.5, 1, 0.5, -5)
+        arrow.Rotation = 45
+        arrow.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
+        arrow.BorderSizePixel = 0
+        arrow.ZIndex = 9
+        arrow.Name = "AccentFill"
+
+    elseif tabName == "Misc" then
+        for i = 1, 3 do
+            local dot = Instance.new("Frame", iconContainer)
+            dot.Size = UDim2.new(0, 3, 0, 3)
+            dot.Position = UDim2.new(0, (i-1)*5 + 2, 0.5, -1)
+            dot.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
+            dot.BorderSizePixel = 0
+            dot.ZIndex = 9
+            dot.Name = "AccentFill"
+            Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
+        end
+    end
+end
+
+local function RecolorirIcone(iconContainer, targetColor, animSpeed)
+    if not iconContainer then return end
+    for _, child in ipairs(iconContainer:GetDescendants()) do
+        if child.Name == "AccentStroke" and child:IsA("UIStroke") then
+            TweenService:Create(child, animSpeed, {Color = targetColor}):Play()
+        elseif child.Name == "AccentFill" and child:IsA("Frame") then
+            TweenService:Create(child, animSpeed, {BackgroundColor3 = targetColor}):Play()
+        end
+    end
+end
+
+-- Função centralizada de tradução de Idiomas
+local function AtualizarIdioma()
+    local langData = Locales[currentLanguage]
+    if not langData then return end
+    
+    -- Atualizando textos cabeçalho
+    title.Text = langData.Title
+    subtitle.Text = langData.Subtitle
+    searchTextBox.PlaceholderText = langData.SearchPlaceholder
+    
+    -- Atualizando abas (Tabs)
+    for tabName, btn in pairs(tabButtons) do
+        local label = btn:FindFirstChild("Label")
+        if label then
+            label.Text = langData.Tabs[tabName] or tabName
+        end
+    end
+    
+    -- Atualizando opções (Toggles)
+    for _, child in ipairs(togglesContainer:GetChildren()) do
+        if child:IsA("Frame") and child.Name ~= "UIListLayout" and child.Name ~= "UIPadding" then
+            local configKey = child:GetAttribute("ConfigKey")
+            if configKey and langData.Options[configKey] then
+                local titleLabel = child:FindFirstChild("Title")
+                local descLabel = child:FindFirstChild("Description")
+                if titleLabel then titleLabel.Text = langData.Options[configKey].Title end
+                if descLabel then descLabel.Text = langData.Options[configKey].Desc end
+            end
+        end
+    end
+    
+    -- Atualizando Janela de confirmação
+    confirmLabel.Text = langData.ConfirmCloseTitle
+    btnYes.Text = langData.ConfirmBtn
+    btnNo.Text = langData.CancelBtn
+end
+
+local function filterToggles(currentActiveTab, query)
+    local searchQuery = (query or ""):lower()
+    for _, child in ipairs(togglesContainer:GetChildren()) do
+        if child:IsA("Frame") and child.Name ~= "UIListLayout" and child.Name ~= "UIPadding" then
+            local itemTab = child:GetAttribute("Tab") or "Combat"
+            if searchQuery ~= "" then
+                local titleLabel = child:FindFirstChild("Title")
+                local match = titleLabel and titleLabel.Text:lower():find(searchQuery) ~= nil
+                child.Visible = match
+            else
+                child.Visible = (itemTab == currentActiveTab)
+            end
+        end
+    end
+end
+
+local function selectTab(tabName)
+    activeTab = tabName
+    local animSpeed = TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    
+    for name, btn in pairs(tabButtons) do
+        local label = btn:FindFirstChild("Label")
+        local iconContainer = btn:FindFirstChild("Icon")
+        if name == tabName then
+            TweenService:Create(btn, animSpeed, {BackgroundColor3 = Color3.fromHex("#8B0000")}):Play()
+            if label then TweenService:Create(label, animSpeed, {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play() end
+            RecolorirIcone(iconContainer, Color3.fromRGB(255, 255, 255), animSpeed)
+        else
+            TweenService:Create(btn, animSpeed, {BackgroundColor3 = Color3.fromRGB(15, 15, 15)}):Play()
+            if label then TweenService:Create(label, animSpeed, {TextColor3 = Color3.fromRGB(180, 180, 180)}):Play() end
+            RecolorirIcone(iconContainer, Color3.fromRGB(180, 180, 180), animSpeed)
+        end
+    end
+    searchTextBox.Text = "" 
+    filterToggles(tabName, "")
+end
+
+local function createTabBtn(tabName)
+    local tabBtn = Instance.new("TextButton", TabsContainer)
+    tabBtn.Name = tabName .. "TabBtn"
+    tabBtn.Size = UDim2.new(1, -16, 0, 32)
+    tabBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+    tabBtn.Text = "" 
+    tabBtn.ZIndex = 8
+    tabBtn.AutoButtonColor = false
+    
+    local corner = Instance.new("UICorner", tabBtn)
+    corner.CornerRadius = UDim.new(0, 5)
+    
+    CriarIconeProcedural(tabBtn, tabName)
+    
+    local tabLabel = Instance.new("TextLabel", tabBtn)
+    tabLabel.Name = "Label"
+    tabLabel.Size = UDim2.new(1, -44, 1, 0)
+    tabLabel.Position = UDim2.new(0, 36, 0, 0)
+    tabLabel.BackgroundTransparency = 1
+    tabLabel.Text = Locales[currentLanguage].Tabs[tabName] or tabName
+    tabLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+    tabLabel.Font = Enum.Font.GothamMedium
+    tabLabel.TextSize = 11
+    tabLabel.TextXAlignment = Enum.TextXAlignment.Left
+    tabLabel.ZIndex = 9
+    
+    tabBtn.MouseButton1Down:Connect(function()
+        TweenService:Create(tabBtn, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = UDim2.new(1, -24, 0, 30)
+        }):Play()
+    end)
+    
+    local function restaurarTamanho()
+        TweenService:Create(tabBtn, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Size = UDim2.new(1, -16, 0, 32)
+        }):Play()
+    end
+    
+    tabBtn.MouseButton1Up:Connect(restaurarTamanho)
+    
+    tabBtn.MouseLeave:Connect(function()
+        restaurarTamanho()
+        if activeTab ~= tabName then
+            TweenService:Create(tabBtn, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundColor3 = Color3.fromRGB(15, 15, 15)}):Play()
+            TweenService:Create(tabLabel, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {TextColor3 = Color3.fromRGB(180, 180, 180)}):Play()
+            RecolorirIcone(tabBtn:FindFirstChild("Icon"), Color3.fromRGB(180, 180, 180), TweenInfo.new(0.2, Enum.EasingStyle.Quad))
+        end
+    end)
+    
+    tabBtn.MouseEnter:Connect(function()
+        if activeTab ~= tabName then
+            TweenService:Create(tabBtn, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundColor3 = Color3.fromRGB(22, 22, 22)}):Play()
+            TweenService:Create(tabLabel, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {TextColor3 = Color3.fromRGB(220, 220, 220)}):Play()
+            RecolorirIcone(tabBtn:FindFirstChild("Icon"), Color3.fromRGB(220, 220, 220), TweenInfo.new(0.2, Enum.EasingStyle.Quad))
+        end
+    end)
+    
+    tabBtn.MouseButton1Click:Connect(function()
+        selectTab(tabName)
+    end)
+    
+    tabButtons[tabName] = tabBtn
+end
+
+-- Callbacks customizados para ações de ativação de recursos
+local ConfigCallbacks = {
+    SafeSpot = function(enabled)
+        local char = player.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+        
+        if enabled then
+            lastPositionBeforeSafeSpot = root.CFrame
+            if not safePlatform or not safePlatform.Parent then
+                safePlatform = Instance.new("Part")
+                safePlatform.Name = "AkatSafePlatform"
+                safePlatform.Size = Vector3.new(15, 1, 15)
+                safePlatform.Position = Vector3.new(root.Position.X, 900, root.Position.Z)
+                safePlatform.Anchored = true
+                safePlatform.Transparency = 0.4
+                safePlatform.Material = Enum.Material.ForceField
+                safePlatform.Color = Color3.fromHex("#8B0000")
+                safePlatform.Parent = workspace
+            end
+            root.CFrame = safePlatform.CFrame * CFrame.new(0, 3, 0)
+        else
+            if safePlatform then
+                safePlatform:Destroy()
+                safePlatform = nil
+            end
+            if lastPositionBeforeSafeSpot then
+                root.CFrame = lastPositionBeforeSafeSpot
+                lastPositionBeforeSafeSpot = nil
+            end
+        end
+    end
+}
+
+local function createToggle(parent, configKey, tabCategory)
+    local toggleFrame = Instance.new("Frame")
+    toggleFrame.Name = configKey
+    toggleFrame.Size = UDim2.new(1, -8, 0, 48) 
+    toggleFrame.BackgroundColor3 = Color3.fromHex("#0F0F0F")
+    toggleFrame.ZIndex = 6
+    toggleFrame:SetAttribute("Tab", tabCategory)
+    toggleFrame:SetAttribute("ConfigKey", configKey)
+    toggleFrame.Parent = parent
+    
+    Instance.new("UICorner", toggleFrame).CornerRadius = UDim.new(0, 6)
+    local stroke = Instance.new("UIStroke", toggleFrame)
+    stroke.Color = Color3.fromHex("#141414")
+    stroke.Thickness = 1
+    
+    local titleLabel = Instance.new("TextLabel", toggleFrame)
+    titleLabel.Name = "Title"
+    titleLabel.Size = UDim2.new(0.65, 0, 0, 16)
+    titleLabel.Position = UDim2.new(0, 12, 0, 8)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.TextColor3 = Color3.fromHex("#CCCCCC")
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.TextSize = 11
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.ZIndex = 6
+    
+    local descLabel = Instance.new("TextLabel", toggleFrame)
+    descLabel.Name = "Description"
+    descLabel.Size = UDim2.new(0.65, 0, 0, 14)
+    descLabel.Position = UDim2.new(0, 12, 0, 24)
+    descLabel.BackgroundTransparency = 1
+    descLabel.TextColor3 = Color3.fromRGB(130, 130, 130)
+    descLabel.Font = Enum.Font.Gotham
+    descLabel.TextSize = 9
+    descLabel.TextXAlignment = Enum.TextXAlignment.Left
+    descLabel.ZIndex = 6
+    
+    -- Botão Interruptor (Switch)
+    local switchTrack = Instance.new("Frame", toggleFrame)
+    switchTrack.Size = UDim2.new(0, 40, 0, 20)
+    switchTrack.Position = UDim2.new(1, -52, 0.5, -10)
+    switchTrack.BackgroundColor3 = Configs[configKey] and Color3.fromHex("#8B0000") or Color3.fromRGB(30, 30, 30)
+    switchTrack.ZIndex = 6
+    Instance.new("UICorner", switchTrack).CornerRadius = UDim.new(1, 0)
+    
+    local trackStroke = Instance.new("UIStroke", switchTrack)
+    trackStroke.Color = Color3.fromRGB(45, 45, 45)
+    trackStroke.Thickness = 1
+    
+    local switchCircle = Instance.new("Frame", switchTrack)
+    switchCircle.Size = UDim2.new(0, 14, 0, 14)
+    switchCircle.Position = Configs[configKey] and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
+    switchCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    switchCircle.ZIndex = 7
+    Instance.new("UICorner", switchCircle).CornerRadius = UDim.new(1, 0)
+    
+    local triggerBtn = Instance.new("TextButton", toggleFrame)
+    triggerBtn.Size = UDim2.new(1, 0, 1, 0)
+    triggerBtn.BackgroundTransparency = 1
+    triggerBtn.Text = ""
+    triggerBtn.ZIndex = 8
+    
+    triggerBtn.MouseButton1Click:Connect(function()
+        Configs[configKey] = not Configs[configKey]
+        local targetPos = Configs[configKey] and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
+        local targetColor = Configs[configKey] and Color3.fromHex("#8B0000") or Color3.fromRGB(30, 30, 30)
+        
+        local toggleAnim = TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+        TweenService:Create(switchCircle, toggleAnim, {Position = targetPos}):Play()
+        TweenService:Create(switchTrack, toggleAnim, {BackgroundColor3 = targetColor}):Play()
+        
+        if ConfigCallbacks[configKey] then
+            task.spawn(ConfigCallbacks[configKey], Configs[configKey])
+        end
+    end)
+end
+
+local function LimparEDesligarAbsolutamente()
+    if hbConnection then hbConnection:Disconnect() hbConnection = nil end
+    if renderConnection then renderConnection:Disconnect() renderConnection = nil end
+    for k in pairs(Configs) do Configs[k] = false end
+    
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p.Character then
+            local hl = p.Character:FindFirstChild("AkatHighlightMinimal")
+            if hl then pcall(function() hl:Destroy() end) end
+        end
+    end
+    
+    if safePlatform then pcall(function() safePlatform:Destroy() end) safePlatform = nil end
+    
+    pcall(function()
+        local char = player.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if hum then hum.WalkSpeed = 16 end
+        if char then
+            for _, item in ipairs(char:GetChildren()) do
+                if item:IsA("Tool") then
+                    local handle = item:FindFirstChild("Handle")
+                    local reachPart = handle and handle:FindFirstChild("AkatReachPart")
+                    if reachPart then reachPart:Destroy() end
+                end
+            end
+        end
+    end)
+end
+
+local function AlternarConfirmacao(exibir)
+    isConfirmOpen = exibir
+    local tempoAnim = 0.2
+    
+    if exibir then
+        if not confirmBlur then
+            confirmBlur = Instance.new("BlurEffect")
+            confirmBlur.Name = "AkatConfirmBlur"
+            confirmBlur.Size = 0
+            confirmBlur.Parent = Lighting
+        end
+        confirmFrame.Visible = true
+        AplicarFadeSincronizado(confirmFrame, true, 0)
+        AplicarFadeSincronizado(confirmFrame, false, tempoAnim)
+        TweenService:Create(confirmBlur, TweenInfo.new(tempoAnim, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = 14}):Play()
+    else
+        AplicarFadeSincronizado(confirmFrame, true, tempoAnim)
+        if confirmBlur then TweenService:Create(confirmBlur, TweenInfo.new(tempoAnim, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = 0}):Play() end
+        if wasMinimizedBeforeConfirm then
+            togglesContainer.Visible = false
+            SidebarFrame.Visible = false
+            div.Visible = false
+            isMinimized = true
+            TweenService:Create(mainWrapper, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 520, 0, 52)}):Play()
+        end
+        task.delay(tempoAnim, function()
+            if not isConfirmOpen then 
+                confirmFrame.Visible = false 
+                if confirmBlur then confirmBlur:Destroy() confirmBlur = nil end
+            end
+        end)
+    end
+end
+
+local function executarMinimizacao()
+    if isConfirmOpen then return end
+    isMinimized = not isMinimized
+    local windowAnim = TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    
+    if isMinimized then
+        togglesContainer.Visible = false 
+        SidebarFrame.Visible = false
+        div.Visible = false
+        TweenService:Create(mainWrapper, windowAnim, {Size = UDim2.new(0, 520, 0, 52)}):Play()
+    else
+        div.Visible = true
+        SidebarFrame.Visible = true
+        local openTween = TweenService:Create(mainWrapper, windowAnim, {Size = UDim2.new(0, 520, 0, 300)})
+        openTween:Play()
+        openTween.Completed:Connect(function()
+            if not isMinimized and not isConfirmOpen then togglesContainer.Visible = true end
+        end)
+    end
+end
+
+local function alternarVisibilidadeMenu()
+    menuAberto = not menuAberto
+    local tempoAnim = 0.15 
+    local windowAnim = TweenInfo.new(tempoAnim, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    
+    if menuAberto then
+        mainWrapper.Visible = true
+        togglesContainer.Visible = false
+        SidebarFrame.Visible = false
+        
+        mainWrapper.Size = UDim2.new(0, 480, 0, isMinimized and 40 or 270)
+        AplicarFadeSincronizado(mainWrapper, true, 0)
+        AplicarFadeSincronizado(mainWrapper, false, tempoAnim)
+        
+        local pop = TweenService:Create(mainWrapper, windowAnim, {Size = UDim2.new(0, 520, 0, isMinimized and 52 or 300)})
+        pop:Play()
+        pop.Completed:Connect(function()
+            if menuAberto and not isMinimized and not isConfirmOpen then 
+                togglesContainer.Visible = true 
+                SidebarFrame.Visible = true
+            end
+        end)
+    else
+        togglesContainer.Visible = false
+        SidebarFrame.Visible = false
+        
+        AplicarFadeSincronizado(mainWrapper, true, tempoAnim)
+        local hide = TweenService:Create(mainWrapper, windowAnim, {Size = UDim2.new(0, 480, 0, isMinimized and 40 or 270)})
+        hide:Play()
+        hide.Completed:Connect(function() 
+            if not menuAberto then mainWrapper.Visible = false end 
+        end)
+    end
+end
+
+local function ConfigurarArrastarAkat(inst)
+    local drag = false
+    local startPos, dragStart, dragInput
+    inst.InputBegan:Connect(function(input)
+        if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and not drag then
+            drag = true; dragStart = input.Position; startPos = inst.Position; dragInput = input
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if drag and input == dragInput and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            inst.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input) if drag and input == dragInput then drag = false; dragInput = nil end end)
+end
+
+-- Animação de Introdução
+local function ExecutarIntroAkat()
+    local Blur = Instance.new("BlurEffect")
+    Blur.Size = 0
+    Blur.Parent = Lighting
+
+    local IntroFrame = Instance.new("Frame", screenGui)
+    IntroFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+    IntroFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+    IntroFrame.Size = UDim2.new(1, 0, 1, 0)
+    IntroFrame.BackgroundColor3 = Color3.fromHex("#0A0A0A")
+    IntroFrame.BackgroundTransparency = 1
+    IntroFrame.ZIndex = 500
+
+    local IntroText = Instance.new("TextLabel", IntroFrame)
+    IntroText.AnchorPoint = Vector2.new(0.5, 0.5)
+    IntroText.Size = UDim2.new(0, 600, 0, 80)
+    IntroText.Position = UDim2.new(0.5, 0, 0.5, 10) 
+    IntroText.BackgroundTransparency = 1
+    IntroText.Font = Enum.Font.GothamBold
+    IntroText.TextSize = 26
+    IntroText.RichText = true
+    IntroText.Text = Locales[currentLanguage].Intro
+    IntroText.TextTransparency = 1
+    IntroText.ZIndex = 501
+    
+    local IntroLine = Instance.new("Frame", IntroFrame)
+    IntroLine.AnchorPoint = Vector2.new(0.5, 0.5)
+    IntroLine.Position = UDim2.new(0.5, 0, 0.5, 30) 
+    IntroLine.Size = UDim2.new(0, 0, 0, 2) 
+    IntroLine.BackgroundColor3 = Color3.fromHex("#8B0000")
+    IntroLine.BorderSizePixel = 0
+    IntroLine.BackgroundTransparency = 1
+    IntroLine.ZIndex = 502
+
+    TweenService:Create(IntroFrame, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0.2}):Play()
+    TweenService:Create(IntroText, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {TextTransparency = 0, Position = UDim2.new(0.5, 0, 0.5, -6)}):Play()
+    TweenService:Create(IntroLine, TweenInfo.new(0.7, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0, Size = UDim2.new(0, 260, 0, 2), Position = UDim2.new(0.5, 0, 0.5, 17)}):Play()
+    TweenService:Create(Blur, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = 14}):Play()
+    task.wait(0.6)
+
+    local correndoBrilho = true
+    task.spawn(function()
+        local infoFadeOut = TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+        local infoFadeIn = TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+        while correndoBrilho do
+            local tw1 = TweenService:Create(IntroText, infoFadeOut, {TextTransparency = 0.4})
+            local tw2 = TweenService:Create(IntroLine, infoFadeOut, {BackgroundTransparency = 0.4})
+            tw1:Play() tw2:Play()
+            tw1.Completed:Wait()
+            if not correndoBrilho then break end
+            local tw3 = TweenService:Create(IntroText, infoFadeIn, {TextTransparency = 0})
+            local tw4 = TweenService:Create(IntroLine, infoFadeIn, {BackgroundTransparency = 0})
+            tw3:Play() tw4:Play()
+            tw3.Completed:Wait()
+        end
+    end)
+
+    task.wait(2.2)
+    correndoBrilho = false
+
+    TweenService:Create(IntroText, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {TextTransparency = 1, Position = UDim2.new(0.5, 0, 0.5, -16)}):Play()
+    TweenService:Create(IntroLine, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {BackgroundTransparency = 1, Size = UDim2.new(0, 0, 0, 2)}):Play()
+    TweenService:Create(IntroFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
+    TweenService:Create(Blur, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = 0}):Play()
+    task.wait(0.4)
+
+    IntroFrame:Destroy()
+    Blur:Destroy()
+
+    RegistrarTransparencias(mainFrame)
+    for _, item in ipairs(mainFrame:GetDescendants()) do RegistrarTransparencias(item) end
+
+    mainWrapper.Visible = true
+    FloatBtn.Visible = true
+    
+    AplicarFadeSincronizado(mainWrapper, true, 0)
+    mainWrapper.Size = UDim2.new(0, 505, 0, 288)
+    
+    local fastOpen = TweenInfo.new(0.12, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    AplicarFadeSincronizado(mainWrapper, false, 0.12)
+    local openTween = TweenService:Create(mainWrapper, fastOpen, {Size = UDim2.new(0, 520, 0, 300)})
+    openTween:Play()
+    openTween.Completed:Connect(function() selectTab("Combat") end)
+end
+
+-- Envia mensagem limpa e tratada para ambos os sistemas de chat da Roblox (Antigo e Novo)
+local function EnviarMensagemChat(msg)
+    local TextChatService = game:GetService("TextChatService")
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    pcall(function()
+        if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+            local channel = TextChatService.TextChannels:FindFirstChild("RBXGeneral")
+            if channel then
+                channel:SendAsync(msg)
+            end
+        else
+            local chatEvent = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents") and ReplicatedStorage.DefaultChatSystemChatEvents:FindFirstChild("SayMessageRequest")
+            if chatEvent then
+                chatEvent:FireServer(msg, "All")
+            end
+        end
+    end)
+end
+
+-- ==================== 5. INSTANCIAÇÃO DINÂMICA DE ELEMENTOS E EVENTOS ====================
+
+-- Efeitos de Hover Dinâmicos nos Botões Superiores
+local function AplicarEfeitoFisicoBotao(btn, hoverColor)
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {BackgroundColor3 = Color3.fromRGB(36, 36, 36)}):Play()
+        if btn.Name == "MinimizeBtn" then
+            TweenService:Create(btn.Line, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {BackgroundColor3 = hoverColor}):Play()
+        elseif btn.Name == "SearchBtn" then
+            TweenService:Create(circleStroke, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {Color = hoverColor}):Play()
+            TweenService:Create(SearchHandle, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {BackgroundColor3 = hoverColor}):Play()
+        elseif btn.Name == "CloseBtn" then
+            TweenService:Create(btn.Line1, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {BackgroundColor3 = hoverColor}):Play()
+            TweenService:Create(btn.Line2, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {BackgroundColor3 = hoverColor}):Play()
+        elseif btn.Name == "LanguageBtn" then
+            TweenService:Create(btn, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {TextColor3 = hoverColor}):Play()
+        end
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {BackgroundColor3 = Color3.fromRGB(24, 24, 24)}):Play()
+        if btn.Name == "MinimizeBtn" then
+            TweenService:Create(btn.Line, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play()
+        elseif btn.Name == "SearchBtn" then
+            TweenService:Create(circleStroke, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {Color = Color3.fromHex("#A0A0A0")}):Play()
+            TweenService:Create(SearchHandle, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play()
+        elseif btn.Name == "CloseBtn" then
+            TweenService:Create(btn.Line1, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play()
+            TweenService:Create(btn.Line2, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play()
+        elseif btn.Name == "LanguageBtn" then
+            TweenService:Create(btn, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {TextColor3 = Color3.fromRGB(160, 160, 160)}):Play()
+        end
+    end)
+end
+
+AplicarEfeitoFisicoBotao(LanguageBtn, Color3.fromRGB(255, 255, 255))
+AplicarEfeitoFisicoBotao(SearchBtn, Color3.fromRGB(255, 255, 255))
+AplicarEfeitoFisicoBotao(MinimizeBtn, Color3.fromRGB(255, 255, 255))
+AplicarEfeitoFisicoBotao(CloseBtn, Color3.fromRGB(255, 60, 60))
+
+-- Criar Botões das Abas (Agora com 5 Abas)
+createTabBtn("Combat")
+createTabBtn("Visuals")
+createTabBtn("Movement")
+createTabBtn("Teleports")
+createTabBtn("Misc")
+
+-- Criando as Opções de Configuração divididas nas novas abas
+createToggle(togglesContainer, "AutoShoot", "Combat")
+createToggle(togglesContainer, "Reach", "Combat")
+createToggle(togglesContainer, "ESP", "Visuals")
+createToggle(togglesContainer, "Speed", "Movement")
+createToggle(togglesContainer, "AntiFling", "Movement")
+createToggle(togglesContainer, "TpToGun", "Teleports")
+createToggle(togglesContainer, "SafeSpot", "Teleports")
+createToggle(togglesContainer, "AutoCollect", "Misc")
+createToggle(togglesContainer, "ChatRoles", "Misc")
+
+-- Configuração da Busca
+local searchOpen = false
+SearchBtn.MouseButton1Click:Connect(function()
+    searchOpen = not searchOpen
+    local searchAnimInfo = TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    if searchOpen then
+        TweenService:Create(searchBarFrame, searchAnimInfo, {Size = UDim2.new(0, 160, 0, 26)}):Play()
+        searchTextBox:CaptureFocus()
+    else
+        searchTextBox.Text = ""
+        TweenService:Create(searchBarFrame, searchAnimInfo, {Size = UDim2.new(0, 0, 0, 26)}):Play()
+        searchTextBox:ReleaseFocus()
+        filterToggles(activeTab, "")
+    end
+end)
+
+searchTextBox:GetPropertyChangedSignal("Text"):Connect(function()
+    filterToggles(activeTab, searchTextBox.Text)
+end)
+
+-- Clique e lógica de loop de idiomas: EN -> PT -> ES -> EN
+LanguageBtn.MouseButton1Click:Connect(function()
+    if currentLanguage == "EN" then
+        currentLanguage = "PT"
+    elseif currentLanguage == "PT" then
+        currentLanguage = "ES"
+    else
+        currentLanguage = "EN"
+    end
+    
+    LanguageBtn.Text = currentLanguage
+    AtualizarIdioma()
+end)
+
+-- Inicializar Tradução Global Inicial
+AtualizarIdioma()
+
+-- Conectar Eventos de Fechamento / Confirmação
+CloseBtn.MouseButton1Click:Connect(function()
+    wasMinimizedBeforeConfirm = isMinimized
+    if isMinimized then
+        isMinimized = false
+        div.Visible = true
+        SidebarFrame.Visible = true
+        togglesContainer.Visible = true
+        local expandTween = TweenService:Create(mainWrapper, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 520, 0, 300)})
+        expandTween:Play()
+        expandTween.Completed:Wait()
+    end
+    AlternarConfirmacao(true)
+end)
+
+btnNo.MouseButton1Click:Connect(function() AlternarConfirmacao(false) end)
+
+btnYes.MouseButton1Click:Connect(function()
+    local syncTime = 0.2
+    if confirmBlur then TweenService:Create(confirmBlur, TweenInfo.new(syncTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = 0}):Play() end
+    AplicarFadeSincronizado(mainWrapper, true, syncTime)
+    TweenService:Create(FloatBtn, TweenInfo.new(syncTime, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {ImageTransparency = 1}):Play()
+    
+    task.wait(syncTime)
+    LimparEDesligarAbsolutamente()
+    pcall(function() if confirmBlur then confirmBlur:Destroy() end end)
+    screenGui:Destroy()
+end)
+
+MinimizeBtn.MouseButton1Click:Connect(executarMinimizacao)
+FloatBtn.MouseButton1Click:Connect(alternarVisibilidadeMenu)
+
+-- Input de abertura por Teclado
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed and (input.KeyCode == Enum.KeyCode.Insert or input.KeyCode == Enum.KeyCode.RightShift) then
+        alternarVisibilidadeMenu()
+    end
+end)
+
+-- Arrastar Menu/Botão
+ConfigurarArrastarAkat(mainWrapper)
+ConfigurarArrastarAkat(FloatBtn)
+
+-- Executar registro em segundo plano de transparencias para o painel de confirmação
+task.spawn(function()
+    task.wait(0.1)
+    RegistrarTransparencias(confirmFrame)
+    for _, d in ipairs(confirmFrame:GetDescendants()) do RegistrarTransparencias(d) end
+end)
+
+-- ==================== 6. THREADS EM SEGUNDO PLANO (CHEST LOOPS E CACHE) ====================
+
+-- Loop de Monitoramento de Funções & Chat Announcement
+task.spawn(function()
+    while true do
+        local currentMurderer = nil
+        local currentSheriff = nil
+        
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= player then 
+                local role = DetectarRoleReal(p)
+                PlayerRoles[p] = role
+                if role == "Murderer" then currentMurderer = p end
+                if role == "Sheriff" then currentSheriff = p end
+            end
+        end
+        
+        -- Reinicia o anunciador automático se as funções resetarem (fim de rodada)
+        if not currentMurderer and not currentSheriff then
+            announcedThisRound = false
+        elseif Configs.ChatRoles and (currentMurderer or currentSheriff) and not announcedThisRound then
+            announcedThisRound = true
+            local msg = "[AKAT] "
+            if currentMurderer then
+                msg = msg .. "Murderer: " .. currentMurderer.DisplayName .. " (@" .. currentMurderer.Name .. ") "
+            end
+            if currentSheriff then
+                msg = msg .. "| Sheriff: " .. currentSheriff.DisplayName .. " (@" .. currentSheriff.Name .. ")"
+            end
+            EnviarMensagemChat(msg)
+        end
+        
+        task.wait(0.4)
+    end
+end)
+
+-- Render Loop para Mira Suave e Auto Shoot (Real)
+renderConnection = RunService.RenderStepped:Connect(function()
+    if Configs.AutoShoot then
+        local char = player.Character
+        -- Checa se o jogador está com o item "Gun" (Arma do Xerife) equipado e ativo na mão
+        local gunTool = char and char:FindFirstChild("Gun")
+        if gunTool and gunTool:IsA("Tool") then
+            local murderer, distancia = ObterMurderer()
+            if murderer and murderer.Character and distancia < 250 then
+                local targetPart = murderer.Character:FindFirstChild("Head") or murderer.Character:FindFirstChild("HumanoidRootPart")
+                if targetPart then
+                    -- Snap instantâneo de câmera focado no alvo
+                    local lookVector = (targetPart.Position - Camera.CFrame.Position).Unit
+                    Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, Camera.CFrame.Position + lookVector)
+                    
+                    -- Disparo Automático Real utilizando o acionador nativo da Tool da Roblox
+                    local now = os.clock()
+                    if now - lastShootTime > 0.25 then -- Evita bugs de repetição excessiva do trigger
+                        lastShootTime = now
+                        gunTool:Activate()
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- Heartbeat Loop para Física, ESP, Teleportes e Coletor de Moedas
+hbConnection = RunService.Heartbeat:Connect(function()
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    local hum  = char and char:FindFirstChildOfClass("Humanoid")
+
+    -- 1. Anti-Fling
+    if Configs.AntiFling then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= player and p.Character then
+                for _, part in ipairs(p.Character:GetChildren()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                        pcall(function()
+                            part.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                            part.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+                        end)
+                    end
+                end
+            end
+        end
+    end
+
+    -- 2. ESP de Jogadores
+    if Configs.ESP then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= player and p.Character then
+                local pChar = p.Character
+                local hl = pChar:FindFirstChild("AkatHighlightMinimal")
+                if not hl then
+                    hl = Instance.new("Highlight")
+                    hl.Name = "AkatHighlightMinimal"
+                    hl.FillTransparency = 0.25
+                    hl.OutlineTransparency = 0
+                    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                    hl.Parent = pChar
+                end
+                local role = PlayerRoles[p] or "Survivor"
+                if role == "Murderer" then
+                    hl.FillColor = Color3.fromRGB(255, 0, 0)
+                    hl.OutlineColor = Color3.fromRGB(255, 0, 0)
+                elseif role == "Sheriff" then
+                    hl.FillColor = Color3.fromRGB(0, 110, 255)
+                    hl.OutlineColor = Color3.fromRGB(0, 110, 255)
+                else
+                    hl.FillColor = Color3.fromRGB(0, 255, 0)
+                    hl.OutlineColor = Color3.fromRGB(0, 255, 0)
+                end
+            end
+        end
+    else
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p.Character then
+                local hl = p.Character:FindFirstChild("AkatHighlightMinimal")
+                if hl then hl:Destroy() end
+            end
+        end
+    end
+
+    -- 3. Teleporte para Arma Caída (TP to Gun)
+    if Configs.TpToGun and root then
+        local gunDrop = workspace:FindFirstChild("GunDrop")
+        if gunDrop then
+            -- Suporte estrito para o modelo ou parte física independente de atualizações do mapa
+            local targetCF = gunDrop:IsA("BasePart") and gunDrop.CFrame or (gunDrop:IsA("Model") and (gunDrop.PrimaryPart and gunDrop.PrimaryPart.CFrame or gunDrop:FindFirstChildOfClass("BasePart") and gunDrop:FindFirstChildOfClass("BasePart").CFrame))
+            if targetCF then
+                root.CFrame = targetCF * CFrame.new(0, 1.5, 0)
+            end
+        end
+    end
+
+    -- 4. Coletor Automático de Moedas Inteligente (Auto Collect)
+    if Configs.AutoCollect and root then
+        local now = os.clock()
+        if now - lastCoinCollect > 0.75 then -- Velocidade ajustada para evitar detecções e kicks do servidor
+            local closestCoin = nil
+            local closestDist = math.huge
+            
+            -- Procura proativamente por recipientes de moedas no mapa
+            for _, d in ipairs(workspace:GetDescendants()) do
+                if d.Name == "Coin_Container" or d.Name == "Coin" or d.Name == "CoinVisual" then
+                    local pPart = d:IsA("BasePart") and d or d:FindFirstChildOfClass("BasePart")
+                    if pPart then
+                        local dist = (root.Position - pPart.Position).Magnitude
+                        if dist < closestDist and dist < 400 then
+                            closestDist = dist
+                            closestCoin = pPart
+                        end
+                    end
+                end
+            end
+            
+            if closestCoin then
+                lastCoinCollect = now
+                root.CFrame = closestCoin.CFrame
+            end
+        end
+    end
+
+    -- 5. Atualização de Velocidade e Alcance da Faca
+    if char and root and hum then
+        local velocidadeAlvo = Configs.Speed and 23 or 16
+        if hum.WalkSpeed ~= velocidadeAlvo then hum.WalkSpeed = velocidadeAlvo end
+
+        local knife = char:FindFirstChild("Knife")
+        if knife and knife:IsA("Tool") then
+            local handle = knife:FindFirstChild("Handle")
+            if handle then
+                local reachPart = handle:FindFirstChild("AkatReachPart")
+                if Configs.Reach then
+                    if not reachPart then
+                        reachPart = Instance.new("Part")
+                        reachPart.Name = "AkatReachPart"
+                        reachPart.Size = Vector3.new(25, 25, 25)
+                        reachPart.Transparency = 1
+                        reachPart.CanCollide = false
+                        reachPart.Massless = true
+                        reachPart.CFrame = handle.CFrame
+                        reachPart.Parent = handle
+                        local weld = Instance.new("WeldConstraint")
+                        weld.Part0 = handle
+                        weld.Part1 = reachPart
+                        weld.Parent = reachPart
+                    end
+                    if firetouchinterest then
+                        for _, p in ipairs(Players:GetPlayers()) do
+                            if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                                local tRoot = p.Character.HumanoidRootPart
+                                if (root.Position - tRoot.Position).Magnitude <= 25 then
+                                    firetouchinterest(handle, tRoot, 0)
+                                    firetouchinterest(handle, tRoot, 1)
+                                end
+                            end
+                        end
+                    end
+                else
+                    if reachPart then reachPart:Destroy() end
+                end
+            end
+        end
+    end
+end)
+
+-- Iniciar Intro do Script de forma assíncrona
+task.spawn(ExecutarIntroAkat)
+
