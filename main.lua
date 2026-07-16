@@ -225,13 +225,13 @@ if uiParent:FindFirstChild("DeltaAkatUniversalUI") then
 end
 screenGui.Parent = uiParent
 
--- Botão Flutuante (AKAT) - Substitua abaixo pelo ID correspondente a foto 1000035314.png
+-- Botão Flutuante (AKAT)
 local FloatBtn = Instance.new("ImageButton", screenGui)
 FloatBtn.Name = "FloatBtn"
 FloatBtn.AnchorPoint = Vector2.new(0.5, 0.5) 
 FloatBtn.Size = UDim2.new(0, 44, 0, 44)
-FloatBtn.Image = "rbxassetid://1000035314_ID_AQUI" -- <--- COLOQUE O ID DA FOTO 1000035314.png AQUI!
-FloatBtn.ImageColor3 = Color3.fromRGB(255, 255, 255) -- Estritamente branco
+FloatBtn.Position = UDim2.new(0.05, 22, 0.5, 0)
+FloatBtn.Image = "rbxthumb://type=Asset&id=74407434556912&w=420&h=420"
 FloatBtn.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
 FloatBtn.Visible = false 
 FloatBtn.ZIndex = 30
@@ -760,11 +760,11 @@ local function AplicarFadeTextos(raiz, fadeOut, duracao)
     for _, desc in ipairs(raiz:GetDescendants()) do tratarObjeto(desc) end
 end
 
--- CRIAÇÃO DOS ÍCONES DAS ABAS (Cor branca com transparência dinâmica ativo/inativo)
+-- CARREGAMENTO DE ÍCONES PERSONALIZADOS VIA ASSET ID
 local function CriarIconeProcedural(parent, tabName)
     local iconContainer = Instance.new("Frame", parent)
     iconContainer.Name = "Icon"
-    iconContainer.Size = UDim2.new(0, 16, 0, 16) -- Tamanho idêntico e padronizado
+    iconContainer.Size = UDim2.new(0, 16, 0, 16)
     iconContainer.Position = UDim2.new(0, 12, 0.5, -8)
     iconContainer.BackgroundTransparency = 1
     iconContainer.ZIndex = 9
@@ -774,29 +774,30 @@ local function CriarIconeProcedural(parent, tabName)
     imageLabel.Size = UDim2.new(1, 0, 1, 0)
     imageLabel.BackgroundTransparency = 1
     imageLabel.ZIndex = 10
-    imageLabel.ImageColor3 = Color3.fromRGB(255, 255, 255) -- Cor fixa branca como requisitado
-    imageLabel.ImageTransparency = 0.4 -- Opacidade apagada por padrão
+    imageLabel.ImageColor3 = Color3.fromRGB(180, 180, 180) -- Cor padrão inativa
 
-    -- Substitua os IDs fictícios abaixo pelos gerados no Roblox Developer Dashboard
-    if tabName == "Combat" then
-        imageLabel.Image = "rbxassetid://1000035318_ID_AQUI" -- ID da foto 1000035318.png (Espadas)
-    elseif tabName == "Visuals" then
-        imageLabel.Image = "rbxassetid://1000035317_ID_AQUI" -- ID da foto 1000035317.png (Olho)
-    elseif tabName == "Movement" then
-        imageLabel.Image = "rbxassetid://1000035319_ID_AQUI" -- ID da foto 1000035319.png (Bota)
+    if tabName == "Movement" then
+        imageLabel.Image = "rbxassetid://90358690675463"
     elseif tabName == "Teleports" then
-        imageLabel.Image = "rbxassetid://1000035315_ID_AQUI" -- ID da foto 1000035315.png (Portal)
+        imageLabel.Image = "rbxassetid://90358690675463"
     elseif tabName == "Misc" then
-        imageLabel.Image = "rbxassetid://1000035316_ID_AQUI" -- ID da foto 1000035316.png (Engrenagem)
+        imageLabel.Image = "rbxassetid://110656497311677"
+    elseif tabName == "Visuals" then
+        imageLabel.Image = "rbxassetid://98051686611454"
+    elseif tabName == "Combat" then
+        imageLabel.Image = "rbxassetid://133188606257719"
     end
 end
 
--- Alternância de Destaque usando Opacidade em vez de cor (Mantendo o Ícone Branco)
-local function RecolorirIcone(iconContainer, targetTransparency, animSpeed)
+local function RecolorirIcone(iconContainer, targetColor, animSpeed)
     if not iconContainer then return end
     for _, child in ipairs(iconContainer:GetDescendants()) do
-        if child.Name == "AccentImage" and child:IsA("ImageLabel") then
-            TweenService:Create(child, animSpeed, {ImageTransparency = targetTransparency}):Play()
+        if child.Name == "AccentStroke" and child:IsA("UIStroke") then
+            TweenService:Create(child, animSpeed, {Color = targetColor}):Play()
+        elseif child.Name == "AccentFill" and child:IsA("Frame") then
+            TweenService:Create(child, animSpeed, {BackgroundColor3 = targetColor}):Play()
+        elseif child.Name == "AccentImage" and child:IsA("ImageLabel") then
+            TweenService:Create(child, animSpeed, {ImageColor3 = targetColor}):Play()
         end
     end
 end
@@ -805,6 +806,7 @@ local function AtualizarIdioma()
     local langData = Locales[currentLanguage]
     if not langData then return end
     
+    -- TÍTULO E SUBTÍTULO BLOQUEADOS PARA NÃO SE ALTERAREM
     searchTextBox.PlaceholderText = langData.SearchPlaceholder
     
     for tabName, btn in pairs(tabButtons) do
@@ -860,6 +862,7 @@ local function filterToggles(currentActiveTab, query)
                 if desc then desc.TextTransparency = 1 end
                 
                 task.delay((itemIndex - 1) * 0.03, function()
+                    -- Altura dos containers redefinida para 56 para evitar cortar descrições
                     TweenService:Create(child, TweenInfo.new(0.25, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {
                         Size = UDim2.new(1, -8, 0, 56),
                         BackgroundTransparency = 0
@@ -883,11 +886,11 @@ local function selectTab(tabName)
         if name == tabName then
             TweenService:Create(btn, animSpeed, {BackgroundColor3 = Color3.fromHex("#8B0000")}):Play()
             if label then TweenService:Create(label, animSpeed, {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play() end
-            RecolorirIcone(iconContainer, 0, animSpeed) -- Ícone Brilhante (Opacidade 0)
+            RecolorirIcone(iconContainer, Color3.fromRGB(255, 255, 255), animSpeed)
         else
             TweenService:Create(btn, animSpeed, {BackgroundColor3 = Color3.fromRGB(15, 15, 15)}):Play()
             if label then TweenService:Create(label, animSpeed, {TextColor3 = Color3.fromRGB(180, 180, 180)}):Play() end
-            RecolorirIcone(iconContainer, 0.4, animSpeed) -- Ícone Fosco (Opacidade 0.4)
+            RecolorirIcone(iconContainer, Color3.fromRGB(180, 180, 180), animSpeed)
         end
     end
     
@@ -941,7 +944,7 @@ local function createTabBtn(tabName)
         if activeTab ~= tabName then
             TweenService:Create(tabBtn, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundColor3 = Color3.fromRGB(15, 15, 15)}):Play()
             TweenService:Create(tabLabel, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {TextColor3 = Color3.fromRGB(180, 180, 180)}):Play()
-            RecolorirIcone(tabBtn:FindFirstChild("Icon"), 0.4, TweenInfo.new(0.15, Enum.EasingStyle.Quad))
+            RecolorirIcone(tabBtn:FindFirstChild("Icon"), Color3.fromRGB(180, 180, 180), TweenInfo.new(0.15, Enum.EasingStyle.Quad))
         end
     end)
     
@@ -949,7 +952,7 @@ local function createTabBtn(tabName)
         if activeTab ~= tabName then
             TweenService:Create(tabBtn, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundColor3 = Color3.fromRGB(22, 22, 22)}):Play()
             TweenService:Create(tabLabel, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {TextColor3 = Color3.fromRGB(220, 220, 220)}):Play()
-            RecolorirIcone(tabBtn:FindFirstChild("Icon"), 0.1, TweenInfo.new(0.15, Enum.EasingStyle.Quad))
+            RecolorirIcone(tabBtn:FindFirstChild("Icon"), Color3.fromRGB(220, 220, 220), TweenInfo.new(0.15, Enum.EasingStyle.Quad))
         end
     end)
     
@@ -1015,7 +1018,7 @@ local ConfigCallbacks = {
 local function createToggle(parent, configKey, tabCategory)
     local toggleFrame = Instance.new("Frame")
     toggleFrame.Name = configKey
-    toggleFrame.Size = UDim2.new(1, -8, 0, 56)
+    toggleFrame.Size = UDim2.new(1, -8, 0, 56) -- Altura aumentada de 48 para 56 para dar margem
     toggleFrame.BackgroundColor3 = Color3.fromHex("#0F0F0F")
     toggleFrame.ZIndex = 6
     toggleFrame:SetAttribute("Tab", tabCategory)
@@ -1030,7 +1033,7 @@ local function createToggle(parent, configKey, tabCategory)
     local titleLabel = Instance.new("TextLabel", toggleFrame)
     titleLabel.Name = "Title"
     titleLabel.Size = UDim2.new(0.65, 0, 0, 16)
-    titleLabel.Position = UDim2.new(0, 12, 0, 6)
+    titleLabel.Position = UDim2.new(0, 12, 0, 6) -- Deslocado levemente para cima (Y: 6)
     titleLabel.BackgroundTransparency = 1
     titleLabel.TextColor3 = Color3.fromHex("#CCCCCC")
     titleLabel.Font = Enum.Font.GothamBold
@@ -1040,15 +1043,15 @@ local function createToggle(parent, configKey, tabCategory)
     
     local descLabel = Instance.new("TextLabel", toggleFrame)
     descLabel.Name = "Description"
-    descLabel.Size = UDim2.new(0.65, 0, 0, 28)
-    descLabel.Position = UDim2.new(0, 12, 0, 22)
+    descLabel.Size = UDim2.new(0.65, 0, 0, 28) -- Altura expandida de 14 para 28
+    descLabel.Position = UDim2.new(0, 12, 0, 22) -- Alinhado na parte inferior
     descLabel.BackgroundTransparency = 1
     descLabel.TextColor3 = Color3.fromRGB(130, 130, 130)
     descLabel.Font = Enum.Font.Gotham
     descLabel.TextSize = 9
     descLabel.TextXAlignment = Enum.TextXAlignment.Left
-    descLabel.TextYAlignment = Enum.TextYAlignment.Top
-    descLabel.TextWrapped = true
+    descLabel.TextYAlignment = Enum.TextYAlignment.Top -- Força o alinhamento no topo do container
+    descLabel.TextWrapped = true -- PERMITE A QUEBRA DE LINHA CORRETA SEM APAGAR O TEXTO
     descLabel.ZIndex = 6
     
     local switchTrack = Instance.new("Frame", toggleFrame)
@@ -1157,12 +1160,14 @@ local function AlternarConfirmacao(exibir)
     end
 end
 
+-- Função de minimização totalmente otimizada (Buttery Smooth)
 local function executarMinimizacao()
     if isConfirmOpen then return end
     isMinimized = not isMinimized
     local windowAnim = TweenInfo.new(0.22, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out)
     
     if isMinimized then
+        -- Desvanece itens e redimensiona simultaneamente
         AplicarFadeSincronizado(SidebarFrame, true, 0.15)
         AplicarFadeSincronizado(togglesContainer, true, 0.15)
         
@@ -1192,6 +1197,7 @@ local function executarMinimizacao()
     end
 end
 
+-- Função de exibição do menu principal altamente responsiva
 local function alternarVisibilidadeMenu()
     menuAberto = not menuAberto
     local tempoAnim = 0.2
@@ -1234,6 +1240,7 @@ local function alternarVisibilidadeMenu()
     end
 end
 
+-- Mecanismo de Arrastar Aprimorado (Mobile/PC)
 local function ConfigurarArrastarAkat(inst)
     local drag = false
     local startPos, dragStart, dragInput
@@ -1261,6 +1268,7 @@ local function ConfigurarArrastarAkat(inst)
     end)
 end
 
+-- Introdução do Script
 local function ExecutarIntroAkat()
     local Blur = Instance.new("BlurEffect")
     Blur.Size = 0
@@ -1635,6 +1643,7 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
+    -- TELEPORT TO GUN CORRIGIDO COM VERIFICAÇÃO DE PARTIDA ATIVA
     if Configs.TpToGun and root and IsInMatch() then
         local gunDrop = ObterArmaCaida()
         if gunDrop then
@@ -1665,7 +1674,9 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
+    -- AUTO COLLECT REESTRUTURADO E ALTAMENTE OTIMIZADO PARA DELTA MOBILE 2026
     if Configs.AutoCollect and root and IsInMatch() then
+        -- No-clip otimizado para celulares sem provocar quedas de FPS por varredura recursiva
         if char then
             for _, part in ipairs(char:GetChildren()) do
                 if part:IsA("BasePart") then
@@ -1682,6 +1693,7 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
             currentCollectTarget = nil
         end
 
+        -- Busca controlada por clock para evitar gargalo de hardware no Delta
         if not currentCollectTarget and os.clock() - lastCoinSearch > 0.15 then
             lastCoinSearch = os.clock()
             local closestCoin = nil
@@ -1703,6 +1715,7 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
             currentCollectTarget = closestCoin
         end
 
+        -- Movimento de interpolação perfeito sem rubberbanding (PlatStand ativo via Callback)
         if currentCollectTarget then
             local targetPos = currentCollectTarget.Position
             local currentPos = root.Position
@@ -1714,7 +1727,7 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
             end)
             
             if dist > 0.5 then
-                local flySpeed = 115 
+                local flySpeed = 115 -- Velocidade otimizada e ultra segura para bypass de física
                 local moveAmount = flySpeed * dt
                 local direction = (targetPos - currentPos).Unit
                 
