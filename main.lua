@@ -1,5 +1,5 @@
 -- [[
---     AKAT MM2 SCRIPT [BETA v2.0] - GLOBAL LOCALIZATION, DRAG FIX & SMOOTH FADES
+--     AKAT MM2 SCRIPT [BETA v2.1] - FIXED ANIMATIONS, PROCEDURAL VECTOR ARROW & SAFE AUTOCOLLECT
 -- ]]
 
 local Players = game:GetService("Players")
@@ -70,7 +70,7 @@ local Locales = {
             },
             AutoCollect = {
                 Title = "Coletar Moedas",
-                Desc = "Voa atravessando tudo rapidamente e espera coletar cada moeda antes de ir para a próxima."
+                Desc = "Voa atravessando tudo rapidamente e espera coletar cada moeda de forma segura."
             },
             ChatRoles = {
                 Title = "Revelar Funções",
@@ -124,7 +124,7 @@ local Locales = {
             },
             AutoCollect = {
                 Title = "Auto Collect",
-                Desc = "Flies through walls very fast, waiting for each coin to be collected before moving to the next."
+                Desc = "Flies through walls safely, picking up real coins while preventing high glides."
             },
             ChatRoles = {
                 Title = "Reveal Roles",
@@ -166,7 +166,7 @@ local Locales = {
             },
             AntiFling = {
                 Title = "Anti-Fling",
-                Desc = "Bloquea colisiones para evitar que te empujen o lancen."
+                Desc = "Bloqueia colisiones para evitar que te empujen o lancen."
             },
             TpToGun = {
                 Title = "TP a la Arma",
@@ -178,7 +178,7 @@ local Locales = {
             },
             AutoCollect = {
                 Title = "Auto Monedas",
-                Desc = "Vuela atravesando todo rápidamente y espera a recolectar cada moneda antes de ir a la siguiente."
+                Desc = "Vuela atravesando todo de forma segura evitando subidas al vacío."
             },
             ChatRoles = {
                 Title = "Revelar Roles",
@@ -209,7 +209,7 @@ local announcedThisRound = false
 local lastShootTime = 0
 local hasTeleportedToGun = false
 local originalPositionBeforeGun = nil
-local currentCollectTarget = nil -- Trava de foco para o coletor
+local currentCollectTarget = nil 
 
 -- ==================== 3. CRIAÇÃO DE TODA A ESTRUTURA DE INTERFACE (UI) ====================
 local screenGui = Instance.new("ScreenGui")
@@ -633,6 +633,18 @@ Instance.new("UICorner", btnNo).CornerRadius = UDim.new(0, 6)
 
 -- ==================== 4. FUNÇÕES DE SUPORTE E DE EXECUÇÃO ====================
 
+-- Função para detectar se o jogador está fisicamente no lobby (Evita TP e Loops indesejados)
+local function NoLobby()
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return true end
+    -- Checa se o jogador está na caixa do lobby do MM2 pelo posicionamento
+    if root.Position.Y > 50 or root.Position.X > 100 or root.Position.X < -100 then
+        return false
+    end
+    return true
+end
+
 local function DetectarRoleReal(p)
     if not p or not p.Parent then return "Survivor" end
     local char = p.Character
@@ -851,14 +863,45 @@ local function CriarIconeProcedural(parent, tabName)
         buildTrail(5, 11, 8)
 
     elseif tabName == "Teleports" then
-        -- ÍCONE ATUALIZADO: Seta diagonal de localização (Arrow Cursor / Chevron) conforme a imagem enviada
-        local arrowIcon = Instance.new("ImageLabel", iconContainer)
-        arrowIcon.Name = "AccentImage"
-        arrowIcon.Size = UDim2.new(1, 0, 1, 0)
-        arrowIcon.BackgroundTransparency = 1
-        arrowIcon.Image = "rbxassetid://10734898144" -- Ícone vetorizado de alta fidelidade
-        arrowIcon.ImageColor3 = Color3.fromRGB(180, 180, 180)
-        arrowIcon.ZIndex = 9
+        -- ÍCONE PROCEDURAL CORRIGIDO: Seta de navegação exata da foto desenhada dinamicamente (zero assets externos)
+        local arrowFrame = Instance.new("Frame", iconContainer)
+        arrowFrame.Name = "ArrowFrame"
+        arrowFrame.Size = UDim2.new(0, 14, 0, 14)
+        arrowFrame.Position = UDim2.new(0.5, -7, 0.5, -6)
+        arrowFrame.BackgroundTransparency = 1
+        arrowFrame.ZIndex = 9
+        
+        -- Corpo diagonal esquerdo da seta
+        local leftLine = Instance.new("Frame", arrowFrame)
+        leftLine.Size = UDim2.new(0, 2, 0, 12)
+        leftLine.Position = UDim2.new(0.3, 0, 0.1, 0)
+        leftLine.Rotation = -35
+        leftLine.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
+        leftLine.BorderSizePixel = 0
+        leftLine.Name = "AccentFill"
+        leftLine.ZIndex = 9
+        Instance.new("UICorner", leftLine).CornerRadius = UDim.new(1, 0)
+
+        -- Corpo diagonal direito da seta
+        local rightLine = Instance.new("Frame", arrowFrame)
+        rightLine.Size = UDim2.new(0, 2, 0, 12)
+        rightLine.Position = UDim2.new(0.5, 0, 0.1, 0)
+        rightLine.Rotation = 35
+        rightLine.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
+        rightLine.BorderSizePixel = 0
+        rightLine.Name = "AccentFill"
+        rightLine.ZIndex = 9
+        Instance.new("UICorner", rightLine).CornerRadius = UDim.new(1, 0)
+
+        -- Preenchimento da base interna curvada
+        local baseLine = Instance.new("Frame", arrowFrame)
+        baseLine.Size = UDim2.new(0, 6, 0, 2)
+        baseLine.Position = UDim2.new(0.5, -3, 0.8, -1)
+        baseLine.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
+        baseLine.BorderSizePixel = 0
+        baseLine.Name = "AccentFill"
+        baseLine.ZIndex = 9
+        Instance.new("UICorner", baseLine).CornerRadius = UDim.new(1, 0)
 
     elseif tabName == "Misc" then
         for i = 1, 3 do
@@ -939,23 +982,13 @@ local function filterToggles(currentActiveTab, query)
             
             if shouldBeVisible then
                 itemIndex = itemIndex + 1
-                child.Size = UDim2.new(1, -8, 0, 0)
-                child.BackgroundTransparency = 1
+                child.Size = UDim2.new(1, -8, 0, 48)
+                child.BackgroundTransparency = 0
                 
                 local title = child:FindFirstChild("Title")
                 local desc = child:FindFirstChild("Description")
-                if title then title.TextTransparency = 1 end
-                if desc then desc.TextTransparency = 1 end
-                
-                task.delay((itemIndex - 1) * 0.04, function()
-                    TweenService:Create(child, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-                        Size = UDim2.new(1, -8, 0, 48),
-                        BackgroundTransparency = 0
-                    }):Play()
-                    
-                    if title then TweenService:Create(title, TweenInfo.new(0.25), {TextTransparency = 0}):Play() end
-                    if desc then TweenService:Create(desc, TweenInfo.new(0.25), {TextTransparency = 0}):Play() end
-                end)
+                if title then title.TextTransparency = 0 end
+                if desc then desc.TextTransparency = 0 end
             end
         end
     end
@@ -963,7 +996,7 @@ end
 
 local function selectTab(tabName)
     activeTab = tabName
-    local animSpeed = TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    local animSpeed = TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
     
     for name, btn in pairs(tabButtons) do
         local label = btn:FindFirstChild("Label")
@@ -1011,13 +1044,13 @@ local function createTabBtn(tabName)
     tabLabel.ZIndex = 9
     
     tabBtn.MouseButton1Down:Connect(function()
-        TweenService:Create(tabBtn, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            Size = UDim2.new(1, -24, 0, 30)
+        TweenService:Create(tabBtn, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = UDim2.new(1, -20, 0, 31)
         }):Play()
     end)
     
     local function restaurarTamanho()
-        TweenService:Create(tabBtn, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        TweenService:Create(tabBtn, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
             Size = UDim2.new(1, -16, 0, 32)
         }):Play()
     end
@@ -1027,17 +1060,17 @@ local function createTabBtn(tabName)
     tabBtn.MouseLeave:Connect(function()
         restaurarTamanho()
         if activeTab ~= tabName then
-            TweenService:Create(tabBtn, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundColor3 = Color3.fromRGB(15, 15, 15)}):Play()
-            TweenService:Create(tabLabel, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {TextColor3 = Color3.fromRGB(180, 180, 180)}):Play()
-            RecolorirIcone(tabBtn:FindFirstChild("Icon"), Color3.fromRGB(180, 180, 180), TweenInfo.new(0.2, Enum.EasingStyle.Quad))
+            TweenService:Create(tabBtn, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundColor3 = Color3.fromRGB(15, 15, 15)}):Play()
+            TweenService:Create(tabLabel, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {TextColor3 = Color3.fromRGB(180, 180, 180)}):Play()
+            RecolorirIcone(tabBtn:FindFirstChild("Icon"), Color3.fromRGB(180, 180, 180), TweenInfo.new(0.15, Enum.EasingStyle.Quad))
         end
     end)
     
     tabBtn.MouseEnter:Connect(function()
         if activeTab ~= tabName then
-            TweenService:Create(tabBtn, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundColor3 = Color3.fromRGB(22, 22, 22)}):Play()
-            TweenService:Create(tabLabel, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {TextColor3 = Color3.fromRGB(220, 220, 220)}):Play()
-            RecolorirIcone(tabBtn:FindFirstChild("Icon"), Color3.fromRGB(220, 220, 220), TweenInfo.new(0.2, Enum.EasingStyle.Quad))
+            TweenService:Create(tabBtn, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundColor3 = Color3.fromRGB(22, 22, 22)}):Play()
+            TweenService:Create(tabLabel, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {TextColor3 = Color3.fromRGB(220, 220, 220)}):Play()
+            RecolorirIcone(tabBtn:FindFirstChild("Icon"), Color3.fromRGB(220, 220, 220), TweenInfo.new(0.15, Enum.EasingStyle.Quad))
         end
     end)
     
@@ -1147,7 +1180,7 @@ local function createToggle(parent, configKey, tabCategory)
         local targetPos = Configs[configKey] and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
         local targetColor = Configs[configKey] and Color3.fromHex("#8B0000") or Color3.fromRGB(30, 30, 30)
         
-        local toggleAnim = TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+        local toggleAnim = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
         TweenService:Create(switchCircle, toggleAnim, {Position = targetPos}):Play()
         TweenService:Create(switchTrack, toggleAnim, {BackgroundColor3 = targetColor}):Play()
         
@@ -1189,7 +1222,7 @@ end
 
 local function AlternarConfirmacao(exibir)
     isConfirmOpen = exibir
-    local tempoAnim = 0.2
+    local tempoAnim = 0.15
     
     if exibir then
         if not confirmBlur then
@@ -1201,7 +1234,7 @@ local function AlternarConfirmacao(exibir)
         confirmFrame.Visible = true
         AplicarFadeSincronizado(confirmFrame, true, 0)
         AplicarFadeSincronizado(confirmFrame, false, tempoAnim)
-        TweenService:Create(confirmBlur, TweenInfo.new(tempoAnim, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = 14}):Play()
+        TweenService:Create(confirmBlur, TweenInfo.new(tempoAnim, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = 10}):Play()
     else
         AplicarFadeSincronizado(confirmFrame, true, tempoAnim)
         if confirmBlur then TweenService:Create(confirmBlur, TweenInfo.new(tempoAnim, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = 0}):Play() end
@@ -1210,7 +1243,7 @@ local function AlternarConfirmacao(exibir)
             SidebarFrame.Visible = false
             div.Visible = false
             isMinimized = true
-            TweenService:Create(mainWrapper, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 520, 0, 52)}):Play()
+            TweenService:Create(mainWrapper, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 520, 0, 52)}):Play()
         end
         task.delay(tempoAnim, function()
             if not isConfirmOpen then 
@@ -1221,44 +1254,32 @@ local function AlternarConfirmacao(exibir)
     end
 end
 
--- Função de minimização totalmente sincronizada e fluida com efeito "Caindo" ao retornar
+-- Função de minimização totalmente sincronizada, fluida e instantânea
 local function executarMinimizacao()
     if isConfirmOpen then return end
     isMinimized = not isMinimized
-    local windowAnim = TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    local windowAnim = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
     
     if isMinimized then
-        -- Fade Out e minimização sincronizados
-        AplicarFadeSincronizado(SidebarFrame, true, 0.15)
-        AplicarFadeSincronizado(togglesContainer, true, 0.15)
-        task.wait(0.12)
         togglesContainer.Visible = false 
         SidebarFrame.Visible = false
         div.Visible = false
         TweenService:Create(mainWrapper, windowAnim, {Size = UDim2.new(0, 520, 0, 52)}):Play()
     else
-        -- Un-minimize (Restauração) com o efeito de queda sequencial das abas e opções
         div.Visible = true
         SidebarFrame.Visible = true
         togglesContainer.Visible = true
         
-        AplicarFadeSincronizado(SidebarFrame, true, 0)
-        
-        local openTween = TweenService:Create(mainWrapper, windowAnim, {Size = UDim2.new(0, 520, 0, 300)})
-        openTween:Play()
-        
-        AplicarFadeSincronizado(SidebarFrame, false, 0.3)
-        
-        -- Executa a animação "Caindo" instantaneamente nas opções do menu
+        TweenService:Create(mainWrapper, windowAnim, {Size = UDim2.new(0, 520, 0, 300)}):Play()
         filterToggles(activeTab, searchTextBox.Text)
     end
 end
 
--- Função de abertura totalmente sincronizada com efeito "Caindo" integrado
+-- Função de abertura totalmente sincronizada com animações ultrarrápidas
 local function alternarVisibilidadeMenu()
     menuAberto = not menuAberto
-    local tempoAnim = 0.2
-    local windowAnim = TweenInfo.new(tempoAnim, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    local tempoAnim = 0.15
+    local windowAnim = TweenInfo.new(tempoAnim, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
     
     if menuAberto then
         mainWrapper.Visible = true
@@ -1266,7 +1287,7 @@ local function alternarVisibilidadeMenu()
         SidebarFrame.Visible = false
         div.Visible = false
         
-        mainWrapper.Size = UDim2.new(0, 480, 0, isMinimized and 40 or 270)
+        mainWrapper.Size = UDim2.new(0, 500, 0, isMinimized and 48 or 280)
         AplicarFadeSincronizado(mainWrapper, true, 0)
         AplicarFadeSincronizado(mainWrapper, false, tempoAnim)
         
@@ -1277,10 +1298,6 @@ local function alternarVisibilidadeMenu()
                 SidebarFrame.Visible = true
                 togglesContainer.Visible = true
                 div.Visible = true
-                AplicarFadeSincronizado(SidebarFrame, true, 0)
-                AplicarFadeSincronizado(SidebarFrame, false, 0.22)
-                
-                -- Ativa a animação exata de queda sequencial ao reabrir pelo botão flutuante
                 filterToggles(activeTab, searchTextBox.Text)
             end
         end)
@@ -1290,7 +1307,7 @@ local function alternarVisibilidadeMenu()
         div.Visible = false
         
         AplicarFadeSincronizado(mainWrapper, true, tempoAnim)
-        local hide = TweenService:Create(mainWrapper, windowAnim, {Size = UDim2.new(0, 480, 0, isMinimized and 40 or 270)})
+        local hide = TweenService:Create(mainWrapper, windowAnim, {Size = UDim2.new(0, 500, 0, isMinimized and 48 or 280)})
         hide:Play()
         hide.Completed:Connect(function() 
             if not menuAberto then mainWrapper.Visible = false end 
@@ -1326,7 +1343,7 @@ local function ConfigurarArrastarAkat(inst)
     end)
 end
 
--- Animação de Introdução
+-- Animação de Introdução Sincronizada
 local function ExecutarIntroAkat()
     local Blur = Instance.new("BlurEffect")
     Blur.Size = 0
@@ -1361,16 +1378,16 @@ local function ExecutarIntroAkat()
     IntroLine.BackgroundTransparency = 1
     IntroLine.ZIndex = 502
 
-    TweenService:Create(IntroFrame, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0.2}):Play()
-    TweenService:Create(IntroText, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {TextTransparency = 0, Position = UDim2.new(0.5, 0, 0.5, -6)}):Play()
-    TweenService:Create(IntroLine, TweenInfo.new(0.7, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0, Size = UDim2.new(0, 260, 0, 2), Position = UDim2.new(0.5, 0, 0.5, 17)}):Play()
-    TweenService:Create(Blur, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = 14}):Play()
-    task.wait(0.6)
+    TweenService:Create(IntroFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0.2}):Play()
+    TweenService:Create(IntroText, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {TextTransparency = 0, Position = UDim2.new(0.5, 0, 0.5, -6)}):Play()
+    TweenService:Create(IntroLine, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0, Size = UDim2.new(0, 260, 0, 2), Position = UDim2.new(0.5, 0, 0.5, 17)}):Play()
+    TweenService:Create(Blur, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = 10}):Play()
+    task.wait(0.5)
 
     local correndoBrilho = true
     task.spawn(function()
-        local infoFadeOut = TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
-        local infoFadeIn = TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+        local infoFadeOut = TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+        local infoFadeIn = TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
         while correndoBrilho do
             local tw1 = TweenService:Create(IntroText, infoFadeOut, {TextTransparency = 0.4})
             local tw2 = TweenService:Create(IntroLine, infoFadeOut, {BackgroundTransparency = 0.4})
@@ -1384,14 +1401,14 @@ local function ExecutarIntroAkat()
         end
     end)
 
-    task.wait(2.2)
+    task.wait(1.5)
     correndoBrilho = false
 
-    TweenService:Create(IntroText, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {TextTransparency = 1, Position = UDim2.new(0.5, 0, 0.5, -16)}):Play()
-    TweenService:Create(IntroLine, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {BackgroundTransparency = 1, Size = UDim2.new(0, 0, 0, 2)}):Play()
-    TweenService:Create(IntroFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
-    TweenService:Create(Blur, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = 0}):Play()
-    task.wait(0.4)
+    TweenService:Create(IntroText, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {TextTransparency = 1, Position = UDim2.new(0.5, 0, 0.5, -16)}):Play()
+    TweenService:Create(IntroLine, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {BackgroundTransparency = 1, Size = UDim2.new(0, 0, 0, 2)}):Play()
+    TweenService:Create(IntroFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
+    TweenService:Create(Blur, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = 0}):Play()
+    task.wait(0.3)
 
     IntroFrame:Destroy()
     Blur:Destroy()
@@ -1405,8 +1422,8 @@ local function ExecutarIntroAkat()
     AplicarFadeSincronizado(mainWrapper, true, 0)
     mainWrapper.Size = UDim2.new(0, 505, 0, 288)
     
-    local fastOpen = TweenInfo.new(0.12, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-    AplicarFadeSincronizado(mainWrapper, false, 0.12)
+    local fastOpen = TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    AplicarFadeSincronizado(mainWrapper, false, 0.1)
     local openTween = TweenService:Create(mainWrapper, fastOpen, {Size = UDim2.new(0, 520, 0, 300)})
     openTween:Play()
     openTween.Completed:Connect(function() selectTab("Combat") end)
@@ -1434,31 +1451,31 @@ end
 
 local function AplicarEfeitoFisicoBotao(btn, hoverColor)
     btn.MouseEnter:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {BackgroundColor3 = Color3.fromRGB(36, 36, 36)}):Play()
+        TweenService:Create(btn, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundColor3 = Color3.fromRGB(36, 36, 36)}):Play()
         if btn.Name == "MinimizeBtn" then
-            TweenService:Create(btn.Line, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {BackgroundColor3 = hoverColor}):Play()
+            TweenService:Create(btn.Line, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundColor3 = hoverColor}):Play()
         elseif btn.Name == "SearchBtn" then
-            TweenService:Create(circleStroke, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {Color = hoverColor}):Play()
-            TweenService:Create(SearchHandle, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {BackgroundColor3 = hoverColor}):Play()
+            TweenService:Create(circleStroke, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {Color = hoverColor}):Play()
+            TweenService:Create(SearchHandle, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundColor3 = hoverColor}):Play()
         elseif btn.Name == "CloseBtn" then
-            TweenService:Create(btn.Line1, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {BackgroundColor3 = hoverColor}):Play()
-            TweenService:Create(btn.Line2, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {BackgroundColor3 = hoverColor}):Play()
+            TweenService:Create(btn.Line1, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundColor3 = hoverColor}):Play()
+            TweenService:Create(btn.Line2, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundColor3 = hoverColor}):Play()
         elseif btn.Name == "LanguageBtn" then
-            TweenService:Create(btn, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {TextColor3 = hoverColor}):Play()
+            TweenService:Create(btn, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {TextColor3 = hoverColor}):Play()
         end
     end)
     btn.MouseLeave:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {BackgroundColor3 = Color3.fromRGB(24, 24, 24)}):Play()
+        TweenService:Create(btn, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundColor3 = Color3.fromRGB(24, 24, 24)}):Play()
         if btn.Name == "MinimizeBtn" then
-            TweenService:Create(btn.Line, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play()
+            TweenService:Create(btn.Line, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play()
         elseif btn.Name == "SearchBtn" then
-            TweenService:Create(circleStroke, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {Color = Color3.fromHex("#A0A0A0")}):Play()
-            TweenService:Create(SearchHandle, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play()
+            TweenService:Create(circleStroke, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {Color = Color3.fromHex("#A0A0A0")}):Play()
+            TweenService:Create(SearchHandle, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play()
         elseif btn.Name == "CloseBtn" then
-            TweenService:Create(btn.Line1, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play()
-            TweenService:Create(btn.Line2, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play()
+            TweenService:Create(btn.Line1, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play()
+            TweenService:Create(btn.Line2, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play()
         elseif btn.Name == "LanguageBtn" then
-            TweenService:Create(btn, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {TextColor3 = Color3.fromRGB(160, 160, 160)}):Play()
+            TweenService:Create(btn, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {TextColor3 = Color3.fromRGB(160, 160, 160)}):Play()
         end
     end)
 end
@@ -1487,7 +1504,7 @@ createToggle(togglesContainer, "ChatRoles", "Misc")
 local searchOpen = false
 SearchBtn.MouseButton1Click:Connect(function()
     searchOpen = not searchOpen
-    local searchAnimInfo = TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    local searchAnimInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
     if searchOpen then
         TweenService:Create(searchBarFrame, searchAnimInfo, {Size = UDim2.new(0, 160, 0, 26)}):Play()
         searchTextBox:CaptureFocus()
@@ -1509,8 +1526,8 @@ LanguageBtn.MouseButton1Click:Connect(function()
     if languageTransitioning then return end
     languageTransitioning = true
     
-    AplicarFadeTextos(mainFrame, true, 0.12)
-    task.wait(0.12)
+    AplicarFadeTextos(mainFrame, true, 0.08)
+    task.wait(0.08)
     
     if currentLanguage == "EN" then
         currentLanguage = "PT"
@@ -1523,8 +1540,8 @@ LanguageBtn.MouseButton1Click:Connect(function()
     LanguageBtn.Text = currentLanguage
     AtualizarIdioma()
     
-    AplicarFadeTextos(mainFrame, false, 0.15)
-    task.wait(0.15)
+    AplicarFadeTextos(mainFrame, false, 0.1)
+    task.wait(0.1)
     
     languageTransitioning = false
 end)
@@ -1538,7 +1555,7 @@ CloseBtn.MouseButton1Click:Connect(function()
         div.Visible = true
         SidebarFrame.Visible = true
         togglesContainer.Visible = true
-        local expandTween = TweenService:Create(mainWrapper, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 520, 0, 300)})
+        local expandTween = TweenService:Create(mainWrapper, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 520, 0, 300)})
         expandTween:Play()
         expandTween.Completed:Wait()
     end
@@ -1548,7 +1565,7 @@ end)
 btnNo.MouseButton1Click:Connect(function() AlternarConfirmacao(false) end)
 
 btnYes.MouseButton1Click:Connect(function()
-    local syncTime = 0.2
+    local syncTime = 0.15
     if confirmBlur then TweenService:Create(confirmBlur, TweenInfo.new(syncTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = 0}):Play() end
     AplicarFadeSincronizado(mainWrapper, true, syncTime)
     TweenService:Create(FloatBtn, TweenInfo.new(syncTime, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {ImageTransparency = 1}):Play()
@@ -1563,8 +1580,8 @@ MinimizeBtn.MouseButton1Click:Connect(executarMinimizacao)
 FloatBtn.MouseButton1Click:Connect(alternarVisibilidadeMenu)
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if not gameProcessed and (input.KeyCode == Enum.KeyCode.Insert or input.KeyCode == Enum.KeyCode.RightShift) then
-        alternarVisibilidadeMenu()
+    if not gameProcessed and (input.KeyCode == Enum.KeyCode.Minus or input.KeyCode == Enum.KeyCode.Insert) then
+        executarMinimizacao()
     end
 end)
 
@@ -1634,7 +1651,7 @@ renderConnection = RunService.RenderStepped:Connect(function()
     end
 end)
 
--- Função para encontrar a arma caida em qualquer lugar do mapa recursivamente
+-- Função para encontrar a arma caída de forma limpa
 local function ObterArmaCaida()
     local gun = workspace:FindFirstChild("GunDrop", true)
     if not gun then
@@ -1703,8 +1720,8 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- TELEPORT TO GUN CORRIGIDO E SEGURO (Bumerangue)
-    if Configs.TpToGun and root then
+    -- TELEPORT TO GUN APENAS EM PARTIDA (Bloqueado se estiver no Lobby)
+    if Configs.TpToGun and root and not NoLobby() then
         local gunDrop = ObterArmaCaida()
         if gunDrop then
             local targetPart = nil
@@ -1718,15 +1735,14 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
                 hasTeleportedToGun = true
                 originalPositionBeforeGun = root.CFrame
                 
-                -- Teleporta em cima da arma
                 root.CFrame = targetPart.CFrame * CFrame.new(0, 1.5, 0)
                 
                 task.spawn(function()
-                    task.wait(0.3) -- Tempo de coleta para garantir a captura na engine
+                    task.wait(0.3) 
                     if originalPositionBeforeGun and root and Configs.TpToGun then
                         root.CFrame = originalPositionBeforeGun
                     end
-                    task.wait(1.5) -- Cooldown para prevenir spam
+                    task.wait(1.5) 
                     hasTeleportedToGun = false
                 end)
             end
@@ -1735,9 +1751,8 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- AUTO COLLECT TOTALMENTE MODIFICADO, RAPIDO E PRECISO (No-Clip + Lock de Moeda)
-    if Configs.AutoCollect and root then
-        -- Desativa totalmente as colisões do personagem para atravessar qualquer parede/chão
+    -- AUTO COLLECT TOTALMENTE REESCRITO (Evita subidas infinitas, ignora moedas invisíveis e respeita o lobby)
+    if Configs.AutoCollect and root and not NoLobby() then
         if char then
             for _, part in ipairs(char:GetDescendants()) do
                 if part:IsA("BasePart") then
@@ -1746,12 +1761,10 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
             end
         end
 
-        -- Verifica se o alvo atual foi coletado ou desapareceu do mapa
-        if currentCollectTarget and (not currentCollectTarget.Parent or not currentCollectTarget:IsDescendantOf(workspace)) then
+        if currentCollectTarget and (not currentCollectTarget.Parent or not currentCollectTarget:IsDescendantOf(workspace) or currentCollectTarget.Transparency >= 1) then
             currentCollectTarget = nil
         end
 
-        -- Busca a moeda válida mais próxima se não estiver focado em nenhuma
         if not currentCollectTarget then
             local closestCoin = nil
             local closestDist = math.huge
@@ -1760,10 +1773,10 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
                 if d.Name == "Coin_Container" or d.Name == "Coin" or d.Name == "CoinVisual" or d.Name == "MainCoin" or d.Name == "GoldenCoin" then
                     local pPart = d:IsA("BasePart") and d or d:FindFirstChildOfClass("BasePart")
                     if pPart then
-                        -- Ignora se a moeda já estiver invisível (coletada) ou fora do jogo
-                        if pPart.Transparency < 1 and pPart:IsDescendantOf(workspace) then
+                        -- FILTRO SEGURO: Ignora moedas fantasmas fora dos limites ou invisíveis
+                        if pPart.Transparency < 0.9 and pPart:IsDescendantOf(workspace) and pPart.Position.Y < 80 then
                             local dist = (root.Position - pPart.Position).Magnitude
-                            if dist < closestDist and dist < 1000 then
+                            if dist < closestDist then
                                 closestDist = dist
                                 closestCoin = pPart
                             end
@@ -1774,9 +1787,15 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
             currentCollectTarget = closestCoin
         end
 
-        -- Executa o movimento direto e rápido focado na moeda travada
         if currentCollectTarget then
             local targetPos = currentCollectTarget.Position
+            
+            -- Salvaguarda física: Se a moeda for colocada no vácuo alto, cancela o alvo e busca no chão
+            if targetPos.Y > 75 then
+                currentCollectTarget = nil
+                return
+            end
+
             local currentPos = root.Position
             local dist = (targetPos - currentPos).Magnitude
             
@@ -1785,8 +1804,7 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
             end)
             
             if dist > 1 then
-                -- Voo rápido e sem jittering (110 studs por segundo)
-                local flySpeed = 110 
+                local flySpeed = 95 -- Velocidade equilibrada ideal para evitar desyncs
                 local moveAmount = flySpeed * dt
                 local direction = (targetPos - currentPos).Unit
                 
@@ -1796,7 +1814,6 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
                     root.CFrame = CFrame.new(currentPos + direction * moveAmount)
                 end
             else
-                -- Fica exatamente parado na moeda focado até ela sumir do jogo de fato (evita voo bagunçado)
                 root.CFrame = CFrame.new(targetPos)
             end
         end
