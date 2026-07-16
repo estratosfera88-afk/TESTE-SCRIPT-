@@ -1,5 +1,5 @@
 -- [[
---     AKAT MM2 SCRIPT [BETA v2.2] - PERFORMANCE & UI OVERHAUL (OPTIMIZED & FIXED)
+--     AKAT MM2 SCRIPT [BETA v2.3] - PERFORMANCE & UI OVERHAUL (OPTIMIZED & FIXED)
 -- ]]
 
 local Players = game:GetService("Players")
@@ -172,7 +172,7 @@ local Locales = {
             },
             AutoCollect = {
                 Title = "Auto Monedas",
-                Desc = "Vuela atravesando todo rápidamente y espera a recolectar cada moneda antes de ir a la siguiente."
+                Desc = "Vuela atravesando todo rápidamente y espera a recolectar cada moenda antes de ir a la siguiente."
             },
             ChatRoles = {
                 Title = "Revelar Roles",
@@ -225,13 +225,14 @@ if uiParent:FindFirstChild("DeltaAkatUniversalUI") then
 end
 screenGui.Parent = uiParent
 
--- Botão Flutuante (AKAT) - ATUALIZADO (IMAGEM E BORDA PRETA FINA)
+-- Botão Flutuante (AKAT) - CORRIGIDO (IMAGEM E BORDA)
 local FloatBtn = Instance.new("ImageButton", screenGui)
 FloatBtn.Name = "FloatBtn"
 FloatBtn.AnchorPoint = Vector2.new(0.5, 0.5) 
 FloatBtn.Size = UDim2.new(0, 44, 0, 44)
-FloatBtn.Position = UDim2.new(0.05, 22, 0.5, 0)
-FloatBtn.Image = "rbxassetid://99997714241420"
+-- Formato rbxthumb resolve de forma universal Decals para Image IDs em qualquer executor mobile!
+FloatBtn.Image = "rbxthumb://type=Asset&id=99997714241420&w=150&h=150"
+FloatBtn.ImageColor3 = Color3.fromRGB(255, 255, 255)
 FloatBtn.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
 FloatBtn.Visible = false 
 FloatBtn.ZIndex = 30
@@ -239,19 +240,19 @@ FloatBtn.ZIndex = 30
 local floatCorner = Instance.new("UICorner", FloatBtn)
 floatCorner.CornerRadius = UDim.new(0, 8) 
 
--- Borda mais fina (Thickness = 1) e cor alterada para preto
+-- CORRIGIDO: A borda precisa ser Branca (255,255,255) para que as cores do UIGradient não fiquem pretas!
 local FloatStroke = Instance.new("UIStroke", FloatBtn)
 FloatStroke.Thickness = 1
-FloatStroke.Color = Color3.fromRGB(0, 0, 0)
+FloatStroke.Color = Color3.fromRGB(255, 255, 255)
 
 local StrokeGradient = Instance.new("UIGradient", FloatStroke)
 StrokeGradient.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(0, Color3.fromHex("#8B0000")),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 0, 0)), -- Trocado branco por preto
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(15, 15, 15)), -- Transição suave para tom quase preto
     ColorSequenceKeypoint.new(1, Color3.fromHex("#8B0000"))
 })
 
--- Animação infinita do gradiente
+-- Animação do gradiente giratório
 task.spawn(function()
     local rot = 0
     while task.wait() do
@@ -647,12 +648,6 @@ Instance.new("UICorner", btnNo).CornerRadius = UDim.new(0, 6)
 
 -- ==================== 4. FUNÇÕES DE SUPORTE E DE EXECUÇÃO ====================
 
-local function IsInMatch()
-    local normal = workspace:FindFirstChild("Normal")
-    local map = workspace:FindFirstChild("Map")
-    return (normal ~= nil or map ~= nil or workspace:FindFirstChild("GunDrop", true) ~= nil)
-end
-
 local function DetectarRoleReal(p)
     if not p or not p.Parent then return "Survivor" end
     local char = p.Character
@@ -1019,7 +1014,6 @@ local ConfigCallbacks = {
         end
     end,
 
-    -- PROBLEMA 1 CORRIGIDO (Removido PlatformStand que causava o Ragdoll ao ativar AutoCollect)
     AutoCollect = function(enabled)
         local char = player.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -1030,7 +1024,7 @@ local ConfigCallbacks = {
             end
         else
             if hum then
-                pcall(function() hum.PlatformStand = false end) -- Agora permanece em pé e não cai
+                pcall(function() hum.PlatformStand = false end)
             end
         end
     end
@@ -1583,7 +1577,7 @@ task.spawn(function()
     end
 end)
 
--- PROBLEMA 3 CORRIGIDO (AIMBOT ATUALIZADO: Gira câmera e personagem no Mobile para mirar exatamente no Murderer)
+-- AIMBOT ATUALIZADO (Gira câmera e personagem para mirar no Murderer)
 renderConnection = RunService.RenderStepped:Connect(function()
     if Configs.AutoShoot then
         local char = player.Character
@@ -1594,7 +1588,6 @@ renderConnection = RunService.RenderStepped:Connect(function()
                 local targetPart = murderer.Character:FindFirstChild("HumanoidRootPart") or murderer.Character:FindFirstChild("Head")
                 local myRoot = char:FindFirstChild("HumanoidRootPart")
                 if targetPart and myRoot then
-                    -- Rotaciona a frente do jogador e a câmera em direção ao inimigo
                     local targetPos = targetPart.Position
                     myRoot.CFrame = CFrame.new(myRoot.Position, Vector3.new(targetPos.X, myRoot.Position.Y, targetPos.Z))
                     Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPos)
@@ -1610,7 +1603,7 @@ renderConnection = RunService.RenderStepped:Connect(function()
     end
 end)
 
--- PROBLEMA 2 CORRIGIDO (Busca aprimorada e direta do GunDrop)
+-- TELEPORT TO GUN (Busca recursiva direta da pistola dropada)
 local function ObterArmaCaida()
     local gun = workspace:FindFirstChild("GunDrop", true)
     if gun then
@@ -1632,26 +1625,20 @@ local function PlayerTemArma()
     return false
 end
 
--- Busca recursiva de moedas para que nunca perca o target de farm no Mobile
+-- AUTO COLLECT CORRIGIDO (Busca recursiva de moedas de partida no MM2)
 local function ObterMoedaProxima(root)
     local closestCoin = nil
     local closestDist = math.huge
     
-    local normal = workspace:FindFirstChild("Normal")
-    local map = normal and normal:FindFirstChild("Map") or workspace:FindFirstChild("Map")
-    local searchRoot = map or workspace
-    
-    for _, d in ipairs(searchRoot:GetDescendants()) do
+    for _, d in ipairs(workspace:GetDescendants()) do
         if d:IsA("BasePart") then
             local name = d.Name:lower()
-            -- Corresponde a qualquer tipo de moeda em qualquer mapa e eventos do MM2
-            if string.find(name, "coin") or name == "snowflake" or name == "candycane" then
-                if d.Transparency < 1 then
-                    local dist = (root.Position - d.Position).Magnitude
-                    if dist < closestDist then
-                        closestDist = dist
-                        closestCoin = d
-                    end
+            -- Filtra especificamente moedas coletáveis e moedas de eventos festivos
+            if (name == "coin" or name == "snowflake" or name == "candycane" or name:find("token") or name:find("diamond")) and d.Transparency < 1 then
+                local dist = (root.Position - d.Position).Magnitude
+                if dist < closestDist then
+                    closestDist = dist
+                    closestCoin = d
                 end
             end
         end
@@ -1715,7 +1702,7 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- TELEPORT TO GUN CORRIGIDO E APRIMORADO (Removido bloqueio do IsInMatch que quebrava o script)
+    -- TELEPORT TO GUN
     if Configs.TpToGun and root and not PlayerTemArma() then
         local gunDrop = ObterArmaCaida()
         if gunDrop and not hasTeleportedToGun then
@@ -1740,8 +1727,8 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- AUTO COLLECT CORRIGIDO E OTIMIZADO (Não deita mais o personagem)
-    if Configs.AutoCollect and root and IsInMatch() then
+    -- AUTO COLLECT TOTALMENTE CORRIGIDO (Removido o IsInMatch que impedia de rodar)
+    if Configs.AutoCollect and root then
         if char then
             for _, part in ipairs(char:GetChildren()) do
                 if part:IsA("BasePart") then
