@@ -1,5 +1,5 @@
 -- [[
---     AKAT MM2 SCRIPT [BETA v2.4] - MELHORIAS INTELIGENTES (AUTO COLLECT & TP GUN FIXES)
+--     AKAT MM2 SCRIPT [BETA v2.3] - PERFORMANCE & UI OVERHAUL (OPTIMIZED & FIXED)
 -- ]]
 
 local Players = game:GetService("Players")
@@ -8,39 +8,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
 
--- ==================== COMPATIBILIDADE E POLYFILLS ====================
--- Garante que a biblioteca task funcione mesmo em executores desatualizados
-if not task then
-    task = {
-        spawn = function(f, ...) return coroutine.resume(coroutine.create(f), ...) end,
-        wait = function(s) return wait(s) end,
-        delay = function(s, f) return delay(s, f) end,
-        defer = function(f) return spawn(f) end
-    }
-else
-    if not task.spawn then task.spawn = function(f, ...) return coroutine.resume(coroutine.create(f), ...) end end
-    if not task.wait then task.wait = function(s) return wait(s) end end
-    if not task.delay then task.delay = function(s, f) return delay(s, f) end end
-end
-
--- Polyfill para o Color3.fromHex (evita crash em ambientes antigos)
-if not Color3.fromHex then
-    Color3.fromHex = function(hex)
-        hex = hex:gsub("#", "")
-        local r = tonumber(hex:sub(1, 2), 16) or 0
-        local g = tonumber(hex:sub(3, 4), 16) or 0
-        local b = tonumber(hex:sub(5, 6), 16) or 0
-        return Color3.fromRGB(r, g, b)
-    end
-end
-
--- Garante que o LocalPlayer está carregado
 local player = Players.LocalPlayer
-while not player do
-    task.wait()
-    player = Players.LocalPlayer
-end
-
 local Camera = workspace.CurrentCamera
 
 -- ==================== 1. CONFIGURAÇÕES E LOCALES ESTÁTICOS ====================
@@ -237,37 +205,7 @@ local hasTeleportedToGun = false
 local originalPositionBeforeGun = nil
 local currentCollectTarget = nil 
 local lastCoinSearch = 0
-
--- [CORREÇÃO INTELIGENTE]: Variáveis para detectar se está em partida real
-local isInActualGame = false
-local lastGameStateCheck = 0
-
--- ==================== FUNÇÕES DE DETECÇÃO INTELIGENTE ====================
-
-local function VerificarSeEstáEmPartida()
-    local char = player.Character
-    if not char then return false end
-    
-    local temsHumanoid = char:FindFirstChildOfClass("Humanoid")
-    if not temsHumanoid then return false end
-    
-    local hasGameElements = workspace:FindFirstChild("Coins") or 
-                            workspace:FindFirstChild("ToggledCoins") or
-                            workspace:FindFirstChild("SpawnCoins") or
-                            workspace:FindFirstChildWhichIsA("Folder", false) ~= nil
-    
-    if temsHumanoid.Health <= 0 then return false end
-    
-    local hasActivePlayers = false
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= player and p.Character and p.Character:FindFirstChildOfClass("Humanoid") and p.Character.Humanoid.Health > 0 then
-            hasActivePlayers = true
-            break
-        end
-    end
-    
-    return hasActivePlayers
-end
+local wasAutoCollecting = false -- Controle inteligente do Auto Collect
 
 -- ==================== 3. CRIAÇÃO DE TODA A ESTRUTURA DE INTERFACE (UI) ====================
 local screenGui = Instance.new("ScreenGui")
@@ -276,9 +214,8 @@ screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true 
 
 local uiParent = player:FindFirstChild("PlayerGui")
-if gethui and type(gethui) == "function" then 
-    local ok, res = pcall(gethui)
-    if ok and res then uiParent = res end
+if gethui then 
+    uiParent = gethui()
 else
     local successCore, coreGui = pcall(function() return game:GetService("CoreGui") end)
     if successCore and coreGui then uiParent = coreGui end
@@ -289,12 +226,14 @@ if uiParent:FindFirstChild("DeltaAkatUniversalUI") then
 end
 screenGui.Parent = uiParent
 
--- Botão Flutuante (AKAT) - LADO ESQUERDO
+-- Botão Flutuante (AKAT) - NASCENDO NA ESQUERDA AGORA
 local FloatBtn = Instance.new("ImageButton", screenGui)
 FloatBtn.Name = "FloatBtn"
 FloatBtn.AnchorPoint = Vector2.new(0.5, 0.5) 
 FloatBtn.Size = UDim2.new(0, 44, 0, 44)
-FloatBtn.Position = UDim2.new(0.15, 0, 0.4, 0)
+
+-- [CORREÇÃO]: Botão posicionado no lado esquerdo da tela
+FloatBtn.Position = UDim2.new(0.12, 0, 0.4, 0)
 
 FloatBtn.Image = "rbxthumb://type=Asset&id=99997714241420&w=150&h=150"
 FloatBtn.ImageColor3 = Color3.fromRGB(255, 255, 255)
@@ -312,7 +251,7 @@ FloatStroke.Color = Color3.fromRGB(255, 255, 255)
 local StrokeGradient = Instance.new("UIGradient", FloatStroke)
 StrokeGradient.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(0, Color3.fromHex("#8B0000")),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(15, 15, 15)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(15, 15, 15)), 
     ColorSequenceKeypoint.new(1, Color3.fromHex("#8B0000"))
 })
 
@@ -440,7 +379,6 @@ UIListTop.VerticalAlignment = Enum.VerticalAlignment.Center
 UIListTop.Padding = UDim.new(0, 8)
 UIListTop.SortOrder = Enum.SortOrder.LayoutOrder
 
--- Botão de Idioma
 local LanguageBtn = Instance.new("TextButton", topButtons)
 LanguageBtn.Name = "LanguageBtn"
 LanguageBtn.LayoutOrder = 0
@@ -453,7 +391,6 @@ LanguageBtn.TextSize = 10
 LanguageBtn.ZIndex = 7
 Instance.new("UICorner", LanguageBtn).CornerRadius = UDim.new(0, 5)
 
--- Botão da Lupa de Pesquisa
 local SearchBtn = Instance.new("TextButton", topButtons)
 SearchBtn.Name = "SearchBtn"
 SearchBtn.LayoutOrder = 1
@@ -491,7 +428,6 @@ SearchHandle.BackgroundColor3 = Color3.fromHex("#A0A0A0")
 SearchHandle.BorderSizePixel = 0
 SearchHandle.ZIndex = 8
 
--- Botão de Minimizar
 local MinimizeBtn = Instance.new("TextButton", topButtons)
 MinimizeBtn.Name = "MinimizeBtn"
 MinimizeBtn.LayoutOrder = 2
@@ -510,7 +446,6 @@ MinimizeLine.BackgroundColor3 = Color3.fromHex("#A0A0A0")
 MinimizeLine.BorderSizePixel = 0
 MinimizeLine.ZIndex = 8
 
--- Botão de Fechar
 local CloseBtn = Instance.new("TextButton", topButtons)
 CloseBtn.Name = "CloseBtn"
 CloseBtn.LayoutOrder = 3 
@@ -540,7 +475,6 @@ CloseLine2.BackgroundColor3 = Color3.fromHex("#A0A0A0")
 CloseLine2.BorderSizePixel = 0
 CloseLine2.ZIndex = 8
 
--- Divisor Horizontal
 local div = Instance.new("Frame", mainFrame)
 div.Size = UDim2.new(1, 0, 0, 1)
 div.Position = UDim2.new(0, 0, 0, 52)
@@ -548,7 +482,6 @@ div.BackgroundColor3 = Color3.fromHex("#121212")
 div.BorderSizePixel = 0
 div.ZIndex = 6
 
--- Painel Lateral (Sidebar)
 local SidebarFrame = Instance.new("Frame", mainFrame)
 SidebarFrame.Name = "SidebarFrame"
 SidebarFrame.Size = UDim2.new(0, 140, 1, -53)
@@ -595,7 +528,6 @@ local TabsPadding = Instance.new("UIPadding", TabsContainer)
 TabsPadding.PaddingBottom = UDim.new(0, 15)
 TabsPadding.PaddingTop = UDim.new(0, 5)
 
--- Perfil de Usuário
 local UserProfileFrame = Instance.new("Frame", SidebarFrame)
 UserProfileFrame.Name = "UserProfileFrame"
 UserProfileFrame.Size = UDim2.new(1, -16, 0, 50)
@@ -645,7 +577,6 @@ UsernameLabel.TextXAlignment = Enum.TextXAlignment.Left
 UsernameLabel.TextTruncate = Enum.TextTruncate.AtEnd
 UsernameLabel.ZIndex = 8
 
--- Container Principal de Toggles
 local togglesContainer = Instance.new("ScrollingFrame", mainFrame)
 togglesContainer.Name = "TogglesContainer"
 togglesContainer.Size = UDim2.new(1, -156, 1, -66)
@@ -666,7 +597,6 @@ containerLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 local uiPadding = Instance.new("UIPadding", togglesContainer)
 uiPadding.PaddingBottom = UDim.new(0, 8)
 
--- Painel de Confirmação para Fechar
 local confirmFrame = Instance.new("Frame", mainFrame)
 confirmFrame.Name = "ConfirmFrame"
 confirmFrame.Size = UDim2.new(1, 0, 1, 0)
@@ -1078,24 +1008,9 @@ local ConfigCallbacks = {
     end,
 
     AutoCollect = function(enabled)
-        local char = player.Character
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
         if not enabled then
             currentCollectTarget = nil
-            if hum then
-                pcall(function() hum.PlatformStand = false end)
-            end
-            if char then
-                for _, part in ipairs(char:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = true
-                    end
-                end
-            end
-        else
-            if hum then
-                pcall(function() hum.PlatformStand = true end)
-            end
+            -- A restauração inteligente de física e colisão agora é tratada de forma segura dentro do Heartbeat
         end
     end
 }
@@ -1205,11 +1120,6 @@ local function LimparEDesligarAbsolutamente()
                     local handle = item:FindFirstChild("Handle")
                     local reachPart = handle and handle:FindFirstChild("AkatReachPart")
                     if reachPart then reachPart:Destroy() end
-                end
-            end
-            for _, part in ipairs(char:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = true
                 end
             end
         end
@@ -1695,17 +1605,24 @@ renderConnection = RunService.RenderStepped:Connect(function()
     end
 end)
 
-local function ObterArmaCaida()
-    if not VerificarSeEstáEmPartida() then return nil end
-    
+-- TELEPORT TO GUN (Com proteção de limite de distância p/ não bugar no lobby)
+local function ObterArmaCaida(root)
     local gun = workspace:FindFirstChild("GunDrop", true)
     if gun then
+        local targetPart = nil
         if gun:IsA("BasePart") then 
-            return gun 
+            targetPart = gun 
         elseif gun:IsA("Model") then
-            return gun:FindFirstChildOfClass("BasePart") or gun.PrimaryPart
+            targetPart = gun:FindFirstChildOfClass("BasePart") or gun.PrimaryPart
         elseif gun:IsA("Tool") then
-            return gun:FindFirstChild("Handle") or gun:FindFirstChildOfClass("BasePart")
+            targetPart = gun:FindFirstChild("Handle") or gun:FindFirstChildOfClass("BasePart")
+        end
+        
+        if targetPart and root then
+            -- [CORREÇÃO]: Evita ir para a arma se o jogador estiver muito longe (ex: No Lobby)
+            if (root.Position - targetPart.Position).Magnitude < 1500 then
+                return targetPart
+            end
         end
     end
     return nil
@@ -1718,9 +1635,8 @@ local function PlayerTemArma()
     return false
 end
 
+-- AUTO COLLECT COM PROTEÇÃO DE DISTÂNCIA
 local function ObterMoedaProxima(root)
-    if not VerificarSeEstáEmPartida() then return nil end
-    
     local closestCoin = nil
     local closestDist = math.huge
     
@@ -1730,7 +1646,8 @@ local function ObterMoedaProxima(root)
             if name:find("coin") or name:find("moeda") or name:find("gold") or name == "snowflake" or name == "candycane" or name:find("token") or name:find("diamond") or name:find("present") or name:find("candy") then
                 if not d:IsDescendantOf(Players) and not d:FindFirstAncestorOfClass("Tool") and not d:FindFirstAncestorOfClass("Accessory") then
                     local dist = (root.Position - d.Position).Magnitude
-                    if dist < closestDist then
+                    -- [CORREÇÃO]: Se estiver a mais de 1500 studs (ex: No lobby), ele ignora, evitando voar do lobby até o mapa!
+                    if dist < closestDist and dist < 1500 then
                         closestDist = dist
                         closestCoin = d
                     end
@@ -1797,8 +1714,9 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    if Configs.TpToGun and root and not PlayerTemArma() and VerificarSeEstáEmPartida() then
-        local gunDrop = ObterArmaCaida()
+    -- TELEPORT TO GUN
+    if Configs.TpToGun and root and not PlayerTemArma() then
+        local gunDrop = ObterArmaCaida(root)
         if gunDrop and not hasTeleportedToGun then
             hasTeleportedToGun = true
             originalPositionBeforeGun = root.CFrame
@@ -1821,19 +1739,8 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    if Configs.AutoCollect and root and VerificarSeEstáEmPartida() then
-        if hum then
-            pcall(function() hum.PlatformStand = true end)
-        end
-
-        if char then
-            for _, part in ipairs(char:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = false
-                end
-            end
-        end
-
+    -- AUTO COLLECT TOTALMENTE CORRIGIDO (Proteção Inteligente de colisão e distância do Lobby)
+    if Configs.AutoCollect and root then
         if currentCollectTarget and (not currentCollectTarget.Parent or not currentCollectTarget:IsDescendantOf(workspace) or currentCollectTarget.Transparency >= 1) then
             currentCollectTarget = nil
         end
@@ -1844,6 +1751,21 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
 
         if currentCollectTarget then
+            wasAutoCollecting = true
+            
+            -- [CORREÇÃO]: Força estado sem gravidade se houver moedas
+            if hum then
+                pcall(function() hum.PlatformStand = true end)
+            end
+
+            if char then
+                for _, part in ipairs(char:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+            end
+
             local targetPos = currentCollectTarget.Position
             local currentPos = root.Position
             local dist = (targetPos - currentPos).Magnitude
@@ -1854,7 +1776,7 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
             end)
             
             if dist > 1 then
-                local flySpeed = 85
+                local flySpeed = 85 
                 local moveAmount = flySpeed * dt
                 local direction = (targetPos - currentPos).Unit
                 
@@ -1865,18 +1787,49 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
                 end
             else
                 root.CFrame = CFrame.new(targetPos)
-                if firetouchinterest and type(firetouchinterest) == "function" then
-                    pcall(function()
-                        firetouchinterest(root, currentCollectTarget, 0)
-                        firetouchinterest(root, currentCollectTarget, 1)
-                    end)
+                if firetouchinterest then
+                    firetouchinterest(root, currentCollectTarget, 0)
+                    firetouchinterest(root, currentCollectTarget, 1)
+                end
+            end
+        else
+            -- [CORREÇÃO LOBBY/VOID]: AutoCollect ativado mas sem moedas (está no lobby ou partida acabou).
+            -- Restaura colisão e física para que possa andar sem cair no void.
+            if wasAutoCollecting then
+                wasAutoCollecting = false
+                if hum then
+                    pcall(function() hum.PlatformStand = false end)
+                end
+                if char then
+                    for _, part in ipairs(char:GetChildren()) do
+                        if part:IsA("BasePart") and (part.Name == "HumanoidRootPart" or part.Name == "Head" or part.Name == "Torso" or part.Name == "UpperTorso" or part.Name == "LowerTorso") then
+                            part.CanCollide = true
+                        end
+                    end
+                end
+                if root then
+                    root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
                 end
             end
         end
     else
         currentCollectTarget = nil
-        if hum and hum.PlatformStand then
-            pcall(function() hum.PlatformStand = false end)
+        -- [CORREÇÃO VOID]: Restaura colisão de forma limpa imediatamente após desativar o botão
+        if wasAutoCollecting then
+            wasAutoCollecting = false
+            if hum then
+                pcall(function() hum.PlatformStand = false end)
+            end
+            if char then
+                for _, part in ipairs(char:GetChildren()) do
+                    if part:IsA("BasePart") and (part.Name == "HumanoidRootPart" or part.Name == "Head" or part.Name == "Torso" or part.Name == "UpperTorso" or part.Name == "LowerTorso") then
+                        part.CanCollide = true
+                    end
+                end
+            end
+            if root then
+                root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+            end
         end
     end
 
@@ -1904,15 +1857,13 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
                         weld.Part1 = reachPart
                         weld.Parent = reachPart
                     end
-                    if firetouchinterest and type(firetouchinterest) == "function" then
+                    if firetouchinterest then
                         for _, p in ipairs(Players:GetPlayers()) do
                             if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
                                 local tRoot = p.Character.HumanoidRootPart
                                 if (root.Position - tRoot.Position).Magnitude <= 25 then
-                                    pcall(function()
-                                        firetouchinterest(handle, tRoot, 0)
-                                        firetouchinterest(handle, tRoot, 1)
-                                    end)
+                                    firetouchinterest(handle, tRoot, 0)
+                                    firetouchinterest(handle, tRoot, 1)
                                 end
                             end
                         end
