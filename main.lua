@@ -8,7 +8,39 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
 
+-- ==================== COMPATIBILIDADE E POLYFILLS ====================
+-- Garante que a biblioteca task funcione mesmo em executores desatualizados
+if not task then
+    task = {
+        spawn = function(f, ...) return coroutine.resume(coroutine.create(f), ...) end,
+        wait = function(s) return wait(s) end,
+        delay = function(s, f) return delay(s, f) end,
+        defer = function(f) return spawn(f) end
+    }
+else
+    if not task.spawn then task.spawn = function(f, ...) return coroutine.resume(coroutine.create(f), ...) end end
+    if not task.wait then task.wait = function(s) return wait(s) end end
+    if not task.delay then task.delay = function(s, f) return delay(s, f) end end
+end
+
+-- Polyfill para o Color3.fromHex (evita crash em ambientes antigos)
+if not Color3.fromHex then
+    Color3.fromHex = function(hex)
+        hex = hex:gsub("#", "")
+        local r = tonumber(hex:sub(1, 2), 16) or 0
+        local g = tonumber(hex:sub(3, 4), 16) or 0
+        local b = tonumber(hex:sub(5, 6), 16) or 0
+        return Color3.fromRGB(r, g, b)
+    end
+end
+
+-- Garante que o LocalPlayer está carregado
 local player = Players.LocalPlayer
+while not player do
+    task.wait()
+    player = Players.LocalPlayer
+end
+
 local Camera = workspace.CurrentCamera
 
 -- ==================== 1. CONFIGURAÇÕES E LOCALES ESTÁTICOS ====================
@@ -212,25 +244,20 @@ local lastGameStateCheck = 0
 
 -- ==================== FUNÇÕES DE DETECÇÃO INTELIGENTE ====================
 
--- [NOVO]: Função para verificar se o jogador está em uma partida real (não no lobby)
 local function VerificarSeEstáEmPartida()
     local char = player.Character
     if not char then return false end
     
-    -- Verifica se há objetos típicos de partida ativa
     local temsHumanoid = char:FindFirstChildOfClass("Humanoid")
     if not temsHumanoid then return false end
     
-    -- Verifica se o mapa está carregado (procura por elementos do MM2)
     local hasGameElements = workspace:FindFirstChild("Coins") or 
                             workspace:FindFirstChild("ToggledCoins") or
                             workspace:FindFirstChild("SpawnCoins") or
                             workspace:FindFirstChildWhichIsA("Folder", false) ~= nil
     
-    -- Verifica se humanoid tem saúde válida
     if temsHumanoid.Health <= 0 then return false end
     
-    -- Verifica se existem outros jogadores com papéis (indica partida ativa)
     local hasActivePlayers = false
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= player and p.Character and p.Character:FindFirstChildOfClass("Humanoid") and p.Character.Humanoid.Health > 0 then
@@ -249,8 +276,9 @@ screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true 
 
 local uiParent = player:FindFirstChild("PlayerGui")
-if gethui then 
-    uiParent = gethui()
+if gethui and type(gethui) == "function" then 
+    local ok, res = pcall(gethui)
+    if ok and res then uiParent = res end
 else
     local successCore, coreGui = pcall(function() return game:GetService("CoreGui") end)
     if successCore and coreGui then uiParent = coreGui end
@@ -261,16 +289,13 @@ if uiParent:FindFirstChild("DeltaAkatUniversalUI") then
 end
 screenGui.Parent = uiParent
 
--- Botão Flutuante (AKAT) - CORRIGIDO PARA NASCER DO LADO ESQUERDO
+-- Botão Flutuante (AKAT) - LADO ESQUERDO
 local FloatBtn = Instance.new("ImageButton", screenGui)
 FloatBtn.Name = "FloatBtn"
 FloatBtn.AnchorPoint = Vector2.new(0.5, 0.5) 
 FloatBtn.Size = UDim2.new(0, 44, 0, 44)
-
--- [CORREÇÃO]: FloatBtn agora nasce no lado ESQUERDO da tela
 FloatBtn.Position = UDim2.new(0.15, 0, 0.4, 0)
 
--- Formato rbxthumb resolve de forma universal Decals para Image IDs em qualquer executor mobile!
 FloatBtn.Image = "rbxthumb://type=Asset&id=99997714241420&w=150&h=150"
 FloatBtn.ImageColor3 = Color3.fromRGB(255, 255, 255)
 FloatBtn.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
@@ -280,7 +305,6 @@ FloatBtn.ZIndex = 30
 local floatCorner = Instance.new("UICorner", FloatBtn)
 floatCorner.CornerRadius = UDim.new(0, 8) 
 
--- CORRIGIDO: A borda precisa ser Branca (255,255,255) para que as cores do UIGradient não fiquem pretas!
 local FloatStroke = Instance.new("UIStroke", FloatBtn)
 FloatStroke.Thickness = 1
 FloatStroke.Color = Color3.fromRGB(255, 255, 255)
@@ -292,7 +316,6 @@ StrokeGradient.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(1, Color3.fromHex("#8B0000"))
 })
 
--- Animação do gradiente giratório
 task.spawn(function()
     local rot = 0
     while task.wait() do
@@ -1062,7 +1085,6 @@ local ConfigCallbacks = {
             if hum then
                 pcall(function() hum.PlatformStand = false end)
             end
-            -- [CORREÇÃO INTELIGENTE]: Restaura a física normal e recoloca as colisões ao desativar
             if char then
                 for _, part in ipairs(char:GetDescendants()) do
                     if part:IsA("BasePart") then
@@ -1185,7 +1207,6 @@ local function LimparEDesligarAbsolutamente()
                     if reachPart then reachPart:Destroy() end
                 end
             end
-            -- [CORREÇÃO]: Restaura colisões normais ao sair
             for _, part in ipairs(char:GetDescendants()) do
                 if part:IsA("BasePart") then
                     part.CanCollide = true
@@ -1674,7 +1695,6 @@ renderConnection = RunService.RenderStepped:Connect(function()
     end
 end)
 
--- [CORREÇÃO INTELIGENTE]: Verifica se está em partida real antes de teleportar para arma
 local function ObterArmaCaida()
     if not VerificarSeEstáEmPartida() then return nil end
     
@@ -1698,7 +1718,6 @@ local function PlayerTemArma()
     return false
 end
 
--- [CORREÇÃO INTELIGENTE]: Auto Collect agora verifica se está em partida real
 local function ObterMoedaProxima(root)
     if not VerificarSeEstáEmPartida() then return nil end
     
@@ -1778,7 +1797,6 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- [CORREÇÃO INTELIGENTE]: TP TO GUN agora só funciona em partida real
     if Configs.TpToGun and root and not PlayerTemArma() and VerificarSeEstáEmPartida() then
         local gunDrop = ObterArmaCaida()
         if gunDrop and not hasTeleportedToGun then
@@ -1803,7 +1821,6 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- [CORREÇÃO INTELIGENTE]: AUTO COLLECT agora verifica se está em partida real e não cai no void
     if Configs.AutoCollect and root and VerificarSeEstáEmPartida() then
         if hum then
             pcall(function() hum.PlatformStand = true end)
@@ -1848,9 +1865,11 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
                 end
             else
                 root.CFrame = CFrame.new(targetPos)
-                if firetouchinterest then
-                    firetouchinterest(root, currentCollectTarget, 0)
-                    firetouchinterest(root, currentCollectTarget, 1)
+                if firetouchinterest and type(firetouchinterest) == "function" then
+                    pcall(function()
+                        firetouchinterest(root, currentCollectTarget, 0)
+                        firetouchinterest(root, currentCollectTarget, 1)
+                    end)
                 end
             end
         end
@@ -1885,13 +1904,15 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
                         weld.Part1 = reachPart
                         weld.Parent = reachPart
                     end
-                    if firetouchinterest then
+                    if firetouchinterest and type(firetouchinterest) == "function" then
                         for _, p in ipairs(Players:GetPlayers()) do
                             if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
                                 local tRoot = p.Character.HumanoidRootPart
                                 if (root.Position - tRoot.Position).Magnitude <= 25 then
-                                    firetouchinterest(handle, tRoot, 0)
-                                    firetouchinterest(handle, tRoot, 1)
+                                    pcall(function()
+                                        firetouchinterest(handle, tRoot, 0)
+                                        firetouchinterest(handle, tRoot, 1)
+                                    end)
                                 end
                             end
                         end
