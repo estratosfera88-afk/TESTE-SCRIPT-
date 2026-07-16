@@ -1,5 +1,5 @@
 -- [[
---     AKAT MM2 SCRIPT [BETA v2.3] - PERFORMANCE & UI OVERHAUL (OPTIMIZED & FIXED)
+--     AKAT MM2 SCRIPT [BETA v2.4] - ANTI-BAN & FLOATING BUTTON OPTIMIZED
 -- ]]
 
 local Players = game:GetService("Players")
@@ -10,6 +10,56 @@ local Lighting = game:GetService("Lighting")
 
 local player = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
+
+-- ==================== ANTI-BAN / ANTI-KICK INTEGRADO ====================
+task.spawn(function()
+    -- Bloqueia tentativas de Kick locais disparadas por scripts de detecção do jogo
+    local gmt = getrawmetatable and getrawmetatable(game)
+    if gmt and setreadonly and hookfunction then
+        setreadonly(gmt, false)
+        local oldIndex = gmt.__index
+        local oldNamecall = gmt.__namecall
+
+        -- Hook via Namecall (Métodos como player:Kick("motivo"))
+        gmt.__namecall = newcclosure(function(self, ...)
+            local method = getnamecallmethod()
+            if tostring(method):lower() == "kick" and self == player then
+                warn("[AKAT ANTI-BAN] Tentativa de Kick bloqueada com sucesso!")
+                return nil
+            end
+            return oldNamecall(self, ...)
+        end)
+
+        -- Hook via Index (Métodos indiretos ou propriedades)
+        gmt.__index = newcclosure(function(self, key)
+            if tostring(key):lower() == "kick" and self == player then
+                return newcclosure(function() 
+                    warn("[AKAT ANTI-BAN] Tentativa de chamada de Kick indireta bloqueada!")
+                end)
+            end
+            return oldIndex(self, key)
+        end)
+        setreadonly(gmt, true)
+    end
+
+    -- Proteção contra detecção de velocidade e teleporte (Bypass simples de física)
+    local charConnection
+    local function applyBypass(character)
+        if not character then return end
+        local humanoid = character:WaitForChild("Humanoid", 5)
+        if humanoid then
+            -- Previne o anticheat de ler alterações bruscas na WalkSpeed interceptando leituras
+            if hookproperty then
+                pcall(function()
+                    hookproperty(humanoid, "WalkSpeed", 16)
+                end)
+            end
+        end
+    end
+    
+    player.CharacterAdded:Connect(applyBypass)
+    if player.Character then applyBypass(player.Character) end
+end)
 
 -- ==================== 1. CONFIGURAÇÕES E LOCALES ESTÁTICOS ====================
 local Configs = {
@@ -205,7 +255,7 @@ local hasTeleportedToGun = false
 local originalPositionBeforeGun = nil
 local currentCollectTarget = nil 
 local lastCoinSearch = 0
-local wasAutoCollecting = false -- Controle inteligente do Auto Collect
+local wasAutoCollecting = false
 
 -- ==================== 3. CRIAÇÃO DE TODA A ESTRUTURA DE INTERFACE (UI) ====================
 local screenGui = Instance.new("ScreenGui")
@@ -226,13 +276,11 @@ if uiParent:FindFirstChild("DeltaAkatUniversalUI") then
 end
 screenGui.Parent = uiParent
 
--- Botão Flutuante (AKAT) - NASCENDO NA ESQUERDA AGORA
+-- Botão Flutuante (AKAT) - NA ESQUERDA
 local FloatBtn = Instance.new("ImageButton", screenGui)
 FloatBtn.Name = "FloatBtn"
 FloatBtn.AnchorPoint = Vector2.new(0.5, 0.5) 
 FloatBtn.Size = UDim2.new(0, 44, 0, 44)
-
--- [CORREÇÃO]: Botão posicionado no lado esquerdo da tela
 FloatBtn.Position = UDim2.new(0.12, 0, 0.4, 0)
 
 FloatBtn.Image = "rbxthumb://type=Asset&id=99997714241420&w=150&h=150"
@@ -1010,7 +1058,6 @@ local ConfigCallbacks = {
     AutoCollect = function(enabled)
         if not enabled then
             currentCollectTarget = nil
-            -- A restauração inteligente de física e colisão agora é tratada de forma segura dentro do Heartbeat
         end
     end
 }
@@ -1510,16 +1557,20 @@ btnYes.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
+-- ==================== NOVO CLIQUE ULTRA-RÁPIDO DO BOTÃO FLUTUANTE ====================
 local function AnimarCliqueFloatBtn()
     local originalSize = UDim2.new(0, 44, 0, 44)
-    local targetSize = UDim2.new(0, 36, 0, 36)
+    local targetSize = UDim2.new(0, 34, 0, 34) -- Reduz um pouco mais para maior impacto visual
     
-    local shrink = TweenService:Create(FloatBtn, TweenInfo.new(0.06, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = targetSize})
-    local expand = TweenService:Create(FloatBtn, TweenInfo.new(0.12, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = originalSize})
+    -- Transição instantânea e retorno elástico super veloz
+    local shrink = TweenService:Create(FloatBtn, TweenInfo.new(0.04, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = targetSize})
+    local expand = TweenService:Create(FloatBtn, TweenInfo.new(0.08, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = originalSize})
     
     shrink:Play()
-    shrink.Completed:Connect(function()
+    local c
+    c = shrink.Completed:Connect(function()
         expand:Play()
+        c:Disconnect()
     end)
 end
 
@@ -1579,7 +1630,7 @@ task.spawn(function()
     end
 end)
 
--- AIMBOT ATUALIZADO (Gira câmera e personagem para mirar no Murderer)
+-- AIMBOT
 renderConnection = RunService.RenderStepped:Connect(function()
     if Configs.AutoShoot then
         local char = player.Character
@@ -1605,7 +1656,7 @@ renderConnection = RunService.RenderStepped:Connect(function()
     end
 end)
 
--- TELEPORT TO GUN (Com proteção de limite de distância p/ não bugar no lobby)
+-- TELEPORT TO GUN
 local function ObterArmaCaida(root)
     local gun = workspace:FindFirstChild("GunDrop", true)
     if gun then
@@ -1619,7 +1670,6 @@ local function ObterArmaCaida(root)
         end
         
         if targetPart and root then
-            -- [CORREÇÃO]: Evita ir para a arma se o jogador estiver muito longe (ex: No Lobby)
             if (root.Position - targetPart.Position).Magnitude < 1500 then
                 return targetPart
             end
@@ -1635,7 +1685,7 @@ local function PlayerTemArma()
     return false
 end
 
--- AUTO COLLECT COM PROTEÇÃO DE DISTÂNCIA
+-- AUTO COLLECT
 local function ObterMoedaProxima(root)
     local closestCoin = nil
     local closestDist = math.huge
@@ -1646,7 +1696,6 @@ local function ObterMoedaProxima(root)
             if name:find("coin") or name:find("moeda") or name:find("gold") or name == "snowflake" or name == "candycane" or name:find("token") or name:find("diamond") or name:find("present") or name:find("candy") then
                 if not d:IsDescendantOf(Players) and not d:FindFirstAncestorOfClass("Tool") and not d:FindFirstAncestorOfClass("Accessory") then
                     local dist = (root.Position - d.Position).Magnitude
-                    -- [CORREÇÃO]: Se estiver a mais de 1500 studs (ex: No lobby), ele ignora, evitando voar do lobby até o mapa!
                     if dist < closestDist and dist < 1500 then
                         closestDist = dist
                         closestCoin = d
@@ -1739,7 +1788,7 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- AUTO COLLECT TOTALMENTE CORRIGIDO (Proteção Inteligente de colisão e distância do Lobby)
+    -- AUTO COLLECT
     if Configs.AutoCollect and root then
         if currentCollectTarget and (not currentCollectTarget.Parent or not currentCollectTarget:IsDescendantOf(workspace) or currentCollectTarget.Transparency >= 1) then
             currentCollectTarget = nil
@@ -1753,7 +1802,6 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         if currentCollectTarget then
             wasAutoCollecting = true
             
-            -- [CORREÇÃO]: Força estado sem gravidade se houver moedas
             if hum then
                 pcall(function() hum.PlatformStand = true end)
             end
@@ -1793,8 +1841,6 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
                 end
             end
         else
-            -- [CORREÇÃO LOBBY/VOID]: AutoCollect ativado mas sem moedas (está no lobby ou partida acabou).
-            -- Restaura colisão e física para que possa andar sem cair no void.
             if wasAutoCollecting then
                 wasAutoCollecting = false
                 if hum then
@@ -1814,7 +1860,6 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     else
         currentCollectTarget = nil
-        -- [CORREÇÃO VOID]: Restaura colisão de forma limpa imediatamente após desativar o botão
         if wasAutoCollecting then
             wasAutoCollecting = false
             if hum then
