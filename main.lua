@@ -70,7 +70,7 @@ local Locales = {
             },
             AutoCollect = {
                 Title = "Coletar Moedas",
-                Desc = "Voa de forma ultra avançada e suave coletando as moedas do mapa."
+                Desc = "Voa atravessando tudo rapidamente e espera coletar cada moeda antes de ir para a próxima."
             },
             ChatRoles = {
                 Title = "Revelar Funções",
@@ -124,7 +124,7 @@ local Locales = {
             },
             AutoCollect = {
                 Title = "Auto Collect",
-                Desc = "Smoothly flies from coin to coin around the map automatically."
+                Desc = "Flies through walls very fast, waiting for each coin to be collected before moving to the next."
             },
             ChatRoles = {
                 Title = "Reveal Roles",
@@ -178,7 +178,7 @@ local Locales = {
             },
             AutoCollect = {
                 Title = "Auto Monedas",
-                Desc = "Vuela suavemente de moneda en moneda recolectando de forma avanzada."
+                Desc = "Vuela atravesando todo rápidamente y espera a recolectar cada moneda antes de ir a la siguiente."
             },
             ChatRoles = {
                 Title = "Revelar Roles",
@@ -209,6 +209,7 @@ local announcedThisRound = false
 local lastShootTime = 0
 local hasTeleportedToGun = false
 local originalPositionBeforeGun = nil
+local currentCollectTarget = nil -- Trava de foco para o coletor
 
 -- ==================== 3. CRIAÇÃO DE TODA A ESTRUTURA DE INTERFACE (UI) ====================
 local screenGui = Instance.new("ScreenGui")
@@ -850,32 +851,14 @@ local function CriarIconeProcedural(parent, tabName)
         buildTrail(5, 11, 8)
 
     elseif tabName == "Teleports" then
-        -- ÍCONE ATUALIZADO: Seta moderna diagonal e futurista (Paper Plane/Arrow Cursor)
-        local arrowStem = Instance.new("Frame", iconContainer)
-        arrowStem.Name = "AccentFill"
-        arrowStem.Size = UDim2.new(0, 8, 0, 2)
-        arrowStem.Position = UDim2.new(0.5, -5, 0.5, -1)
-        arrowStem.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
-        arrowStem.BorderSizePixel = 0
-        arrowStem.ZIndex = 9
-
-        local arrowTip1 = Instance.new("Frame", iconContainer)
-        arrowTip1.Name = "AccentFill"
-        arrowTip1.Size = UDim2.new(0, 6, 0, 2)
-        arrowTip1.Position = UDim2.new(0.5, -1, 0.5, -3)
-        arrowTip1.Rotation = 45
-        arrowTip1.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
-        arrowTip1.BorderSizePixel = 0
-        arrowTip1.ZIndex = 9
-
-        local arrowTip2 = Instance.new("Frame", iconContainer)
-        arrowTip2.Name = "AccentFill"
-        arrowTip2.Size = UDim2.new(0, 6, 0, 2)
-        arrowTip2.Position = UDim2.new(0.5, -1, 0.5, 1)
-        arrowTip2.Rotation = -45
-        arrowTip2.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
-        arrowTip2.BorderSizePixel = 0
-        arrowTip2.ZIndex = 9
+        -- ÍCONE ATUALIZADO: Seta diagonal de localização (Arrow Cursor / Chevron) conforme a imagem enviada
+        local arrowIcon = Instance.new("ImageLabel", iconContainer)
+        arrowIcon.Name = "AccentImage"
+        arrowIcon.Size = UDim2.new(1, 0, 1, 0)
+        arrowIcon.BackgroundTransparency = 1
+        arrowIcon.Image = "rbxassetid://10734898144" -- Ícone vetorizado de alta fidelidade
+        arrowIcon.ImageColor3 = Color3.fromRGB(180, 180, 180)
+        arrowIcon.ZIndex = 9
 
     elseif tabName == "Misc" then
         for i = 1, 3 do
@@ -898,6 +881,8 @@ local function RecolorirIcone(iconContainer, targetColor, animSpeed)
             TweenService:Create(child, animSpeed, {Color = targetColor}):Play()
         elseif child.Name == "AccentFill" and child:IsA("Frame") then
             TweenService:Create(child, animSpeed, {BackgroundColor3 = targetColor}):Play()
+        elseif child.Name == "AccentImage" and child:IsA("ImageLabel") then
+            TweenService:Create(child, animSpeed, {ImageColor3 = targetColor}):Play()
         end
     end
 end
@@ -1236,7 +1221,7 @@ local function AlternarConfirmacao(exibir)
     end
 end
 
--- Função de minimização totalmente sincronizada e fluida
+-- Função de minimização totalmente sincronizada e fluida com efeito "Caindo" ao retornar
 local function executarMinimizacao()
     if isConfirmOpen then return end
     isMinimized = not isMinimized
@@ -1252,22 +1237,24 @@ local function executarMinimizacao()
         div.Visible = false
         TweenService:Create(mainWrapper, windowAnim, {Size = UDim2.new(0, 520, 0, 52)}):Play()
     else
-        -- Un-minimize (Restauração) idêntica à animação de abertura limpa
+        -- Un-minimize (Restauração) com o efeito de queda sequencial das abas e opções
         div.Visible = true
         SidebarFrame.Visible = true
         togglesContainer.Visible = true
         
         AplicarFadeSincronizado(SidebarFrame, true, 0)
-        AplicarFadeSincronizado(togglesContainer, true, 0)
         
         local openTween = TweenService:Create(mainWrapper, windowAnim, {Size = UDim2.new(0, 520, 0, 300)})
         openTween:Play()
         
         AplicarFadeSincronizado(SidebarFrame, false, 0.3)
-        AplicarFadeSincronizado(togglesContainer, false, 0.3)
+        
+        -- Executa a animação "Caindo" instantaneamente nas opções do menu
+        filterToggles(activeTab, searchTextBox.Text)
     end
 end
 
+-- Função de abertura totalmente sincronizada com efeito "Caindo" integrado
 local function alternarVisibilidadeMenu()
     menuAberto = not menuAberto
     local tempoAnim = 0.2
@@ -1291,9 +1278,10 @@ local function alternarVisibilidadeMenu()
                 togglesContainer.Visible = true
                 div.Visible = true
                 AplicarFadeSincronizado(SidebarFrame, true, 0)
-                AplicarFadeSincronizado(togglesContainer, true, 0)
                 AplicarFadeSincronizado(SidebarFrame, false, 0.22)
-                AplicarFadeSincronizado(togglesContainer, false, 0.22)
+                
+                -- Ativa a animação exata de queda sequencial ao reabrir pelo botão flutuante
+                filterToggles(activeTab, searchTextBox.Text)
             end
         end)
     else
@@ -1747,36 +1735,60 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
+    -- AUTO COLLECT TOTALMENTE MODIFICADO, RAPIDO E PRECISO (No-Clip + Lock de Moeda)
     if Configs.AutoCollect and root then
-        local closestCoin = nil
-        local closestDist = math.huge
-        
-        for _, d in ipairs(workspace:GetDescendants()) do
-            if d.Name == "Coin_Container" or d.Name == "Coin" or d.Name == "CoinVisual" or d.Name == "MainCoin" then
-                local pPart = d:IsA("BasePart") and d or d:FindFirstChildOfClass("BasePart")
-                if pPart then
-                    local dist = (root.Position - pPart.Position).Magnitude
-                    if dist < closestDist and dist < 500 then
-                        closestDist = dist
-                        closestCoin = pPart
-                    end
+        -- Desativa totalmente as colisões do personagem para atravessar qualquer parede/chão
+        if char then
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
                 end
             end
         end
-        
-        if closestCoin then
-            local targetPos = closestCoin.Position
+
+        -- Verifica se o alvo atual foi coletado ou desapareceu do mapa
+        if currentCollectTarget and (not currentCollectTarget.Parent or not currentCollectTarget:IsDescendantOf(workspace)) then
+            currentCollectTarget = nil
+        end
+
+        -- Busca a moeda válida mais próxima se não estiver focado em nenhuma
+        if not currentCollectTarget then
+            local closestCoin = nil
+            local closestDist = math.huge
+            
+            for _, d in ipairs(workspace:GetDescendants()) do
+                if d.Name == "Coin_Container" or d.Name == "Coin" or d.Name == "CoinVisual" or d.Name == "MainCoin" or d.Name == "GoldenCoin" then
+                    local pPart = d:IsA("BasePart") and d or d:FindFirstChildOfClass("BasePart")
+                    if pPart then
+                        -- Ignora se a moeda já estiver invisível (coletada) ou fora do jogo
+                        if pPart.Transparency < 1 and pPart:IsDescendantOf(workspace) then
+                            local dist = (root.Position - pPart.Position).Magnitude
+                            if dist < closestDist and dist < 1000 then
+                                closestDist = dist
+                                closestCoin = pPart
+                            end
+                        end
+                    end
+                end
+            end
+            currentCollectTarget = closestCoin
+        end
+
+        -- Executa o movimento direto e rápido focado na moeda travada
+        if currentCollectTarget then
+            local targetPos = currentCollectTarget.Position
             local currentPos = root.Position
             local dist = (targetPos - currentPos).Magnitude
             
-            if dist > 1.5 then
-                local flySpeed = 75 
+            pcall(function()
+                root.AssemblyLinearVelocity = Vector3.new(0, 0, 0) 
+            end)
+            
+            if dist > 1 then
+                -- Voo rápido e sem jittering (110 studs por segundo)
+                local flySpeed = 110 
                 local moveAmount = flySpeed * dt
                 local direction = (targetPos - currentPos).Unit
-                
-                pcall(function()
-                    root.AssemblyLinearVelocity = Vector3.new(0, 0, 0) 
-                end)
                 
                 if moveAmount >= dist then
                     root.CFrame = CFrame.new(targetPos)
@@ -1784,9 +1796,12 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
                     root.CFrame = CFrame.new(currentPos + direction * moveAmount)
                 end
             else
-                root.CFrame = closestCoin.CFrame
+                -- Fica exatamente parado na moeda focado até ela sumir do jogo de fato (evita voo bagunçado)
+                root.CFrame = CFrame.new(targetPos)
             end
         end
+    else
+        currentCollectTarget = nil
     end
 
     if char and root and hum then
