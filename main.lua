@@ -777,15 +777,15 @@ local function CriarIconeProcedural(parent, tabName)
     imageLabel.ImageColor3 = Color3.fromRGB(180, 180, 180) -- Cor padrão inativa
 
     if tabName == "Movement" then
-        imageLabel.Image = "rbxassetid://90358690675463"
+        imageLabel.Image = "rbxassetid://116118153718196"
     elseif tabName == "Teleports" then
-        imageLabel.Image = "rbxassetid://90358690675463"
+        imageLabel.Image = "rbxassetid://131357413318360"
     elseif tabName == "Misc" then
-        imageLabel.Image = "rbxassetid://110656497311677"
+        imageLabel.Image = "rbxassetid://96954032676031"
     elseif tabName == "Visuals" then
-        imageLabel.Image = "rbxassetid://98051686611454"
+        imageLabel.Image = "rbxassetid://134099134229815"
     elseif tabName == "Combat" then
-        imageLabel.Image = "rbxassetid://133188606257719"
+        imageLabel.Image = "rbxassetid://131607049070859"
     end
 end
 
