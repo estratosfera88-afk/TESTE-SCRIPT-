@@ -230,6 +230,10 @@ local FloatBtn = Instance.new("ImageButton", screenGui)
 FloatBtn.Name = "FloatBtn"
 FloatBtn.AnchorPoint = Vector2.new(0.5, 0.5) 
 FloatBtn.Size = UDim2.new(0, 44, 0, 44)
+
+-- [CORREÇÃO]: Evita que o botão nasça grudado no canto da tela. Agora surge no canto superior-médio direito.
+FloatBtn.Position = UDim2.new(0.85, 0, 0.4, 0)
+
 -- Formato rbxthumb resolve de forma universal Decals para Image IDs em qualquer executor mobile!
 FloatBtn.Image = "rbxthumb://type=Asset&id=99997714241420&w=150&h=150"
 FloatBtn.ImageColor3 = Color3.fromRGB(255, 255, 255)
@@ -1024,7 +1028,8 @@ local ConfigCallbacks = {
             end
         else
             if hum then
-                pcall(function() hum.PlatformStand = false end)
+                -- [CORREÇÃO]: Garante que o jogador fique estático no ar ao ligar
+                pcall(function() hum.PlatformStand = true end)
             end
         end
     end
@@ -1525,8 +1530,27 @@ btnYes.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
+-- [CORREÇÃO]: Nova função de animação tátil elástica para o clique do botão flutuante
+local function AnimarCliqueFloatBtn()
+    local originalSize = UDim2.new(0, 44, 0, 44)
+    local targetSize = UDim2.new(0, 36, 0, 36)
+    
+    local shrink = TweenService:Create(FloatBtn, TweenInfo.new(0.06, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = targetSize})
+    local expand = TweenService:Create(FloatBtn, TweenInfo.new(0.12, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = originalSize})
+    
+    shrink:Play()
+    shrink.Completed:Connect(function()
+        expand:Play()
+    end)
+end
+
 MinimizeBtn.MouseButton1Click:Connect(executarMinimizacao)
-FloatBtn.MouseButton1Click:Connect(alternarVisibilidadeMenu)
+
+-- [CORREÇÃO]: Acopla a animação tátil no evento de clique do FloatBtn
+FloatBtn.MouseButton1Click:Connect(function()
+    AnimarCliqueFloatBtn()
+    alternarVisibilidadeMenu()
+end)
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if not gameProcessed and (input.KeyCode == Enum.KeyCode.Insert or input.KeyCode == Enum.KeyCode.RightShift) then
@@ -1631,14 +1655,17 @@ local function ObterMoedaProxima(root)
     local closestDist = math.huge
     
     for _, d in ipairs(workspace:GetDescendants()) do
-        if d:IsA("BasePart") then
+        if d:IsA("BasePart") and d.Transparency < 1 then
             local name = d.Name:lower()
-            -- Filtra especificamente moedas coletáveis e moedas de eventos festivos
-            if (name == "coin" or name == "snowflake" or name == "candycane" or name:find("token") or name:find("diamond")) and d.Transparency < 1 then
-                local dist = (root.Position - d.Position).Magnitude
-                if dist < closestDist then
-                    closestDist = dist
-                    closestCoin = d
+            -- [CORREÇÃO]: Varredura geral de moedas integrada, incluindo eventos do MM2 (neve, doces, diamantes, etc.)
+            if name:find("coin") or name:find("moeda") or name:find("gold") or name == "snowflake" or name == "candycane" or name:find("token") or name:find("diamond") or name:find("present") or name:find("candy") then
+                -- [CORREÇÃO EXTREMA]: Impede o script de tentar pegar moedas guardadas no inventário/acessórios de outros jogadores!
+                if not d:IsDescendantOf(Players) and not d:FindFirstAncestorOfClass("Tool") and not d:FindFirstAncestorOfClass("Accessory") then
+                    local dist = (root.Position - d.Position).Magnitude
+                    if dist < closestDist then
+                        closestDist = dist
+                        closestCoin = d
+                    end
                 end
             end
         end
@@ -1727,18 +1754,20 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- AUTO COLLECT TOTALMENTE CORRIGIDO (Removido o IsInMatch que impedia de rodar)
+    -- AUTO COLLECT TOTALMENTE CORRIGIDO (Noclip estável + Voar sem gravidade)
     if Configs.AutoCollect and root then
+        -- [CORREÇÃO]: Força o estado sem gravidade continuamente
+        if hum then
+            pcall(function() hum.PlatformStand = true end)
+        end
+
+        -- [CORREÇÃO]: Desativa colisão recursivamente em absolutamente todas as partes para atravessar paredes perfeitamente
         if char then
-            for _, part in ipairs(char:GetChildren()) do
+            for _, part in ipairs(char:GetDescendants()) do
                 if part:IsA("BasePart") then
                     part.CanCollide = false
-                elseif part:IsA("Accessory") then
-                    local handle = part:FindFirstChild("Handle")
-                    if handle then handle.CanCollide = false end
                 end
             end
-            root.CanCollide = false
         end
 
         if currentCollectTarget and (not currentCollectTarget.Parent or not currentCollectTarget:IsDescendantOf(workspace) or currentCollectTarget.Transparency >= 1) then
@@ -1761,7 +1790,7 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
             end)
             
             if dist > 1 then
-                local flySpeed = 55 
+                local flySpeed = 85 -- [MELHORIA]: Velocidade de deslocamento otimizada de 55 para 85 para atravessar o mapa rapidamente
                 local moveAmount = flySpeed * dt
                 local direction = (targetPos - currentPos).Unit
                 
@@ -1780,6 +1809,10 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     else
         currentCollectTarget = nil
+        -- [CORREÇÃO]: Restaura a física normal se desativar o auto collect
+        if hum and hum.PlatformStand then
+            pcall(function() hum.PlatformStand = false end)
+        end
     end
 
     if char and root and hum then
