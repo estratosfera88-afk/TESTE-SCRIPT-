@@ -225,13 +225,13 @@ if uiParent:FindFirstChild("DeltaAkatUniversalUI") then
 end
 screenGui.Parent = uiParent
 
--- Botão Flutuante (AKAT) - NOVO EFEITO RGB VERMELHO/BRANCO
+-- Botão Flutuante (AKAT) - ATUALIZADO (IMAGEM E BORDA PRETA FINA)
 local FloatBtn = Instance.new("ImageButton", screenGui)
 FloatBtn.Name = "FloatBtn"
 FloatBtn.AnchorPoint = Vector2.new(0.5, 0.5) 
 FloatBtn.Size = UDim2.new(0, 44, 0, 44)
 FloatBtn.Position = UDim2.new(0.05, 22, 0.5, 0)
-FloatBtn.Image = "rbxthumb://type=Asset&id=74407434556912&w=420&h=420"
+FloatBtn.Image = "rbxassetid://99997714241420"
 FloatBtn.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
 FloatBtn.Visible = false 
 FloatBtn.ZIndex = 30
@@ -239,15 +239,15 @@ FloatBtn.ZIndex = 30
 local floatCorner = Instance.new("UICorner", FloatBtn)
 floatCorner.CornerRadius = UDim.new(0, 8) 
 
--- Efeito giratório nas bordas do botão flutuante
+-- Borda mais fina (Thickness = 1) e cor alterada para preto
 local FloatStroke = Instance.new("UIStroke", FloatBtn)
-FloatStroke.Thickness = 2
-FloatStroke.Color = Color3.fromRGB(255, 255, 255)
+FloatStroke.Thickness = 1
+FloatStroke.Color = Color3.fromRGB(0, 0, 0)
 
 local StrokeGradient = Instance.new("UIGradient", FloatStroke)
 StrokeGradient.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(0, Color3.fromHex("#8B0000")),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 255, 255)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 0, 0)), -- Trocado branco por preto
     ColorSequenceKeypoint.new(1, Color3.fromHex("#8B0000"))
 })
 
@@ -650,7 +650,7 @@ Instance.new("UICorner", btnNo).CornerRadius = UDim.new(0, 6)
 local function IsInMatch()
     local normal = workspace:FindFirstChild("Normal")
     local map = workspace:FindFirstChild("Map")
-    return (normal ~= nil or map ~= nil)
+    return (normal ~= nil or map ~= nil or workspace:FindFirstChild("GunDrop", true) ~= nil)
 end
 
 local function DetectarRoleReal(p)
@@ -1019,6 +1019,7 @@ local ConfigCallbacks = {
         end
     end,
 
+    -- PROBLEMA 1 CORRIGIDO (Removido PlatformStand que causava o Ragdoll ao ativar AutoCollect)
     AutoCollect = function(enabled)
         local char = player.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -1029,7 +1030,7 @@ local ConfigCallbacks = {
             end
         else
             if hum then
-                pcall(function() hum.PlatformStand = true end)
+                pcall(function() hum.PlatformStand = false end) -- Agora permanece em pé e não cai
             end
         end
     end
@@ -1582,7 +1583,7 @@ task.spawn(function()
     end
 end)
 
--- CORREÇÃO DO AIMBOT (AGORA ROTACIONA O CORPO, ÚTIL PARA O MOBILE E CORRIGE ERROS DE MIRA)
+-- PROBLEMA 3 CORRIGIDO (AIMBOT ATUALIZADO: Gira câmera e personagem no Mobile para mirar exatamente no Murderer)
 renderConnection = RunService.RenderStepped:Connect(function()
     if Configs.AutoShoot then
         local char = player.Character
@@ -1593,8 +1594,10 @@ renderConnection = RunService.RenderStepped:Connect(function()
                 local targetPart = murderer.Character:FindFirstChild("HumanoidRootPart") or murderer.Character:FindFirstChild("Head")
                 local myRoot = char:FindFirstChild("HumanoidRootPart")
                 if targetPart and myRoot then
-                    -- Rotaciona a frente do jogador diretamente para o inimigo em vez de mover a câmera
-                    myRoot.CFrame = CFrame.new(myRoot.Position, Vector3.new(targetPart.Position.X, myRoot.Position.Y, targetPart.Position.Z))
+                    -- Rotaciona a frente do jogador e a câmera em direção ao inimigo
+                    local targetPos = targetPart.Position
+                    myRoot.CFrame = CFrame.new(myRoot.Position, Vector3.new(targetPos.X, myRoot.Position.Y, targetPos.Z))
+                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPos)
                     
                     local now = os.clock()
                     if now - lastShootTime > 0.25 then 
@@ -1607,14 +1610,16 @@ renderConnection = RunService.RenderStepped:Connect(function()
     end
 end)
 
+-- PROBLEMA 2 CORRIGIDO (Busca aprimorada e direta do GunDrop)
 local function ObterArmaCaida()
-    local gun = workspace:FindFirstDescendant("GunDrop") or workspace:FindFirstDescendant("Gun")
+    local gun = workspace:FindFirstChild("GunDrop", true)
     if gun then
-        if gun:IsA("BasePart") then return gun end
-        local handle = gun:FindFirstChild("Handle")
-        if handle then return handle end
-        for _, part in ipairs(gun:GetChildren()) do
-            if part:IsA("BasePart") then return part end
+        if gun:IsA("BasePart") then 
+            return gun 
+        elseif gun:IsA("Model") then
+            return gun:FindFirstChildOfClass("BasePart") or gun.PrimaryPart
+        elseif gun:IsA("Tool") then
+            return gun:FindFirstChild("Handle") or gun:FindFirstChildOfClass("BasePart")
         end
     end
     return nil
@@ -1627,7 +1632,7 @@ local function PlayerTemArma()
     return false
 end
 
--- Busca recursiva ultra aprimorada de moedas para que nunca perca o target de farm no Delta Mobile
+-- Busca recursiva de moedas para que nunca perca o target de farm no Mobile
 local function ObterMoedaProxima(root)
     local closestCoin = nil
     local closestDist = math.huge
@@ -1710,8 +1715,8 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- TELEPORT TO GUN CORRIGIDO E APRIMORADO
-    if Configs.TpToGun and root and IsInMatch() and not PlayerTemArma() then
+    -- TELEPORT TO GUN CORRIGIDO E APRIMORADO (Removido bloqueio do IsInMatch que quebrava o script)
+    if Configs.TpToGun and root and not PlayerTemArma() then
         local gunDrop = ObterArmaCaida()
         if gunDrop and not hasTeleportedToGun then
             hasTeleportedToGun = true
@@ -1735,7 +1740,7 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- AUTO COLLECT CORRIGIDO E OTIMIZADO
+    -- AUTO COLLECT CORRIGIDO E OTIMIZADO (Não deita mais o personagem)
     if Configs.AutoCollect and root and IsInMatch() then
         if char then
             for _, part in ipairs(char:GetChildren()) do
