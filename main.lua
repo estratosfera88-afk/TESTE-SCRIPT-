@@ -225,7 +225,7 @@ if uiParent:FindFirstChild("DeltaAkatUniversalUI") then
 end
 screenGui.Parent = uiParent
 
--- Botão Flutuante (AKAT)
+-- Botão Flutuante (AKAT) - NOVO EFEITO RGB VERMELHO/BRANCO
 local FloatBtn = Instance.new("ImageButton", screenGui)
 FloatBtn.Name = "FloatBtn"
 FloatBtn.AnchorPoint = Vector2.new(0.5, 0.5) 
@@ -238,9 +238,28 @@ FloatBtn.ZIndex = 30
 
 local floatCorner = Instance.new("UICorner", FloatBtn)
 floatCorner.CornerRadius = UDim.new(0, 8) 
+
+-- Efeito giratório nas bordas do botão flutuante
 local FloatStroke = Instance.new("UIStroke", FloatBtn)
-FloatStroke.Color = Color3.fromHex("#8B0000")
-FloatStroke.Thickness = 1
+FloatStroke.Thickness = 2
+FloatStroke.Color = Color3.fromRGB(255, 255, 255)
+
+local StrokeGradient = Instance.new("UIGradient", FloatStroke)
+StrokeGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromHex("#8B0000")),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 255, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromHex("#8B0000"))
+})
+
+-- Animação infinita do gradiente
+task.spawn(function()
+    local rot = 0
+    while task.wait() do
+        if not StrokeGradient.Parent then break end
+        rot = (rot + 3) % 360
+        StrokeGradient.Rotation = rot
+    end
+end)
 
 -- Wrapper Principal
 local mainWrapper = Instance.new("Frame")
@@ -741,30 +760,9 @@ local function AplicarFadeSincronizado(raiz, fadeOut, duracao)
     for _, desc in ipairs(raiz:GetDescendants()) do tratarObjeto(desc) end
 end
 
-local function AplicarFadeTextos(raiz, fadeOut, duracao)
-    local info = TweenInfo.new(duracao, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-    local function tratarObjeto(obj)
-        RegistrarTransparencias(obj)
-        local orig = originalTrans[obj]
-        if not orig then return end
-        if orig.TextTransparency then
-            local target = fadeOut and 1 or orig.TextTransparency
-            if duracao == 0 then obj.TextTransparency = target else TweenService:Create(obj, info, {TextTransparency = target}):Play() end
-        end
-        if orig.TextStrokeTransparency then
-            local target = fadeOut and 1 or orig.TextStrokeTransparency
-            if duracao == 0 then obj.TextStrokeTransparency = target else TweenService:Create(obj, info, {TextStrokeTransparency = target}):Play() end
-        end
-    end
-    tratarObjeto(raiz)
-    for _, desc in ipairs(raiz:GetDescendants()) do tratarObjeto(desc) end
-end
-
--- NOVO: Aplica o Fade na troca de idioma de forma extremamente cirúrgica (apenas no que de fato muda)
 local function AplicarFadeIdioma(fadeOut, duracao)
     local info = TweenInfo.new(duracao, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
     
-    -- Fade nos textos das abas laterais
     for _, btn in pairs(tabButtons) do
         local label = btn:FindFirstChild("Label")
         if label then
@@ -775,7 +773,6 @@ local function AplicarFadeIdioma(fadeOut, duracao)
         end
     end
     
-    -- Fade nas opções internas do TogglesContainer
     for _, child in ipairs(togglesContainer:GetDescendants()) do
         if child:IsA("TextLabel") then
             RegistrarTransparencias(child)
@@ -785,13 +782,11 @@ local function AplicarFadeIdioma(fadeOut, duracao)
         end
     end
     
-    -- Fade no placeholder da caixa de pesquisa
     RegistrarTransparencias(searchTextBox)
     local targetST = fadeOut and 1 or 0
     TweenService:Create(searchTextBox, info, {TextTransparency = targetST}):Play()
 end
 
--- CARREGAMENTO DE ÍCONES PERSONALIZADOS VIA ASSET ID
 local function CriarIconeProcedural(parent, tabName)
     local iconContainer = Instance.new("Frame", parent)
     iconContainer.Name = "Icon"
@@ -805,7 +800,7 @@ local function CriarIconeProcedural(parent, tabName)
     imageLabel.Size = UDim2.new(1, 0, 1, 0)
     imageLabel.BackgroundTransparency = 1
     imageLabel.ZIndex = 10
-    imageLabel.ImageColor3 = Color3.fromRGB(180, 180, 180) -- Cor padrão inativa
+    imageLabel.ImageColor3 = Color3.fromRGB(180, 180, 180) 
 
     if tabName == "Movement" then
         imageLabel.Image = "rbxthumb://type=Asset&id=116118153718196&w=150&h=150"
@@ -837,7 +832,6 @@ local function AtualizarIdioma()
     local langData = Locales[currentLanguage]
     if not langData then return end
     
-    -- TÍTULO E SUBTÍTULO BLOQUEADOS PARA NÃO SE ALTERAREM (FALADOS PELO USER)
     searchTextBox.PlaceholderText = langData.SearchPlaceholder
     
     for tabName, btn in pairs(tabButtons) do
@@ -1031,15 +1025,11 @@ local ConfigCallbacks = {
         if not enabled then
             currentCollectTarget = nil
             if hum then
-                pcall(function()
-                    hum.PlatformStand = false
-                end)
+                pcall(function() hum.PlatformStand = false end)
             end
         else
             if hum then
-                pcall(function()
-                    hum.PlatformStand = true
-                end)
+                pcall(function() hum.PlatformStand = true end)
             end
         end
     end
@@ -1175,7 +1165,6 @@ local function AlternarConfirmacao(exibir)
         AplicarFadeSincronizado(confirmFrame, true, tempoAnim)
         if confirmBlur then TweenService:Create(confirmBlur, TweenInfo.new(tempoAnim, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = 0}):Play() end
         
-        -- Se foi aberto enquanto minimizado, retorna para o estado minimizado de forma sincronizada
         if wasMinimizedBeforeConfirm then
             AplicarFadeSincronizado(SidebarFrame, true, 0.15)
             AplicarFadeSincronizado(togglesContainer, true, 0.15)
@@ -1201,7 +1190,6 @@ local function AlternarConfirmacao(exibir)
     end
 end
 
--- Função de minimização totalmente otimizada (Mais Rápida e Responsiva)
 local function executarMinimizacao()
     if isConfirmOpen then return end
     isMinimized = not isMinimized
@@ -1237,10 +1225,9 @@ local function executarMinimizacao()
     end
 end
 
--- Função de exibição do menu principal altamente responsiva (VELOCIDADE AJUSTADA)
 local function alternarVisibilidadeMenu()
     menuAberto = not menuAberto
-    local tempoAnim = 0.12 -- Ficou muito mais rápido (antes 0.2)
+    local tempoAnim = 0.12 
     local windowAnim = TweenInfo.new(tempoAnim, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
     
     if menuAberto then
@@ -1280,7 +1267,6 @@ local function alternarVisibilidadeMenu()
     end
 end
 
--- Mecanismo de Arrastar Aprimorado (Mobile/PC)
 local function ConfigurarArrastarAkat(inst)
     local drag = false
     local startPos, dragStart, dragInput
@@ -1308,7 +1294,6 @@ local function ConfigurarArrastarAkat(inst)
     end)
 end
 
--- Introdução do Script
 local function ExecutarIntroAkat()
     local Blur = Instance.new("BlurEffect")
     Blur.Size = 0
@@ -1400,14 +1385,10 @@ local function EnviarMensagemChat(msg)
     pcall(function()
         if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
             local channel = TextChatService.TextChannels:FindFirstChild("RBXGeneral")
-            if channel then
-                channel:SendAsync(msg)
-            end
+            if channel then channel:SendAsync(msg) end
         else
             local chatEvent = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents") and ReplicatedStorage.DefaultChatSystemChatEvents:FindFirstChild("SayMessageRequest")
-            if chatEvent then
-                chatEvent:FireServer(msg, "All")
-            end
+            if chatEvent then chatEvent:FireServer(msg, "All") end
         end
     end)
 end
@@ -1490,7 +1471,6 @@ LanguageBtn.MouseButton1Click:Connect(function()
     if languageTransitioning then return end
     languageTransitioning = true
     
-    -- CORREÇÃO: Aplica fade de forma precisa apenas no que muda de idioma
     AplicarFadeIdioma(true, 0.1)
     task.wait(0.1)
     
@@ -1513,7 +1493,6 @@ end)
 
 AtualizarIdioma()
 
--- CORREÇÃO: Quando o script está minimizado, ele expande antes e exibe o fundo idêntico de confirmação
 CloseBtn.MouseButton1Click:Connect(function()
     wasMinimizedBeforeConfirm = isMinimized
     if isMinimized then
@@ -1522,7 +1501,6 @@ CloseBtn.MouseButton1Click:Connect(function()
         SidebarFrame.Visible = true
         togglesContainer.Visible = true
         
-        -- Restaura as opacidades antes de expandir para que não fique tudo preto no fundo
         AplicarFadeSincronizado(SidebarFrame, false, 0)
         AplicarFadeSincronizado(togglesContainer, false, 0)
         
@@ -1604,6 +1582,7 @@ task.spawn(function()
     end
 end)
 
+-- CORREÇÃO DO AIMBOT (AGORA ROTACIONA O CORPO, ÚTIL PARA O MOBILE E CORRIGE ERROS DE MIRA)
 renderConnection = RunService.RenderStepped:Connect(function()
     if Configs.AutoShoot then
         local char = player.Character
@@ -1611,10 +1590,11 @@ renderConnection = RunService.RenderStepped:Connect(function()
         if gunTool and gunTool:IsA("Tool") then
             local murderer, distancia = ObterMurderer()
             if murderer and murderer.Character and distancia < 250 then
-                local targetPart = murderer.Character:FindFirstChild("Head") or murderer.Character:FindFirstChild("HumanoidRootPart")
-                if targetPart then
-                    local lookVector = (targetPart.Position - Camera.CFrame.Position).Unit
-                    Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, Camera.CFrame.Position + lookVector)
+                local targetPart = murderer.Character:FindFirstChild("HumanoidRootPart") or murderer.Character:FindFirstChild("Head")
+                local myRoot = char:FindFirstChild("HumanoidRootPart")
+                if targetPart and myRoot then
+                    -- Rotaciona a frente do jogador diretamente para o inimigo em vez de mover a câmera
+                    myRoot.CFrame = CFrame.new(myRoot.Position, Vector3.new(targetPart.Position.X, myRoot.Position.Y, targetPart.Position.Z))
                     
                     local now = os.clock()
                     if now - lastShootTime > 0.25 then 
@@ -1628,15 +1608,16 @@ renderConnection = RunService.RenderStepped:Connect(function()
 end)
 
 local function ObterArmaCaida()
-    local gun = workspace:FindFirstChild("GunDrop", true) or workspace:FindFirstChild("Gun", true)
-    if not gun then
-        for _, child in ipairs(workspace:GetChildren()) do
-            if child.Name == "GunDrop" or child.Name == "Gun" then
-                return child
-            end
+    local gun = workspace:FindFirstDescendant("GunDrop") or workspace:FindFirstDescendant("Gun")
+    if gun then
+        if gun:IsA("BasePart") then return gun end
+        local handle = gun:FindFirstChild("Handle")
+        if handle then return handle end
+        for _, part in ipairs(gun:GetChildren()) do
+            if part:IsA("BasePart") then return part end
         end
     end
-    return gun
+    return nil
 end
 
 local function PlayerTemArma()
@@ -1646,7 +1627,7 @@ local function PlayerTemArma()
     return false
 end
 
--- Busca otimizada de Moedas para reduzir o uso de hardware no Delta
+-- Busca recursiva ultra aprimorada de moedas para que nunca perca o target de farm no Delta Mobile
 local function ObterMoedaProxima(root)
     local closestCoin = nil
     local closestDist = math.huge
@@ -1657,9 +1638,10 @@ local function ObterMoedaProxima(root)
     
     for _, d in ipairs(searchRoot:GetDescendants()) do
         if d:IsA("BasePart") then
-            local name = d.Name
-            if name == "Coin" or name == "CoinVisual" or name == "MainCoin" or name == "GoldenCoin" or name == "ClownCoin" or name == "Snowflake" or name == "CandyCane" then
-                if d.Transparency < 1 and d:FindFirstChildOfClass("TouchTransmitter") then
+            local name = d.Name:lower()
+            -- Corresponde a qualquer tipo de moeda em qualquer mapa e eventos do MM2
+            if string.find(name, "coin") or name == "snowflake" or name == "candycane" then
+                if d.Transparency < 1 then
                     local dist = (root.Position - d.Position).Magnitude
                     if dist < closestDist then
                         closestDist = dist
@@ -1728,40 +1710,33 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- TELEPORT TO GUN TOTALMENTE CORRIGIDO E OTIMIZADO PARA DELTA
+    -- TELEPORT TO GUN CORRIGIDO E APRIMORADO
     if Configs.TpToGun and root and IsInMatch() and not PlayerTemArma() then
         local gunDrop = ObterArmaCaida()
-        if gunDrop then
-            local targetPart = gunDrop:IsA("BasePart") and gunDrop or gunDrop:FindFirstChild("Handle") or gunDrop:FindFirstChildOfClass("BasePart")
-
-            if targetPart and not hasTeleportedToGun then
-                hasTeleportedToGun = true
-                originalPositionBeforeGun = root.CFrame
-                
-                -- Reseta velocidades físicas para evitar travamentos/rubberband
-                pcall(function()
-                    root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-                    root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-                end)
-                
-                -- Teleporte suave com segurança
-                root.CFrame = targetPart.CFrame * CFrame.new(0, 1.2, 0)
-                
-                task.spawn(function()
-                    task.wait(0.35) -- Tempo necessário para a física processar e coletar a arma
-                    if originalPositionBeforeGun and root and Configs.TpToGun then
-                        root.CFrame = originalPositionBeforeGun
-                    end
-                    task.wait(1.5) -- Cooldown de proteção contra spam
-                    hasTeleportedToGun = false
-                end)
-            end
+        if gunDrop and not hasTeleportedToGun then
+            hasTeleportedToGun = true
+            originalPositionBeforeGun = root.CFrame
+            
+            pcall(function()
+                root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+            end)
+            
+            root.CFrame = gunDrop.CFrame * CFrame.new(0, 1.2, 0)
+            
+            task.spawn(function()
+                task.wait(0.35) 
+                if originalPositionBeforeGun and root and Configs.TpToGun then
+                    root.CFrame = originalPositionBeforeGun
+                end
+                task.wait(1.5) 
+                hasTeleportedToGun = false
+            end)
         end
     end
 
-    -- AUTO COLLECT ULTRA OTIMIZADO E BASTANTE VELOZ
+    -- AUTO COLLECT CORRIGIDO E OTIMIZADO
     if Configs.AutoCollect and root and IsInMatch() then
-        -- No-clip otimizado e focado (desativa colisões rapidamente)
         if char then
             for _, part in ipairs(char:GetChildren()) do
                 if part:IsA("BasePart") then
@@ -1774,17 +1749,15 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
             root.CanCollide = false
         end
 
-        if currentCollectTarget and (not currentCollectTarget.Parent or not currentCollectTarget:IsDescendantOf(workspace)) then
+        if currentCollectTarget and (not currentCollectTarget.Parent or not currentCollectTarget:IsDescendantOf(workspace) or currentCollectTarget.Transparency >= 1) then
             currentCollectTarget = nil
         end
 
-        -- Busca inteligente de moedas mais próximas
         if not currentCollectTarget and os.clock() - lastCoinSearch > 0.15 then
             lastCoinSearch = os.clock()
             currentCollectTarget = ObterMoedaProxima(root)
         end
 
-        -- Voo linear sem atrito e com teleporte em curto alcance (firetouchinterest integrado)
         if currentCollectTarget then
             local targetPos = currentCollectTarget.Position
             local currentPos = root.Position
@@ -1796,7 +1769,7 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
             end)
             
             if dist > 1 then
-                local flySpeed = 55 -- Velocidade otimizada para o Bypass do Delta 2026
+                local flySpeed = 55 
                 local moveAmount = flySpeed * dt
                 local direction = (targetPos - currentPos).Unit
                 
@@ -1806,7 +1779,6 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
                     root.CFrame = CFrame.new(currentPos + direction * moveAmount)
                 end
             else
-                -- Teleporta em cheio na moeda e força a colisão de coleta de forma instantânea
                 root.CFrame = CFrame.new(targetPos)
                 if firetouchinterest then
                     firetouchinterest(root, currentCollectTarget, 0)
