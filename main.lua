@@ -1,5 +1,5 @@
 -- [[
---     AKAT MM2 SCRIPT [BETA v2.1] - PERFORMANCE & UI OVERHAUL
+--     AKAT MM2 SCRIPT [BETA v2.2] - PERFORMANCE & UI OVERHAUL
 -- ]]
 
 local Players = game:GetService("Players")
@@ -26,8 +26,6 @@ local Configs = {
 
 local Locales = {
     PT = {
-        Title = "AKAT SCRIPTS",
-        Subtitle = "MM2 SCRIPT [VERSÃO BETA]",
         SearchPlaceholder = "Pesquisar...",
         ConfirmCloseTitle = "Deseja fechar o script?",
         ConfirmBtn = "Confirmar",
@@ -80,8 +78,6 @@ local Locales = {
         Intro = '<font color="#FFFFFF">Scripts por | </font><font color="#8B0000">Comunidade AKAT</font>'
     },
     EN = {
-        Title = "AKAT SCRIPTS",
-        Subtitle = "MM2 SCRIPT [BETA VERSION]",
         SearchPlaceholder = "Search...",
         ConfirmCloseTitle = "Do you want to close the script?",
         ConfirmBtn = "Confirm",
@@ -134,8 +130,6 @@ local Locales = {
         Intro = '<font color="#FFFFFF">Scripts by | </font><font color="#8B0000">AKAT Community</font>'
     },
     ES = {
-        Title = "AKAT SCRIPTS",
-        Subtitle = "MM2 SCRIPT [VERSIÓN BETA]",
         SearchPlaceholder = "Buscar...",
         ConfirmCloseTitle = "¿Deseas cerrar el script?",
         ConfirmBtn = "Confirmar",
@@ -166,7 +160,7 @@ local Locales = {
             },
             AntiFling = {
                 Title = "Anti-Fling",
-                Desc = "Bloquea colisiones para evitar que te empujen o lancen."
+                Desc = "Bloqueia colisiones para evitar que te empujen o lancen."
             },
             TpToGun = {
                 Title = "TP a la Arma",
@@ -210,6 +204,7 @@ local lastShootTime = 0
 local hasTeleportedToGun = false
 local originalPositionBeforeGun = nil
 local currentCollectTarget = nil 
+local lastCoinSearch = 0
 
 -- ==================== 3. CRIAÇÃO DE TODA A ESTRUTURA DE INTERFACE (UI) ====================
 local screenGui = Instance.new("ScreenGui")
@@ -634,7 +629,6 @@ Instance.new("UICorner", btnNo).CornerRadius = UDim.new(0, 6)
 -- ==================== 4. FUNÇÕES DE SUPORTE E DE EXECUÇÃO ====================
 
 local function IsInMatch()
-    -- Checagem robusta: o mapa do MM2 sempre carrega dentro de um modelo chamado "Normal" ou "Map" no Workspace.
     local normal = workspace:FindFirstChild("Normal")
     local map = workspace:FindFirstChild("Map")
     return (normal ~= nil or map ~= nil)
@@ -766,6 +760,7 @@ local function AplicarFadeTextos(raiz, fadeOut, duracao)
     for _, desc in ipairs(raiz:GetDescendants()) do tratarObjeto(desc) end
 end
 
+-- CARREGAMENTO DE ÍCONES PERSONALIZADOS VIA ASSET ID
 local function CriarIconeProcedural(parent, tabName)
     local iconContainer = Instance.new("Frame", parent)
     iconContainer.Name = "Icon"
@@ -773,129 +768,24 @@ local function CriarIconeProcedural(parent, tabName)
     iconContainer.Position = UDim2.new(0, 12, 0.5, -8)
     iconContainer.BackgroundTransparency = 1
     iconContainer.ZIndex = 9
-    
-    if tabName == "Combat" then
-        local circle = Instance.new("Frame", iconContainer)
-        circle.Size = UDim2.new(0, 10, 0, 10)
-        circle.Position = UDim2.new(0.5, -5, 0.5, -5)
-        circle.BackgroundTransparency = 1
-        circle.ZIndex = 9
-        Instance.new("UICorner", circle).CornerRadius = UDim.new(1, 0)
-        
-        local stroke = Instance.new("UIStroke", circle)
-        stroke.Color = Color3.fromRGB(180, 180, 180)
-        stroke.Thickness = 1.5
-        stroke.Name = "AccentStroke"
-        
-        local dot = Instance.new("Frame", iconContainer)
-        dot.Size = UDim2.new(0, 4, 0, 4)
-        dot.Position = UDim2.new(0.5, -2, 0.5, -2)
-        dot.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
-        dot.BorderSizePixel = 0
-        dot.ZIndex = 10
-        Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
-        dot.Name = "AccentFill"
-        
-        local function rLine(x, y, w, h)
-            local l = Instance.new("Frame", iconContainer)
-            l.Size = UDim2.new(0, w, 0, h)
-            l.Position = UDim2.new(0.5, x, 0.5, y)
-            l.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
-            l.BorderSizePixel = 0
-            l.ZIndex = 10
-            l.Name = "AccentFill"
-        end
-        rLine(-1, -8, 2, 2)
-        rLine(-1, 6, 2, 2)
-        rLine(-8, -1, 2, 2)
-        rLine(6, -1, 2, 2)
-        
-    elseif tabName == "Visuals" then
-        local eyeContour = Instance.new("Frame", iconContainer)
-        eyeContour.Size = UDim2.new(0, 14, 0, 8)
-        eyeContour.Position = UDim2.new(0.5, -7, 0.5, -4)
-        eyeContour.BackgroundTransparency = 1
-        eyeContour.ZIndex = 9
-        Instance.new("UICorner", eyeContour).CornerRadius = UDim.new(0.5, 0)
-        
-        local stroke = Instance.new("UIStroke", eyeContour)
-        stroke.Color = Color3.fromRGB(180, 180, 180)
-        stroke.Thickness = 1.5
-        stroke.Name = "AccentStroke"
-        
-        local pupil = Instance.new("Frame", eyeContour)
-        pupil.Size = UDim2.new(0, 6, 0, 6)
-        pupil.Position = UDim2.new(0.5, -3, 0.5, -3)
-        pupil.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
-        pupil.BorderSizePixel = 0
-        pupil.ZIndex = 10
-        Instance.new("UICorner", pupil).CornerRadius = UDim.new(1, 0)
-        pupil.Name = "AccentFill"
-        
-        local reflection = Instance.new("Frame", pupil)
-        reflection.Size = UDim2.new(0, 2, 0, 2)
-        reflection.Position = UDim2.new(0.5, -2, 0.5, -2)
-        reflection.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        reflection.BorderSizePixel = 0
-        reflection.ZIndex = 11
-        reflection.Name = "StaticWhite"
-        Instance.new("UICorner", reflection).CornerRadius = UDim.new(1, 0)
-        
-    elseif tabName == "Movement" then
-        local function buildTrail(x, y, w)
-            local t = Instance.new("Frame", iconContainer)
-            t.Size = UDim2.new(0, w, 0, 2)
-            t.Position = UDim2.new(0, x, 0, y)
-            t.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
-            t.BorderSizePixel = 0
-            t.ZIndex = 9
-            t.Name = "AccentFill"
-            Instance.new("UICorner", t).CornerRadius = UDim.new(1, 0)
-        end
-        buildTrail(3, 3, 10)
-        buildTrail(0, 7, 14)
-        buildTrail(5, 11, 8)
 
+    local imageLabel = Instance.new("ImageLabel", iconContainer)
+    imageLabel.Name = "AccentImage"
+    imageLabel.Size = UDim2.new(1, 0, 1, 0)
+    imageLabel.BackgroundTransparency = 1
+    imageLabel.ZIndex = 10
+    imageLabel.ImageColor3 = Color3.fromRGB(180, 180, 180) -- Cor padrão inativa
+
+    if tabName == "Movement" then
+        imageLabel.Image = "rbxassetid://90358690675463"
     elseif tabName == "Teleports" then
-        -- ÍCONE ATUALIZADO: Seta Chevron Diagonal idêntica à imagem enviada, criada de forma 100% procedural
-        local arrowGroup = Instance.new("Frame", iconContainer)
-        arrowGroup.Name = "ArrowGroup"
-        arrowGroup.Size = UDim2.new(1, 0, 1, 0)
-        arrowGroup.BackgroundTransparency = 1
-        arrowGroup.ZIndex = 9
-        arrowGroup.Rotation = 45 -- Rotaciona 45 graus para simular a inclinação exata da imagem
-
-        local line1 = Instance.new("Frame", arrowGroup)
-        line1.Name = "AccentFill"
-        line1.Size = UDim2.new(0, 11, 0, 3.5)
-        line1.Position = UDim2.new(0.5, -5.5, 0.5, -4.5)
-        line1.Rotation = 35
-        line1.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
-        line1.BorderSizePixel = 0
-        line1.ZIndex = 9
-        Instance.new("UICorner", line1).CornerRadius = UDim.new(1, 0)
-
-        local line2 = Instance.new("Frame", arrowGroup)
-        line2.Name = "AccentFill"
-        line2.Size = UDim2.new(0, 11, 0, 3.5)
-        line2.Position = UDim2.new(0.5, -5.5, 0.5, 1)
-        line2.Rotation = -35
-        line2.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
-        line2.BorderSizePixel = 0
-        line2.ZIndex = 9
-        Instance.new("UICorner", line2).CornerRadius = UDim.new(1, 0)
-
+        imageLabel.Image = "rbxassetid://90358690675463"
     elseif tabName == "Misc" then
-        for i = 1, 3 do
-            local dot = Instance.new("Frame", iconContainer)
-            dot.Size = UDim2.new(0, 3, 0, 3)
-            dot.Position = UDim2.new(0, (i-1)*5 + 2, 0.5, -1)
-            dot.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
-            dot.BorderSizePixel = 0
-            dot.ZIndex = 9
-            dot.Name = "AccentFill"
-            Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
-        end
+        imageLabel.Image = "rbxassetid://110656497311677"
+    elseif tabName == "Visuals" then
+        imageLabel.Image = "rbxassetid://98051686611454"
+    elseif tabName == "Combat" then
+        imageLabel.Image = "rbxassetid://133188606257719"
     end
 end
 
@@ -916,8 +806,7 @@ local function AtualizarIdioma()
     local langData = Locales[currentLanguage]
     if not langData then return end
     
-    title.Text = langData.Title
-    subtitle.Text = langData.Subtitle
+    -- TÍTULO E SUBTÍTULO BLOQUEADOS PARA NÃO SE ALTERAREM
     searchTextBox.PlaceholderText = langData.SearchPlaceholder
     
     for tabName, btn in pairs(tabButtons) do
@@ -973,8 +862,9 @@ local function filterToggles(currentActiveTab, query)
                 if desc then desc.TextTransparency = 1 end
                 
                 task.delay((itemIndex - 1) * 0.03, function()
+                    -- Altura dos containers redefinida para 56 para evitar cortar descrições
                     TweenService:Create(child, TweenInfo.new(0.25, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {
-                        Size = UDim2.new(1, -8, 0, 48),
+                        Size = UDim2.new(1, -8, 0, 56),
                         BackgroundTransparency = 0
                     }):Play()
                     
@@ -1103,13 +993,32 @@ local ConfigCallbacks = {
                 lastPositionBeforeSafeSpot = nil
             end
         end
+    end,
+
+    AutoCollect = function(enabled)
+        local char = player.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if not enabled then
+            currentCollectTarget = nil
+            if hum then
+                pcall(function()
+                    hum.PlatformStand = false
+                end)
+            end
+        else
+            if hum then
+                pcall(function()
+                    hum.PlatformStand = true
+                end)
+            end
+        end
     end
 }
 
 local function createToggle(parent, configKey, tabCategory)
     local toggleFrame = Instance.new("Frame")
     toggleFrame.Name = configKey
-    toggleFrame.Size = UDim2.new(1, -8, 0, 48) 
+    toggleFrame.Size = UDim2.new(1, -8, 0, 56) -- Altura aumentada de 48 para 56 para dar margem
     toggleFrame.BackgroundColor3 = Color3.fromHex("#0F0F0F")
     toggleFrame.ZIndex = 6
     toggleFrame:SetAttribute("Tab", tabCategory)
@@ -1124,7 +1033,7 @@ local function createToggle(parent, configKey, tabCategory)
     local titleLabel = Instance.new("TextLabel", toggleFrame)
     titleLabel.Name = "Title"
     titleLabel.Size = UDim2.new(0.65, 0, 0, 16)
-    titleLabel.Position = UDim2.new(0, 12, 0, 8)
+    titleLabel.Position = UDim2.new(0, 12, 0, 6) -- Deslocado levemente para cima (Y: 6)
     titleLabel.BackgroundTransparency = 1
     titleLabel.TextColor3 = Color3.fromHex("#CCCCCC")
     titleLabel.Font = Enum.Font.GothamBold
@@ -1134,13 +1043,15 @@ local function createToggle(parent, configKey, tabCategory)
     
     local descLabel = Instance.new("TextLabel", toggleFrame)
     descLabel.Name = "Description"
-    descLabel.Size = UDim2.new(0.65, 0, 0, 14)
-    descLabel.Position = UDim2.new(0, 12, 0, 24)
+    descLabel.Size = UDim2.new(0.65, 0, 0, 28) -- Altura expandida de 14 para 28
+    descLabel.Position = UDim2.new(0, 12, 0, 22) -- Alinhado na parte inferior
     descLabel.BackgroundTransparency = 1
     descLabel.TextColor3 = Color3.fromRGB(130, 130, 130)
     descLabel.Font = Enum.Font.Gotham
     descLabel.TextSize = 9
     descLabel.TextXAlignment = Enum.TextXAlignment.Left
+    descLabel.TextYAlignment = Enum.TextYAlignment.Top -- Força o alinhamento no topo do container
+    descLabel.TextWrapped = true -- PERMITE A QUEBRA DE LINHA CORRETA SEM APAGAR O TEXTO
     descLabel.ZIndex = 6
     
     local switchTrack = Instance.new("Frame", toggleFrame)
@@ -1199,7 +1110,10 @@ local function LimparEDesligarAbsolutamente()
     pcall(function()
         local char = player.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if hum then hum.WalkSpeed = 16 end
+        if hum then 
+            hum.WalkSpeed = 16 
+            hum.PlatformStand = false
+        end
         if char then
             for _, item in ipairs(char:GetChildren()) do
                 if item:IsA("Tool") then
@@ -1760,31 +1674,37 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- AUTO COLLECT REESTRUTURADO E CORRIGIDO (Foco estrito em moedas, sem containers)
-    if Configs.AutoCollect and root then
+    -- AUTO COLLECT REESTRUTURADO E ALTAMENTE OTIMIZADO PARA DELTA MOBILE 2026
+    if Configs.AutoCollect and root and IsInMatch() then
+        -- No-clip otimizado para celulares sem provocar quedas de FPS por varredura recursiva
         if char then
-            for _, part in ipairs(char:GetDescendants()) do
+            for _, part in ipairs(char:GetChildren()) do
                 if part:IsA("BasePart") then
                     part.CanCollide = false
+                elseif part:IsA("Accessory") then
+                    local handle = part:FindFirstChild("Handle")
+                    if handle then handle.CanCollide = false end
                 end
             end
+            if root then root.CanCollide = false end
         end
 
         if currentCollectTarget and (not currentCollectTarget.Parent or not currentCollectTarget:IsDescendantOf(workspace)) then
             currentCollectTarget = nil
         end
 
-        if not currentCollectTarget then
+        -- Busca controlada por clock para evitar gargalo de hardware no Delta
+        if not currentCollectTarget and os.clock() - lastCoinSearch > 0.15 then
+            lastCoinSearch = os.clock()
             local closestCoin = nil
             local closestDist = math.huge
             
             for _, d in ipairs(workspace:GetDescendants()) do
-                -- CORREÇÃO DEFINITIVA: Ignora "Coin_Container" e foca unicamente em BaseParts de moedas legítimas
                 if d:IsA("BasePart") and d.Name ~= "Coin_Container" then
                     if d.Name == "Coin" or d.Name == "CoinVisual" or d.Name == "MainCoin" or d.Name == "GoldenCoin" or d.Name == "Coin_Can" or d.Name == "SpinningCoin" then
                         if d.Transparency < 1 and d:IsDescendantOf(workspace) then
                             local dist = (root.Position - d.Position).Magnitude
-                            if dist < closestDist and dist < 1000 then
+                            if dist < closestDist and dist < 1200 then
                                 closestDist = dist
                                 closestCoin = d
                             end
@@ -1795,17 +1715,19 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
             currentCollectTarget = closestCoin
         end
 
+        -- Movimento de interpolação perfeito sem rubberbanding (PlatStand ativo via Callback)
         if currentCollectTarget then
             local targetPos = currentCollectTarget.Position
             local currentPos = root.Position
             local dist = (targetPos - currentPos).Magnitude
             
             pcall(function()
-                root.AssemblyLinearVelocity = Vector3.new(0, 0, 0) 
+                root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
             end)
             
-            if dist > 1 then
-                local flySpeed = 110 
+            if dist > 0.5 then
+                local flySpeed = 115 -- Velocidade otimizada e ultra segura para bypass de física
                 local moveAmount = flySpeed * dt
                 local direction = (targetPos - currentPos).Unit
                 
