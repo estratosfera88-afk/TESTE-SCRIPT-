@@ -776,16 +776,17 @@ local function CriarIconeProcedural(parent, tabName)
     imageLabel.ZIndex = 10
     imageLabel.ImageColor3 = Color3.fromRGB(180, 180, 180) -- Cor padrão inativa
 
+    -- CORREÇÃO: Utilizando rbxthumb ao invés de rbxassetid para contornar o problema de Decal IDs
     if tabName == "Movement" then
-        imageLabel.Image = "rbxassetid://116118153718196"
+        imageLabel.Image = "rbxthumb://type=Asset&id=116118153718196&w=150&h=150"
     elseif tabName == "Teleports" then
-        imageLabel.Image = "rbxassetid://131357413318360"
+        imageLabel.Image = "rbxthumb://type=Asset&id=131357413318360&w=150&h=150"
     elseif tabName == "Misc" then
-        imageLabel.Image = "rbxassetid://96954032676031"
+        imageLabel.Image = "rbxthumb://type=Asset&id=96954032676031&w=150&h=150"
     elseif tabName == "Visuals" then
-        imageLabel.Image = "rbxassetid://134099134229815"
+        imageLabel.Image = "rbxthumb://type=Asset&id=134099134229815&w=150&h=150"
     elseif tabName == "Combat" then
-        imageLabel.Image = "rbxassetid://131607049070859"
+        imageLabel.Image = "rbxthumb://type=Asset&id=131607049070859&w=150&h=150"
     end
 end
 
