@@ -1,5 +1,5 @@
 -- [[
---     AKAT MM2 SCRIPT [BETA v2.2] - PERFORMANCE & UI OVERHAUL
+--     AKAT MM2 SCRIPT [BETA v2.2] - PERFORMANCE & UI OVERHAUL (OPTIMIZED & FIXED)
 -- ]]
 
 local Players = game:GetService("Players")
@@ -760,6 +760,37 @@ local function AplicarFadeTextos(raiz, fadeOut, duracao)
     for _, desc in ipairs(raiz:GetDescendants()) do tratarObjeto(desc) end
 end
 
+-- NOVO: Aplica o Fade na troca de idioma de forma extremamente cirúrgica (apenas no que de fato muda)
+local function AplicarFadeIdioma(fadeOut, duracao)
+    local info = TweenInfo.new(duracao, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    
+    -- Fade nos textos das abas laterais
+    for _, btn in pairs(tabButtons) do
+        local label = btn:FindFirstChild("Label")
+        if label then
+            RegistrarTransparencias(label)
+            local orig = originalTrans[label]
+            local target = fadeOut and 1 or (orig and orig.TextTransparency or 0)
+            TweenService:Create(label, info, {TextTransparency = target}):Play()
+        end
+    end
+    
+    -- Fade nas opções internas do TogglesContainer
+    for _, child in ipairs(togglesContainer:GetDescendants()) do
+        if child:IsA("TextLabel") then
+            RegistrarTransparencias(child)
+            local orig = originalTrans[child]
+            local target = fadeOut and 1 or (orig and orig.TextTransparency or 0)
+            TweenService:Create(child, info, {TextTransparency = target}):Play()
+        end
+    end
+    
+    -- Fade no placeholder da caixa de pesquisa
+    RegistrarTransparencias(searchTextBox)
+    local targetST = fadeOut and 1 or 0
+    TweenService:Create(searchTextBox, info, {TextTransparency = targetST}):Play()
+end
+
 -- CARREGAMENTO DE ÍCONES PERSONALIZADOS VIA ASSET ID
 local function CriarIconeProcedural(parent, tabName)
     local iconContainer = Instance.new("Frame", parent)
@@ -776,7 +807,6 @@ local function CriarIconeProcedural(parent, tabName)
     imageLabel.ZIndex = 10
     imageLabel.ImageColor3 = Color3.fromRGB(180, 180, 180) -- Cor padrão inativa
 
-    -- CORREÇÃO: Utilizando rbxthumb ao invés de rbxassetid para contornar o problema de Decal IDs
     if tabName == "Movement" then
         imageLabel.Image = "rbxthumb://type=Asset&id=116118153718196&w=150&h=150"
     elseif tabName == "Teleports" then
@@ -807,7 +837,7 @@ local function AtualizarIdioma()
     local langData = Locales[currentLanguage]
     if not langData then return end
     
-    -- TÍTULO E SUBTÍTULO BLOQUEADOS PARA NÃO SE ALTERAREM
+    -- TÍTULO E SUBTÍTULO BLOQUEADOS PARA NÃO SE ALTERAREM (FALADOS PELO USER)
     searchTextBox.PlaceholderText = langData.SearchPlaceholder
     
     for tabName, btn in pairs(tabButtons) do
@@ -863,7 +893,6 @@ local function filterToggles(currentActiveTab, query)
                 if desc then desc.TextTransparency = 1 end
                 
                 task.delay((itemIndex - 1) * 0.03, function()
-                    -- Altura dos containers redefinida para 56 para evitar cortar descrições
                     TweenService:Create(child, TweenInfo.new(0.25, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {
                         Size = UDim2.new(1, -8, 0, 56),
                         BackgroundTransparency = 0
@@ -1019,7 +1048,7 @@ local ConfigCallbacks = {
 local function createToggle(parent, configKey, tabCategory)
     local toggleFrame = Instance.new("Frame")
     toggleFrame.Name = configKey
-    toggleFrame.Size = UDim2.new(1, -8, 0, 56) -- Altura aumentada de 48 para 56 para dar margem
+    toggleFrame.Size = UDim2.new(1, -8, 0, 56) 
     toggleFrame.BackgroundColor3 = Color3.fromHex("#0F0F0F")
     toggleFrame.ZIndex = 6
     toggleFrame:SetAttribute("Tab", tabCategory)
@@ -1034,7 +1063,7 @@ local function createToggle(parent, configKey, tabCategory)
     local titleLabel = Instance.new("TextLabel", toggleFrame)
     titleLabel.Name = "Title"
     titleLabel.Size = UDim2.new(0.65, 0, 0, 16)
-    titleLabel.Position = UDim2.new(0, 12, 0, 6) -- Deslocado levemente para cima (Y: 6)
+    titleLabel.Position = UDim2.new(0, 12, 0, 6) 
     titleLabel.BackgroundTransparency = 1
     titleLabel.TextColor3 = Color3.fromHex("#CCCCCC")
     titleLabel.Font = Enum.Font.GothamBold
@@ -1044,15 +1073,15 @@ local function createToggle(parent, configKey, tabCategory)
     
     local descLabel = Instance.new("TextLabel", toggleFrame)
     descLabel.Name = "Description"
-    descLabel.Size = UDim2.new(0.65, 0, 0, 28) -- Altura expandida de 14 para 28
-    descLabel.Position = UDim2.new(0, 12, 0, 22) -- Alinhado na parte inferior
+    descLabel.Size = UDim2.new(0.65, 0, 0, 28) 
+    descLabel.Position = UDim2.new(0, 12, 0, 22) 
     descLabel.BackgroundTransparency = 1
     descLabel.TextColor3 = Color3.fromRGB(130, 130, 130)
     descLabel.Font = Enum.Font.Gotham
     descLabel.TextSize = 9
     descLabel.TextXAlignment = Enum.TextXAlignment.Left
-    descLabel.TextYAlignment = Enum.TextYAlignment.Top -- Força o alinhamento no topo do container
-    descLabel.TextWrapped = true -- PERMITE A QUEBRA DE LINHA CORRETA SEM APAGAR O TEXTO
+    descLabel.TextYAlignment = Enum.TextYAlignment.Top 
+    descLabel.TextWrapped = true 
     descLabel.ZIndex = 6
     
     local switchTrack = Instance.new("Frame", toggleFrame)
@@ -1129,7 +1158,7 @@ end
 
 local function AlternarConfirmacao(exibir)
     isConfirmOpen = exibir
-    local tempoAnim = 0.2
+    local tempoAnim = 0.15 
     
     if exibir then
         if not confirmBlur then
@@ -1145,13 +1174,24 @@ local function AlternarConfirmacao(exibir)
     else
         AplicarFadeSincronizado(confirmFrame, true, tempoAnim)
         if confirmBlur then TweenService:Create(confirmBlur, TweenInfo.new(tempoAnim, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = 0}):Play() end
+        
+        -- Se foi aberto enquanto minimizado, retorna para o estado minimizado de forma sincronizada
         if wasMinimizedBeforeConfirm then
-            togglesContainer.Visible = false
-            SidebarFrame.Visible = false
-            div.Visible = false
+            AplicarFadeSincronizado(SidebarFrame, true, 0.15)
+            AplicarFadeSincronizado(togglesContainer, true, 0.15)
+            
             isMinimized = true
             TweenService:Create(mainWrapper, TweenInfo.new(0.25, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {Size = UDim2.new(0, 520, 0, 52)}):Play()
+            
+            task.delay(0.15, function()
+                if isMinimized then
+                    togglesContainer.Visible = false
+                    SidebarFrame.Visible = false
+                    div.Visible = false
+                end
+            end)
         end
+        
         task.delay(tempoAnim, function()
             if not isConfirmOpen then 
                 confirmFrame.Visible = false 
@@ -1161,20 +1201,19 @@ local function AlternarConfirmacao(exibir)
     end
 end
 
--- Função de minimização totalmente otimizada (Buttery Smooth)
+-- Função de minimização totalmente otimizada (Mais Rápida e Responsiva)
 local function executarMinimizacao()
     if isConfirmOpen then return end
     isMinimized = not isMinimized
-    local windowAnim = TweenInfo.new(0.22, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out)
+    local windowAnim = TweenInfo.new(0.16, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
     
     if isMinimized then
-        -- Desvanece itens e redimensiona simultaneamente
-        AplicarFadeSincronizado(SidebarFrame, true, 0.15)
-        AplicarFadeSincronizado(togglesContainer, true, 0.15)
+        AplicarFadeSincronizado(SidebarFrame, true, 0.1)
+        AplicarFadeSincronizado(togglesContainer, true, 0.1)
         
         TweenService:Create(mainWrapper, windowAnim, {Size = UDim2.new(0, 520, 0, 52)}):Play()
         
-        task.delay(0.15, function()
+        task.delay(0.1, function()
             if isMinimized then
                 togglesContainer.Visible = false 
                 SidebarFrame.Visible = false
@@ -1191,18 +1230,18 @@ local function executarMinimizacao()
         
         TweenService:Create(mainWrapper, windowAnim, {Size = UDim2.new(0, 520, 0, 300)}):Play()
         
-        AplicarFadeSincronizado(SidebarFrame, false, 0.22)
-        AplicarFadeSincronizado(togglesContainer, false, 0.22)
+        AplicarFadeSincronizado(SidebarFrame, false, 0.16)
+        AplicarFadeSincronizado(togglesContainer, false, 0.16)
         
         filterToggles(activeTab, searchTextBox.Text)
     end
 end
 
--- Função de exibição do menu principal altamente responsiva
+-- Função de exibição do menu principal altamente responsiva (VELOCIDADE AJUSTADA)
 local function alternarVisibilidadeMenu()
     menuAberto = not menuAberto
-    local tempoAnim = 0.2
-    local windowAnim = TweenInfo.new(tempoAnim, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local tempoAnim = 0.12 -- Ficou muito mais rápido (antes 0.2)
+    local windowAnim = TweenInfo.new(tempoAnim, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
     
     if menuAberto then
         mainWrapper.Visible = true
@@ -1222,7 +1261,7 @@ local function alternarVisibilidadeMenu()
                 togglesContainer.Visible = true
                 div.Visible = true
                 AplicarFadeSincronizado(SidebarFrame, true, 0)
-                AplicarFadeSincronizado(SidebarFrame, false, 0.15)
+                AplicarFadeSincronizado(SidebarFrame, false, 0.1)
                 
                 filterToggles(activeTab, searchTextBox.Text)
             end
@@ -1451,7 +1490,8 @@ LanguageBtn.MouseButton1Click:Connect(function()
     if languageTransitioning then return end
     languageTransitioning = true
     
-    AplicarFadeTextos(mainFrame, true, 0.1)
+    -- CORREÇÃO: Aplica fade de forma precisa apenas no que muda de idioma
+    AplicarFadeIdioma(true, 0.1)
     task.wait(0.1)
     
     if currentLanguage == "EN" then
@@ -1465,7 +1505,7 @@ LanguageBtn.MouseButton1Click:Connect(function()
     LanguageBtn.Text = currentLanguage
     AtualizarIdioma()
     
-    AplicarFadeTextos(mainFrame, false, 0.12)
+    AplicarFadeIdioma(false, 0.12)
     task.wait(0.12)
     
     languageTransitioning = false
@@ -1473,6 +1513,7 @@ end)
 
 AtualizarIdioma()
 
+-- CORREÇÃO: Quando o script está minimizado, ele expande antes e exibe o fundo idêntico de confirmação
 CloseBtn.MouseButton1Click:Connect(function()
     wasMinimizedBeforeConfirm = isMinimized
     if isMinimized then
@@ -1480,11 +1521,21 @@ CloseBtn.MouseButton1Click:Connect(function()
         div.Visible = true
         SidebarFrame.Visible = true
         togglesContainer.Visible = true
-        local expandTween = TweenService:Create(mainWrapper, TweenInfo.new(0.25, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {Size = UDim2.new(0, 520, 0, 300)})
+        
+        -- Restaura as opacidades antes de expandir para que não fique tudo preto no fundo
+        AplicarFadeSincronizado(SidebarFrame, false, 0)
+        AplicarFadeSincronizado(togglesContainer, false, 0)
+        
+        local expandTween = TweenService:Create(mainWrapper, TweenInfo.new(0.2, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {Size = UDim2.new(0, 520, 0, 300)})
         expandTween:Play()
-        expandTween.Completed:Wait()
+        
+        task.spawn(function()
+            expandTween.Completed:Wait()
+            AlternarConfirmacao(true)
+        end)
+    else
+        AlternarConfirmacao(true)
     end
-    AlternarConfirmacao(true)
 end)
 
 btnNo.MouseButton1Click:Connect(function() AlternarConfirmacao(false) end)
@@ -1577,7 +1628,7 @@ renderConnection = RunService.RenderStepped:Connect(function()
 end)
 
 local function ObterArmaCaida()
-    local gun = workspace:FindFirstChild("GunDrop", true)
+    local gun = workspace:FindFirstChild("GunDrop", true) or workspace:FindFirstChild("Gun", true)
     if not gun then
         for _, child in ipairs(workspace:GetChildren()) do
             if child.Name == "GunDrop" or child.Name == "Gun" then
@@ -1586,6 +1637,39 @@ local function ObterArmaCaida()
         end
     end
     return gun
+end
+
+local function PlayerTemArma()
+    if player.Backpack:FindFirstChild("Gun") or (player.Character and player.Character:FindFirstChild("Gun")) then
+        return true
+    end
+    return false
+end
+
+-- Busca otimizada de Moedas para reduzir o uso de hardware no Delta
+local function ObterMoedaProxima(root)
+    local closestCoin = nil
+    local closestDist = math.huge
+    
+    local normal = workspace:FindFirstChild("Normal")
+    local map = normal and normal:FindFirstChild("Map") or workspace:FindFirstChild("Map")
+    local searchRoot = map or workspace
+    
+    for _, d in ipairs(searchRoot:GetDescendants()) do
+        if d:IsA("BasePart") then
+            local name = d.Name
+            if name == "Coin" or name == "CoinVisual" or name == "MainCoin" or name == "GoldenCoin" or name == "ClownCoin" or name == "Snowflake" or name == "CandyCane" then
+                if d.Transparency < 1 and d:FindFirstChildOfClass("TouchTransmitter") then
+                    local dist = (root.Position - d.Position).Magnitude
+                    if dist < closestDist then
+                        closestDist = dist
+                        closestCoin = d
+                    end
+                end
+            end
+        end
+    end
+    return closestCoin
 end
 
 hbConnection = RunService.Heartbeat:Connect(function(dt)
@@ -1644,40 +1728,40 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- TELEPORT TO GUN CORRIGIDO COM VERIFICAÇÃO DE PARTIDA ATIVA
-    if Configs.TpToGun and root and IsInMatch() then
+    -- TELEPORT TO GUN TOTALMENTE CORRIGIDO E OTIMIZADO PARA DELTA
+    if Configs.TpToGun and root and IsInMatch() and not PlayerTemArma() then
         local gunDrop = ObterArmaCaida()
         if gunDrop then
-            local targetPart = nil
-            if gunDrop:IsA("BasePart") then
-                targetPart = gunDrop
-            else
-                targetPart = gunDrop:FindFirstChildOfClass("BasePart") or gunDrop:FindFirstChild("Handle")
-            end
+            local targetPart = gunDrop:IsA("BasePart") and gunDrop or gunDrop:FindFirstChild("Handle") or gunDrop:FindFirstChildOfClass("BasePart")
 
             if targetPart and not hasTeleportedToGun then
                 hasTeleportedToGun = true
                 originalPositionBeforeGun = root.CFrame
                 
-                root.CFrame = targetPart.CFrame * CFrame.new(0, 1.5, 0)
+                -- Reseta velocidades físicas para evitar travamentos/rubberband
+                pcall(function()
+                    root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                    root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+                end)
+                
+                -- Teleporte suave com segurança
+                root.CFrame = targetPart.CFrame * CFrame.new(0, 1.2, 0)
                 
                 task.spawn(function()
-                    task.wait(0.3) 
+                    task.wait(0.35) -- Tempo necessário para a física processar e coletar a arma
                     if originalPositionBeforeGun and root and Configs.TpToGun then
                         root.CFrame = originalPositionBeforeGun
                     end
-                    task.wait(1.5) 
+                    task.wait(1.5) -- Cooldown de proteção contra spam
                     hasTeleportedToGun = false
                 end)
             end
-        else
-            hasTeleportedToGun = false
         end
     end
 
-    -- AUTO COLLECT REESTRUTURADO E ALTAMENTE OTIMIZADO PARA DELTA MOBILE 2026
+    -- AUTO COLLECT ULTRA OTIMIZADO E BASTANTE VELOZ
     if Configs.AutoCollect and root and IsInMatch() then
-        -- No-clip otimizado para celulares sem provocar quedas de FPS por varredura recursiva
+        -- No-clip otimizado e focado (desativa colisões rapidamente)
         if char then
             for _, part in ipairs(char:GetChildren()) do
                 if part:IsA("BasePart") then
@@ -1687,36 +1771,20 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
                     if handle then handle.CanCollide = false end
                 end
             end
-            if root then root.CanCollide = false end
+            root.CanCollide = false
         end
 
         if currentCollectTarget and (not currentCollectTarget.Parent or not currentCollectTarget:IsDescendantOf(workspace)) then
             currentCollectTarget = nil
         end
 
-        -- Busca controlada por clock para evitar gargalo de hardware no Delta
+        -- Busca inteligente de moedas mais próximas
         if not currentCollectTarget and os.clock() - lastCoinSearch > 0.15 then
             lastCoinSearch = os.clock()
-            local closestCoin = nil
-            local closestDist = math.huge
-            
-            for _, d in ipairs(workspace:GetDescendants()) do
-                if d:IsA("BasePart") and d.Name ~= "Coin_Container" then
-                    if d.Name == "Coin" or d.Name == "CoinVisual" or d.Name == "MainCoin" or d.Name == "GoldenCoin" or d.Name == "Coin_Can" or d.Name == "SpinningCoin" then
-                        if d.Transparency < 1 and d:IsDescendantOf(workspace) then
-                            local dist = (root.Position - d.Position).Magnitude
-                            if dist < closestDist and dist < 1200 then
-                                closestDist = dist
-                                closestCoin = d
-                            end
-                        end
-                    end
-                end
-            end
-            currentCollectTarget = closestCoin
+            currentCollectTarget = ObterMoedaProxima(root)
         end
 
-        -- Movimento de interpolação perfeito sem rubberbanding (PlatStand ativo via Callback)
+        -- Voo linear sem atrito e com teleporte em curto alcance (firetouchinterest integrado)
         if currentCollectTarget then
             local targetPos = currentCollectTarget.Position
             local currentPos = root.Position
@@ -1727,8 +1795,8 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
                 root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
             end)
             
-            if dist > 0.5 then
-                local flySpeed = 115 -- Velocidade otimizada e ultra segura para bypass de física
+            if dist > 1 then
+                local flySpeed = 55 -- Velocidade otimizada para o Bypass do Delta 2026
                 local moveAmount = flySpeed * dt
                 local direction = (targetPos - currentPos).Unit
                 
@@ -1738,7 +1806,12 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
                     root.CFrame = CFrame.new(currentPos + direction * moveAmount)
                 end
             else
+                -- Teleporta em cheio na moeda e força a colisão de coleta de forma instantânea
                 root.CFrame = CFrame.new(targetPos)
+                if firetouchinterest then
+                    firetouchinterest(root, currentCollectTarget, 0)
+                    firetouchinterest(root, currentCollectTarget, 1)
+                end
             end
         end
     else
