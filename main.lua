@@ -1,5 +1,5 @@
 -- [[
---     AKAT MM2 SCRIPT [BETA] - GLOBAL LOCALIZATION & PROCEDURAL ICONS (RESOLVED SCOPE UPDATE)
+--     AKAT MM2 SCRIPT [BETA v2.0] - GLOBAL LOCALIZATION, DRAG FIX & SMOOTH FADES
 -- ]]
 
 local Players = game:GetService("Players")
@@ -157,7 +157,7 @@ local Locales = {
                 Desc = "Aumenta considerablemente el alcance de ataque con tu cuchillo."
             },
             ESP = {
-                Title = "ESP Jugadores",
+                Title = "ESP Jogadores",
                 Desc = "Resalta a los jugadores a través de las paredes según sus roles."
             },
             Speed = {
@@ -203,7 +203,6 @@ local confirmBlur = nil
 local isConfirmOpen = false
 local wasMinimizedBeforeConfirm = false
 
--- Estados adicionais para recursos novos
 local safePlatform = nil
 local lastPositionBeforeSafeSpot = nil
 local announcedThisRound = false
@@ -505,7 +504,7 @@ TabsContainer.BorderSizePixel = 0
 TabsContainer.ScrollBarThickness = 0
 TabsContainer.ZIndex = 7
 TabsContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
-TabsContainer.ElasticBehavior = Enum.ElasticBehavior.Never -- Modificado: Fim do efeito elástico ("chiclete")
+TabsContainer.ElasticBehavior = Enum.ElasticBehavior.Never
 pcall(function() TabsContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y end)
 
 local TabsLayout = Instance.new("UIListLayout", TabsContainer)
@@ -577,7 +576,7 @@ togglesContainer.BorderSizePixel = 0
 togglesContainer.ScrollBarThickness = 0
 togglesContainer.ZIndex = 6
 togglesContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
-togglesContainer.ElasticBehavior = Enum.ElasticBehavior.Never -- Modificado: Fim do efeito elástico ("chiclete")
+togglesContainer.ElasticBehavior = Enum.ElasticBehavior.Never
 pcall(function() togglesContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y end)
 
 local containerLayout = Instance.new("UIListLayout", togglesContainer)
@@ -740,6 +739,26 @@ local function AplicarFadeSincronizado(raiz, fadeOut, duracao)
     for _, desc in ipairs(raiz:GetDescendants()) do tratarObjeto(desc) end
 end
 
+-- Função especial para transição ultra fluida de Idiomas (só altera os textos sem bugar o fundo)
+local function AplicarFadeTextos(raiz, fadeOut, duracao)
+    local info = TweenInfo.new(duracao, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    local function tratarObjeto(obj)
+        RegistrarTransparencias(obj)
+        local orig = originalTrans[obj]
+        if not orig then return end
+        if orig.TextTransparency then
+            local target = fadeOut and 1 or orig.TextTransparency
+            if duracao == 0 then obj.TextTransparency = target else TweenService:Create(obj, info, {TextTransparency = target}):Play() end
+        end
+        if orig.TextStrokeTransparency then
+            local target = fadeOut and 1 or orig.TextStrokeTransparency
+            if duracao == 0 then obj.TextStrokeTransparency = target else TweenService:Create(obj, info, {TextStrokeTransparency = target}):Play() end
+        end
+    end
+    tratarObjeto(raiz)
+    for _, desc in ipairs(raiz:GetDescendants()) do tratarObjeto(desc) end
+end
+
 local function CriarIconeProcedural(parent, tabName)
     local iconContainer = Instance.new("Frame", parent)
     iconContainer.Name = "Icon"
@@ -831,27 +850,32 @@ local function CriarIconeProcedural(parent, tabName)
         buildTrail(5, 11, 8)
 
     elseif tabName == "Teleports" then
-        -- Modificado: Símbolo Procedural de Teleporte criado nativamente (Estilo Target Locator)
-        local outerCircle = Instance.new("Frame", iconContainer)
-        outerCircle.Size = UDim2.new(0, 12, 0, 12)
-        outerCircle.Position = UDim2.new(0.5, -6, 0.5, -6)
-        outerCircle.BackgroundTransparency = 1
-        outerCircle.ZIndex = 9
-        Instance.new("UICorner", outerCircle).CornerRadius = UDim.new(1, 0)
-        
-        local stroke = Instance.new("UIStroke", outerCircle)
-        stroke.Color = Color3.fromRGB(180, 180, 180)
-        stroke.Thickness = 1.5
-        stroke.Name = "AccentStroke"
-        
-        local innerCenter = Instance.new("Frame", iconContainer)
-        innerCenter.Size = UDim2.new(0, 4, 0, 4)
-        innerCenter.Position = UDim2.new(0.5, -2, 0.5, -2)
-        innerCenter.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
-        innerCenter.BorderSizePixel = 0
-        innerCenter.ZIndex = 10
-        innerCenter.Name = "AccentFill"
-        Instance.new("UICorner", innerCenter).CornerRadius = UDim.new(1, 0)
+        -- ÍCONE ATUALIZADO: Seta moderna diagonal e futurista (Paper Plane/Arrow Cursor)
+        local arrowStem = Instance.new("Frame", iconContainer)
+        arrowStem.Name = "AccentFill"
+        arrowStem.Size = UDim2.new(0, 8, 0, 2)
+        arrowStem.Position = UDim2.new(0.5, -5, 0.5, -1)
+        arrowStem.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
+        arrowStem.BorderSizePixel = 0
+        arrowStem.ZIndex = 9
+
+        local arrowTip1 = Instance.new("Frame", iconContainer)
+        arrowTip1.Name = "AccentFill"
+        arrowTip1.Size = UDim2.new(0, 6, 0, 2)
+        arrowTip1.Position = UDim2.new(0.5, -1, 0.5, -3)
+        arrowTip1.Rotation = 45
+        arrowTip1.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
+        arrowTip1.BorderSizePixel = 0
+        arrowTip1.ZIndex = 9
+
+        local arrowTip2 = Instance.new("Frame", iconContainer)
+        arrowTip2.Name = "AccentFill"
+        arrowTip2.Size = UDim2.new(0, 6, 0, 2)
+        arrowTip2.Position = UDim2.new(0.5, -1, 0.5, 1)
+        arrowTip2.Rotation = -45
+        arrowTip2.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
+        arrowTip2.BorderSizePixel = 0
+        arrowTip2.ZIndex = 9
 
     elseif tabName == "Misc" then
         for i = 1, 3 do
@@ -878,17 +902,14 @@ local function RecolorirIcone(iconContainer, targetColor, animSpeed)
     end
 end
 
--- Função centralizada de tradução de Idiomas
 local function AtualizarIdioma()
     local langData = Locales[currentLanguage]
     if not langData then return end
     
-    -- Atualizando textos cabeçalho
     title.Text = langData.Title
     subtitle.Text = langData.Subtitle
     searchTextBox.PlaceholderText = langData.SearchPlaceholder
     
-    -- Atualizando abas (Tabs)
     for tabName, btn in pairs(tabButtons) do
         local label = btn:FindFirstChild("Label")
         if label then
@@ -896,7 +917,6 @@ local function AtualizarIdioma()
         end
     end
     
-    -- Atualizando opções (Toggles)
     for _, child in ipairs(togglesContainer:GetChildren()) do
         if child:IsA("Frame") and child.Name ~= "UIListLayout" and child.Name ~= "UIPadding" then
             local configKey = child:GetAttribute("ConfigKey")
@@ -909,7 +929,6 @@ local function AtualizarIdioma()
         end
     end
     
-    -- Atualizando Janela de confirmação
     confirmLabel.Text = langData.ConfirmCloseTitle
     btnYes.Text = langData.ConfirmBtn
     btnNo.Text = langData.CancelBtn
@@ -933,7 +952,6 @@ local function filterToggles(currentActiveTab, query)
             
             child.Visible = shouldBeVisible
             
-            -- Modificado: Adiciona o efeito de rolagem/cascata suave de cima para baixo
             if shouldBeVisible then
                 itemIndex = itemIndex + 1
                 child.Size = UDim2.new(1, -8, 0, 0)
@@ -976,7 +994,6 @@ local function selectTab(tabName)
         end
     end
     
-    -- Modificado: Sempre força o scroll a voltar ao topo para iniciar a rolagem vertical perfeita
     togglesContainer.CanvasPosition = Vector2.new(0, 0)
     searchTextBox.Text = "" 
     filterToggles(tabName, "")
@@ -1046,7 +1063,6 @@ local function createTabBtn(tabName)
     tabButtons[tabName] = tabBtn
 end
 
--- Callbacks customizados para ações de ativação de recursos
 local ConfigCallbacks = {
     SafeSpot = function(enabled)
         local char = player.Character
@@ -1117,7 +1133,6 @@ local function createToggle(parent, configKey, tabCategory)
     descLabel.TextXAlignment = Enum.TextXAlignment.Left
     descLabel.ZIndex = 6
     
-    -- Botão Interruptor (Switch)
     local switchTrack = Instance.new("Frame", toggleFrame)
     switchTrack.Size = UDim2.new(0, 40, 0, 20)
     switchTrack.Position = UDim2.new(1, -52, 0.5, -10)
@@ -1221,36 +1236,48 @@ local function AlternarConfirmacao(exibir)
     end
 end
 
+-- Função de minimização totalmente sincronizada e fluida
 local function executarMinimizacao()
     if isConfirmOpen then return end
     isMinimized = not isMinimized
-    local windowAnim = TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    local windowAnim = TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
     
     if isMinimized then
+        -- Fade Out e minimização sincronizados
+        AplicarFadeSincronizado(SidebarFrame, true, 0.15)
+        AplicarFadeSincronizado(togglesContainer, true, 0.15)
+        task.wait(0.12)
         togglesContainer.Visible = false 
         SidebarFrame.Visible = false
         div.Visible = false
         TweenService:Create(mainWrapper, windowAnim, {Size = UDim2.new(0, 520, 0, 52)}):Play()
     else
+        -- Un-minimize (Restauração) idêntica à animação de abertura limpa
         div.Visible = true
         SidebarFrame.Visible = true
+        togglesContainer.Visible = true
+        
+        AplicarFadeSincronizado(SidebarFrame, true, 0)
+        AplicarFadeSincronizado(togglesContainer, true, 0)
+        
         local openTween = TweenService:Create(mainWrapper, windowAnim, {Size = UDim2.new(0, 520, 0, 300)})
         openTween:Play()
-        openTween.Completed:Connect(function()
-            if not isMinimized and not isConfirmOpen then togglesContainer.Visible = true end
-        end)
+        
+        AplicarFadeSincronizado(SidebarFrame, false, 0.3)
+        AplicarFadeSincronizado(togglesContainer, false, 0.3)
     end
 end
 
 local function alternarVisibilidadeMenu()
     menuAberto = not menuAberto
-    local tempoAnim = 0.15 
+    local tempoAnim = 0.2
     local windowAnim = TweenInfo.new(tempoAnim, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
     
     if menuAberto then
         mainWrapper.Visible = true
         togglesContainer.Visible = false
         SidebarFrame.Visible = false
+        div.Visible = false
         
         mainWrapper.Size = UDim2.new(0, 480, 0, isMinimized and 40 or 270)
         AplicarFadeSincronizado(mainWrapper, true, 0)
@@ -1260,13 +1287,19 @@ local function alternarVisibilidadeMenu()
         pop:Play()
         pop.Completed:Connect(function()
             if menuAberto and not isMinimized and not isConfirmOpen then 
-                togglesContainer.Visible = true 
                 SidebarFrame.Visible = true
+                togglesContainer.Visible = true
+                div.Visible = true
+                AplicarFadeSincronizado(SidebarFrame, true, 0)
+                AplicarFadeSincronizado(togglesContainer, true, 0)
+                AplicarFadeSincronizado(SidebarFrame, false, 0.22)
+                AplicarFadeSincronizado(togglesContainer, false, 0.22)
             end
         end)
     else
         togglesContainer.Visible = false
         SidebarFrame.Visible = false
+        div.Visible = false
         
         AplicarFadeSincronizado(mainWrapper, true, tempoAnim)
         local hide = TweenService:Create(mainWrapper, windowAnim, {Size = UDim2.new(0, 480, 0, isMinimized and 40 or 270)})
@@ -1277,12 +1310,24 @@ local function alternarVisibilidadeMenu()
     end
 end
 
+-- Função de arrasto corrigida e otimizada (sem travamentos em PC/Mobile)
 local function ConfigurarArrastarAkat(inst)
     local drag = false
     local startPos, dragStart, dragInput
     inst.InputBegan:Connect(function(input)
-        if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and not drag then
-            drag = true; dragStart = input.Position; startPos = inst.Position; dragInput = input
+        if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+            drag = true
+            dragStart = input.Position
+            startPos = inst.Position
+            dragInput = input
+            
+            local connection
+            connection = input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    drag = false
+                    connection:Disconnect()
+                end
+            end)
         end
     end)
     UserInputService.InputChanged:Connect(function(input)
@@ -1291,7 +1336,6 @@ local function ConfigurarArrastarAkat(inst)
             inst.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
     end)
-    UserInputService.InputChanged:Connect(function(input) if drag and input == dragInput then drag = false; dragInput = nil end end)
 end
 
 -- Animação de Introdução
@@ -1380,7 +1424,6 @@ local function ExecutarIntroAkat()
     openTween.Completed:Connect(function() selectTab("Combat") end)
 end
 
--- Envia mensagem limpa e tratada para ambos os sistemas de chat da Roblox (Antigo e Novo)
 local function EnviarMensagemChat(msg)
     local TextChatService = game:GetService("TextChatService")
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -1401,7 +1444,6 @@ end
 
 -- ==================== 5. INSTANCIAÇÃO DINÂMICA DE ELEMENTOS E EVENTOS ====================
 
--- Efeitos de Hover Dinâmicos nos Botões Superiores
 local function AplicarEfeitoFisicoBotao(btn, hoverColor)
     btn.MouseEnter:Connect(function()
         TweenService:Create(btn, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {BackgroundColor3 = Color3.fromRGB(36, 36, 36)}):Play()
@@ -1438,14 +1480,12 @@ AplicarEfeitoFisicoBotao(SearchBtn, Color3.fromRGB(255, 255, 255))
 AplicarEfeitoFisicoBotao(MinimizeBtn, Color3.fromRGB(255, 255, 255))
 AplicarEfeitoFisicoBotao(CloseBtn, Color3.fromRGB(255, 60, 60))
 
--- Criar Botões das Abas
 createTabBtn("Combat")
 createTabBtn("Visuals")
 createTabBtn("Movement")
 createTabBtn("Teleports")
 createTabBtn("Misc")
 
--- Criando as Opções de Configuração divididas nas abas
 createToggle(togglesContainer, "AutoShoot", "Combat")
 createToggle(togglesContainer, "Reach", "Combat")
 createToggle(togglesContainer, "ESP", "Visuals")
@@ -1456,7 +1496,6 @@ createToggle(togglesContainer, "SafeSpot", "Teleports")
 createToggle(togglesContainer, "AutoCollect", "Misc")
 createToggle(togglesContainer, "ChatRoles", "Misc")
 
--- Configuração da Busca
 local searchOpen = false
 SearchBtn.MouseButton1Click:Connect(function()
     searchOpen = not searchOpen
@@ -1476,8 +1515,15 @@ searchTextBox:GetPropertyChangedSignal("Text"):Connect(function()
     filterToggles(activeTab, searchTextBox.Text)
 end)
 
--- Clique e lógica de loop de idiomas: EN -> PT -> ES -> EN
+-- Clique com transição fluida de idioma (Fade Out -> Altera texto -> Fade In)
+local languageTransitioning = false
 LanguageBtn.MouseButton1Click:Connect(function()
+    if languageTransitioning then return end
+    languageTransitioning = true
+    
+    AplicarFadeTextos(mainFrame, true, 0.12)
+    task.wait(0.12)
+    
     if currentLanguage == "EN" then
         currentLanguage = "PT"
     elseif currentLanguage == "PT" then
@@ -1488,12 +1534,15 @@ LanguageBtn.MouseButton1Click:Connect(function()
     
     LanguageBtn.Text = currentLanguage
     AtualizarIdioma()
+    
+    AplicarFadeTextos(mainFrame, false, 0.15)
+    task.wait(0.15)
+    
+    languageTransitioning = false
 end)
 
--- Inicializar Tradução Global Inicial
 AtualizarIdioma()
 
--- Conectar Eventos de Fechamento / Confirmação
 CloseBtn.MouseButton1Click:Connect(function()
     wasMinimizedBeforeConfirm = isMinimized
     if isMinimized then
@@ -1525,27 +1574,23 @@ end)
 MinimizeBtn.MouseButton1Click:Connect(executarMinimizacao)
 FloatBtn.MouseButton1Click:Connect(alternarVisibilidadeMenu)
 
--- Input de abertura por Teclado
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if not gameProcessed and (input.KeyCode == Enum.KeyCode.Insert or input.KeyCode == Enum.KeyCode.RightShift) then
         alternarVisibilidadeMenu()
     end
 end)
 
--- Arrastar Menu/Botão
 ConfigurarArrastarAkat(mainWrapper)
 ConfigurarArrastarAkat(FloatBtn)
 
--- Executar registro em segundo plano de transparencias para o painel de confirmação
 task.spawn(function()
     task.wait(0.1)
     RegistrarTransparencias(confirmFrame)
     for _, d in ipairs(confirmFrame:GetDescendants()) do RegistrarTransparencias(d) end
 end)
 
--- ==================== 6. THREADS EM SEGUNDO PLANO (CHEST LOOPS E CACHE) ====================
+-- ==================== 6. THREADS EM SEGUNDO PLANO ====================
 
--- Loop de Monitoramento de Funções & Chat Announcement
 task.spawn(function()
     while true do
         local currentMurderer = nil
@@ -1560,7 +1605,6 @@ task.spawn(function()
             end
         end
         
-        -- Reinicia o anunciador automático se as funções resetarem (fim de rodada)
         if not currentMurderer and not currentSheriff then
             announcedThisRound = false
         elseif Configs.ChatRoles and (currentMurderer or currentSheriff) and not announcedThisRound then
@@ -1579,7 +1623,6 @@ task.spawn(function()
     end
 end)
 
--- Render Loop para Mira Suave e Auto Shoot (Real)
 renderConnection = RunService.RenderStepped:Connect(function()
     if Configs.AutoShoot then
         local char = player.Character
@@ -1603,13 +1646,24 @@ renderConnection = RunService.RenderStepped:Connect(function()
     end
 end)
 
--- Heartbeat Loop para Física, ESP, Teleportes e Coletor de Moedas
+-- Função para encontrar a arma caida em qualquer lugar do mapa recursivamente
+local function ObterArmaCaida()
+    local gun = workspace:FindFirstChild("GunDrop", true)
+    if not gun then
+        for _, child in ipairs(workspace:GetChildren()) do
+            if child.Name == "GunDrop" or child.Name == "Gun" then
+                return child
+            end
+        end
+    end
+    return gun
+end
+
 hbConnection = RunService.Heartbeat:Connect(function(dt)
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     local hum  = char and char:FindFirstChildOfClass("Humanoid")
 
-    -- 1. Anti-Fling
     if Configs.AntiFling then
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= player and p.Character then
@@ -1626,7 +1680,6 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- 2. ESP de Jogadores
     if Configs.ESP then
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= player and p.Character then
@@ -1662,34 +1715,38 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- 3. Teleporte Bumerangue Inteligente para Arma Caída (TP to Gun)
+    -- TELEPORT TO GUN CORRIGIDO E SEGURO (Bumerangue)
     if Configs.TpToGun and root then
-        local gunDrop = workspace:FindFirstChild("GunDrop") or workspace:FindFirstChild("Gun")
+        local gunDrop = ObterArmaCaida()
         if gunDrop then
-            local targetPart = gunDrop:IsA("BasePart") and gunDrop or gunDrop:FindFirstChildOfClass("BasePart")
+            local targetPart = nil
+            if gunDrop:IsA("BasePart") then
+                targetPart = gunDrop
+            else
+                targetPart = gunDrop:FindFirstChildOfClass("BasePart") or gunDrop:FindFirstChild("Handle")
+            end
+
             if targetPart and not hasTeleportedToGun then
                 hasTeleportedToGun = true
                 originalPositionBeforeGun = root.CFrame
                 
-                -- Vai até a arma instantaneamente
-                root.CFrame = targetPart.CFrame * CFrame.new(0, 1, 0)
+                -- Teleporta em cima da arma
+                root.CFrame = targetPart.CFrame * CFrame.new(0, 1.5, 0)
                 
-                -- Retorna automaticamente e rápido para a posição segura anterior
                 task.spawn(function()
-                    task.wait(0.25) -- Tempo necessário para a engine coletar a arma
+                    task.wait(0.3) -- Tempo de coleta para garantir a captura na engine
                     if originalPositionBeforeGun and root and Configs.TpToGun then
                         root.CFrame = originalPositionBeforeGun
                     end
+                    task.wait(1.5) -- Cooldown para prevenir spam
+                    hasTeleportedToGun = false
                 end)
             end
         else
-            -- Reseta o estado quando a arma sumir do chão (coletada)
             hasTeleportedToGun = false
-            originalPositionBeforeGun = nil
         end
     end
 
-    -- 4. Coletor Automático de Moedas Avançado (Auto Collect de Forma Voando)
     if Configs.AutoCollect and root then
         local closestCoin = nil
         local closestDist = math.huge
@@ -1713,7 +1770,7 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
             local dist = (targetPos - currentPos).Magnitude
             
             if dist > 1.5 then
-                local flySpeed = 75 -- Velocidade avançada de voo linear suave
+                local flySpeed = 75 
                 local moveAmount = flySpeed * dt
                 local direction = (targetPos - currentPos).Unit
                 
@@ -1732,7 +1789,6 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- 5. Atualização de Velocidade e Alcance da Faca
     if char and root and hum then
         local velocidadeAlvo = Configs.Speed and 23 or 16
         if hum.WalkSpeed ~= velocidadeAlvo then hum.WalkSpeed = velocidadeAlvo end
@@ -1776,5 +1832,4 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
     end
 end)
 
--- Iniciar Intro do Script de forma assíncrona
 task.spawn(ExecutarIntroAkat)
