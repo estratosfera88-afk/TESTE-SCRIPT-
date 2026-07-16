@@ -1,5 +1,5 @@
 -- [[
---     AKAT MM2 SCRIPT [BETA v2.3] - PERFORMANCE & UI OVERHAUL (OPTIMIZED & FIXED)
+--     AKAT MM2 SCRIPT [BETA v2.4] - MELHORIAS INTELIGENTES (AUTO COLLECT & TP GUN FIXES)
 -- ]]
 
 local Players = game:GetService("Players")
@@ -206,6 +206,42 @@ local originalPositionBeforeGun = nil
 local currentCollectTarget = nil 
 local lastCoinSearch = 0
 
+-- [CORREÇÃO INTELIGENTE]: Variáveis para detectar se está em partida real
+local isInActualGame = false
+local lastGameStateCheck = 0
+
+-- ==================== FUNÇÕES DE DETECÇÃO INTELIGENTE ====================
+
+-- [NOVO]: Função para verificar se o jogador está em uma partida real (não no lobby)
+local function VerificarSeEstáEmPartida()
+    local char = player.Character
+    if not char then return false end
+    
+    -- Verifica se há objetos típicos de partida ativa
+    local temsHumanoid = char:FindFirstChildOfClass("Humanoid")
+    if not temsHumanoid then return false end
+    
+    -- Verifica se o mapa está carregado (procura por elementos do MM2)
+    local hasGameElements = workspace:FindFirstChild("Coins") or 
+                            workspace:FindFirstChild("ToggledCoins") or
+                            workspace:FindFirstChild("SpawnCoins") or
+                            workspace:FindFirstChildWhichIsA("Folder", false) ~= nil
+    
+    -- Verifica se humanoid tem saúde válida
+    if temsHumanoid.Health <= 0 then return false end
+    
+    -- Verifica se existem outros jogadores com papéis (indica partida ativa)
+    local hasActivePlayers = false
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= player and p.Character and p.Character:FindFirstChildOfClass("Humanoid") and p.Character.Humanoid.Health > 0 then
+            hasActivePlayers = true
+            break
+        end
+    end
+    
+    return hasActivePlayers
+end
+
 -- ==================== 3. CRIAÇÃO DE TODA A ESTRUTURA DE INTERFACE (UI) ====================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "DeltaAkatUniversalUI"
@@ -225,14 +261,14 @@ if uiParent:FindFirstChild("DeltaAkatUniversalUI") then
 end
 screenGui.Parent = uiParent
 
--- Botão Flutuante (AKAT) - CORRIGIDO (IMAGEM E BORDA)
+-- Botão Flutuante (AKAT) - CORRIGIDO PARA NASCER DO LADO ESQUERDO
 local FloatBtn = Instance.new("ImageButton", screenGui)
 FloatBtn.Name = "FloatBtn"
 FloatBtn.AnchorPoint = Vector2.new(0.5, 0.5) 
 FloatBtn.Size = UDim2.new(0, 44, 0, 44)
 
--- [CORREÇÃO]: Evita que o botão nasça grudado no canto da tela. Agora surge no canto superior-médio direito.
-FloatBtn.Position = UDim2.new(0.85, 0, 0.4, 0)
+-- [CORREÇÃO]: FloatBtn agora nasce no lado ESQUERDO da tela
+FloatBtn.Position = UDim2.new(0.15, 0, 0.4, 0)
 
 -- Formato rbxthumb resolve de forma universal Decals para Image IDs em qualquer executor mobile!
 FloatBtn.Image = "rbxthumb://type=Asset&id=99997714241420&w=150&h=150"
@@ -252,7 +288,7 @@ FloatStroke.Color = Color3.fromRGB(255, 255, 255)
 local StrokeGradient = Instance.new("UIGradient", FloatStroke)
 StrokeGradient.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(0, Color3.fromHex("#8B0000")),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(15, 15, 15)), -- Transição suave para tom quase preto
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(15, 15, 15)),
     ColorSequenceKeypoint.new(1, Color3.fromHex("#8B0000"))
 })
 
@@ -1026,9 +1062,16 @@ local ConfigCallbacks = {
             if hum then
                 pcall(function() hum.PlatformStand = false end)
             end
+            -- [CORREÇÃO INTELIGENTE]: Restaura a física normal e recoloca as colisões ao desativar
+            if char then
+                for _, part in ipairs(char:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = true
+                    end
+                end
+            end
         else
             if hum then
-                -- [CORREÇÃO]: Garante que o jogador fique estático no ar ao ligar
                 pcall(function() hum.PlatformStand = true end)
             end
         end
@@ -1140,6 +1183,12 @@ local function LimparEDesligarAbsolutamente()
                     local handle = item:FindFirstChild("Handle")
                     local reachPart = handle and handle:FindFirstChild("AkatReachPart")
                     if reachPart then reachPart:Destroy() end
+                end
+            end
+            -- [CORREÇÃO]: Restaura colisões normais ao sair
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = true
                 end
             end
         end
@@ -1530,7 +1579,6 @@ btnYes.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
--- [CORREÇÃO]: Nova função de animação tátil elástica para o clique do botão flutuante
 local function AnimarCliqueFloatBtn()
     local originalSize = UDim2.new(0, 44, 0, 44)
     local targetSize = UDim2.new(0, 36, 0, 36)
@@ -1546,7 +1594,6 @@ end
 
 MinimizeBtn.MouseButton1Click:Connect(executarMinimizacao)
 
--- [CORREÇÃO]: Acopla a animação tátil no evento de clique do FloatBtn
 FloatBtn.MouseButton1Click:Connect(function()
     AnimarCliqueFloatBtn()
     alternarVisibilidadeMenu()
@@ -1627,8 +1674,10 @@ renderConnection = RunService.RenderStepped:Connect(function()
     end
 end)
 
--- TELEPORT TO GUN (Busca recursiva direta da pistola dropada)
+-- [CORREÇÃO INTELIGENTE]: Verifica se está em partida real antes de teleportar para arma
 local function ObterArmaCaida()
+    if not VerificarSeEstáEmPartida() then return nil end
+    
     local gun = workspace:FindFirstChild("GunDrop", true)
     if gun then
         if gun:IsA("BasePart") then 
@@ -1649,17 +1698,17 @@ local function PlayerTemArma()
     return false
 end
 
--- AUTO COLLECT CORRIGIDO (Busca recursiva de moedas de partida no MM2)
+-- [CORREÇÃO INTELIGENTE]: Auto Collect agora verifica se está em partida real
 local function ObterMoedaProxima(root)
+    if not VerificarSeEstáEmPartida() then return nil end
+    
     local closestCoin = nil
     local closestDist = math.huge
     
     for _, d in ipairs(workspace:GetDescendants()) do
         if d:IsA("BasePart") and d.Transparency < 1 then
             local name = d.Name:lower()
-            -- [CORREÇÃO]: Varredura geral de moedas integrada, incluindo eventos do MM2 (neve, doces, diamantes, etc.)
             if name:find("coin") or name:find("moeda") or name:find("gold") or name == "snowflake" or name == "candycane" or name:find("token") or name:find("diamond") or name:find("present") or name:find("candy") then
-                -- [CORREÇÃO EXTREMA]: Impede o script de tentar pegar moedas guardadas no inventário/acessórios de outros jogadores!
                 if not d:IsDescendantOf(Players) and not d:FindFirstAncestorOfClass("Tool") and not d:FindFirstAncestorOfClass("Accessory") then
                     local dist = (root.Position - d.Position).Magnitude
                     if dist < closestDist then
@@ -1729,8 +1778,8 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- TELEPORT TO GUN
-    if Configs.TpToGun and root and not PlayerTemArma() then
+    -- [CORREÇÃO INTELIGENTE]: TP TO GUN agora só funciona em partida real
+    if Configs.TpToGun and root and not PlayerTemArma() and VerificarSeEstáEmPartida() then
         local gunDrop = ObterArmaCaida()
         if gunDrop and not hasTeleportedToGun then
             hasTeleportedToGun = true
@@ -1754,14 +1803,12 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- AUTO COLLECT TOTALMENTE CORRIGIDO (Noclip estável + Voar sem gravidade)
-    if Configs.AutoCollect and root then
-        -- [CORREÇÃO]: Força o estado sem gravidade continuamente
+    -- [CORREÇÃO INTELIGENTE]: AUTO COLLECT agora verifica se está em partida real e não cai no void
+    if Configs.AutoCollect and root and VerificarSeEstáEmPartida() then
         if hum then
             pcall(function() hum.PlatformStand = true end)
         end
 
-        -- [CORREÇÃO]: Desativa colisão recursivamente em absolutamente todas as partes para atravessar paredes perfeitamente
         if char then
             for _, part in ipairs(char:GetDescendants()) do
                 if part:IsA("BasePart") then
@@ -1790,7 +1837,7 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
             end)
             
             if dist > 1 then
-                local flySpeed = 85 -- [MELHORIA]: Velocidade de deslocamento otimizada de 55 para 85 para atravessar o mapa rapidamente
+                local flySpeed = 85
                 local moveAmount = flySpeed * dt
                 local direction = (targetPos - currentPos).Unit
                 
@@ -1809,7 +1856,6 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     else
         currentCollectTarget = nil
-        -- [CORREÇÃO]: Restaura a física normal se desativar o auto collect
         if hum and hum.PlatformStand then
             pcall(function() hum.PlatformStand = false end)
         end
