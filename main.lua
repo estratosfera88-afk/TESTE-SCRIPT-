@@ -498,14 +498,14 @@ ProfileDiv.ZIndex = 6
 
 local TabsContainer = Instance.new("ScrollingFrame", SidebarFrame)
 TabsContainer.Name = "TabsContainer"
-TabsContainer.Size = UDim2.new(1, 0, 1, -75) -- Ajustado espaço livre para não colidir com o profile
+TabsContainer.Size = UDim2.new(1, 0, 1, -75) 
 TabsContainer.Position = UDim2.new(0, 0, 0, 5)
 TabsContainer.BackgroundTransparency = 1
 TabsContainer.BorderSizePixel = 0
 TabsContainer.ScrollBarThickness = 0
 TabsContainer.ZIndex = 7
 TabsContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
-TabsContainer.ElasticBehavior = Enum.ElasticBehavior.Always -- Adicionado efeito de ir e voltar (Bouncing)
+TabsContainer.ElasticBehavior = Enum.ElasticBehavior.Never -- Modificado: Fim do efeito elástico ("chiclete")
 pcall(function() TabsContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y end)
 
 local TabsLayout = Instance.new("UIListLayout", TabsContainer)
@@ -577,7 +577,7 @@ togglesContainer.BorderSizePixel = 0
 togglesContainer.ScrollBarThickness = 0
 togglesContainer.ZIndex = 6
 togglesContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
-togglesContainer.ElasticBehavior = Enum.ElasticBehavior.Always
+togglesContainer.ElasticBehavior = Enum.ElasticBehavior.Never -- Modificado: Fim do efeito elástico ("chiclete")
 pcall(function() togglesContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y end)
 
 local containerLayout = Instance.new("UIListLayout", togglesContainer)
@@ -831,31 +831,27 @@ local function CriarIconeProcedural(parent, tabName)
         buildTrail(5, 11, 8)
 
     elseif tabName == "Teleports" then
-        -- Ícone Alterado para uma Seta Moderna Minimalista (Up-Right Arrow)
-        local arrowBody = Instance.new("Frame", iconContainer)
-        arrowBody.Size = UDim2.new(0, 11, 0, 2)
-        arrowBody.Position = UDim2.new(0.5, -5, 0.5, -1)
-        arrowBody.Rotation = -45
-        arrowBody.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
-        arrowBody.BorderSizePixel = 0
-        arrowBody.Name = "AccentFill"
-        Instance.new("UICorner", arrowBody).CornerRadius = UDim.new(1, 0)
+        -- Modificado: Símbolo Procedural de Teleporte criado nativamente (Estilo Target Locator)
+        local outerCircle = Instance.new("Frame", iconContainer)
+        outerCircle.Size = UDim2.new(0, 12, 0, 12)
+        outerCircle.Position = UDim2.new(0.5, -6, 0.5, -6)
+        outerCircle.BackgroundTransparency = 1
+        outerCircle.ZIndex = 9
+        Instance.new("UICorner", outerCircle).CornerRadius = UDim.new(1, 0)
         
-        local head1 = Instance.new("Frame", iconContainer)
-        head1.Size = UDim2.new(0, 6, 0, 2)
-        head1.Position = UDim2.new(0.5, 0, 0.5, -5)
-        head1.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
-        head1.BorderSizePixel = 0
-        head1.Name = "AccentFill"
-        Instance.new("UICorner", head1).CornerRadius = UDim.new(1, 0)
+        local stroke = Instance.new("UIStroke", outerCircle)
+        stroke.Color = Color3.fromRGB(180, 180, 180)
+        stroke.Thickness = 1.5
+        stroke.Name = "AccentStroke"
         
-        local head2 = Instance.new("Frame", iconContainer)
-        head2.Size = UDim2.new(0, 2, 0, 6)
-        head2.Position = UDim2.new(0.5, 4, 0.5, -5)
-        head2.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
-        head2.BorderSizePixel = 0
-        head2.Name = "AccentFill"
-        Instance.new("UICorner", head2).CornerRadius = UDim.new(1, 0)
+        local innerCenter = Instance.new("Frame", iconContainer)
+        innerCenter.Size = UDim2.new(0, 4, 0, 4)
+        innerCenter.Position = UDim2.new(0.5, -2, 0.5, -2)
+        innerCenter.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
+        innerCenter.BorderSizePixel = 0
+        innerCenter.ZIndex = 10
+        innerCenter.Name = "AccentFill"
+        Instance.new("UICorner", innerCenter).CornerRadius = UDim.new(1, 0)
 
     elseif tabName == "Misc" then
         for i = 1, 3 do
@@ -921,15 +917,42 @@ end
 
 local function filterToggles(currentActiveTab, query)
     local searchQuery = (query or ""):lower()
+    local itemIndex = 0
+    
     for _, child in ipairs(togglesContainer:GetChildren()) do
         if child:IsA("Frame") and child.Name ~= "UIListLayout" and child.Name ~= "UIPadding" then
             local itemTab = child:GetAttribute("Tab") or "Combat"
+            local shouldBeVisible = false
+            
             if searchQuery ~= "" then
                 local titleLabel = child:FindFirstChild("Title")
-                local match = titleLabel and titleLabel.Text:lower():find(searchQuery) ~= nil
-                child.Visible = match
+                shouldBeVisible = titleLabel and titleLabel.Text:lower():find(searchQuery) ~= nil
             else
-                child.Visible = (itemTab == currentActiveTab)
+                shouldBeVisible = (itemTab == currentActiveTab)
+            end
+            
+            child.Visible = shouldBeVisible
+            
+            -- Modificado: Adiciona o efeito de rolagem/cascata suave de cima para baixo
+            if shouldBeVisible then
+                itemIndex = itemIndex + 1
+                child.Size = UDim2.new(1, -8, 0, 0)
+                child.BackgroundTransparency = 1
+                
+                local title = child:FindFirstChild("Title")
+                local desc = child:FindFirstChild("Description")
+                if title then title.TextTransparency = 1 end
+                if desc then desc.TextTransparency = 1 end
+                
+                task.delay((itemIndex - 1) * 0.04, function()
+                    TweenService:Create(child, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+                        Size = UDim2.new(1, -8, 0, 48),
+                        BackgroundTransparency = 0
+                    }):Play()
+                    
+                    if title then TweenService:Create(title, TweenInfo.new(0.25), {TextTransparency = 0}):Play() end
+                    if desc then TweenService:Create(desc, TweenInfo.new(0.25), {TextTransparency = 0}):Play() end
+                end)
             end
         end
     end
@@ -952,6 +975,9 @@ local function selectTab(tabName)
             RecolorirIcone(iconContainer, Color3.fromRGB(180, 180, 180), animSpeed)
         end
     end
+    
+    -- Modificado: Sempre força o scroll a voltar ao topo para iniciar a rolagem vertical perfeita
+    togglesContainer.CanvasPosition = Vector2.new(0, 0)
     searchTextBox.Text = "" 
     filterToggles(tabName, "")
 end
@@ -1692,7 +1718,7 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
                 local direction = (targetPos - currentPos).Unit
                 
                 pcall(function()
-                    root.AssemblyLinearVelocity = Vector3.new(0, 0, 0) -- Evita puxões da física ou gravidade
+                    root.AssemblyLinearVelocity = Vector3.new(0, 0, 0) 
                 end)
                 
                 if moveAmount >= dist then
@@ -1752,4 +1778,3 @@ end)
 
 -- Iniciar Intro do Script de forma assíncrona
 task.spawn(ExecutarIntroAkat)
-
