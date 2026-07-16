@@ -62,7 +62,7 @@ local Locales = {
             },
             TpToGun = {
                 Title = "Teleportar p/ Arma",
-                Desc = "Teletransporta instantaneamente para a arma dropada se o Sheriff morrer."
+                Desc = "Teletransporta para a arma dropada e retorna ao local original rapidamente."
             },
             SafeSpot = {
                 Title = "Lugar Seguro",
@@ -70,7 +70,7 @@ local Locales = {
             },
             AutoCollect = {
                 Title = "Coletar Moedas",
-                Desc = "Coleta moedas automaticamente teletransportando-se pelo mapa."
+                Desc = "Voa de forma ultra avançada e suave coletando as moedas do mapa."
             },
             ChatRoles = {
                 Title = "Revelar Funções",
@@ -116,7 +116,7 @@ local Locales = {
             },
             TpToGun = {
                 Title = "TP to Gun",
-                Desc = "Automatically teleports to the dropped gun if the Sheriff dies."
+                Desc = "Teleports to the dropped gun and instantly returns to your spot."
             },
             SafeSpot = {
                 Title = "Safe Spot",
@@ -124,7 +124,7 @@ local Locales = {
             },
             AutoCollect = {
                 Title = "Auto Collect",
-                Desc = "Automatically teleports and collects spawned coins around the map."
+                Desc = "Smoothly flies from coin to coin around the map automatically."
             },
             ChatRoles = {
                 Title = "Reveal Roles",
@@ -162,7 +162,7 @@ local Locales = {
             },
             Speed = {
                 Title = "Velocidad",
-                Desc = "Aumenta ligeramente la velocidad del personaje a 23."
+                Desc = "Aumenta ligeramente la velocidad del personagem a 23."
             },
             AntiFling = {
                 Title = "Anti-Fling",
@@ -170,7 +170,7 @@ local Locales = {
             },
             TpToGun = {
                 Title = "TP a la Arma",
-                Desc = "Te teletransporta automáticamente a la pistola tirada si el Sheriff muere."
+                Desc = "Teletransporta a la pistola tirada y regresa a tu lugar velozmente."
             },
             SafeSpot = {
                 Title = "Lugar Seguro",
@@ -178,7 +178,7 @@ local Locales = {
             },
             AutoCollect = {
                 Title = "Auto Monedas",
-                Desc = "Colecciona monedas automáticamente teletransportándose por el mapa."
+                Desc = "Vuela suavemente de moneda en moneda recolectando de forma avanzada."
             },
             ChatRoles = {
                 Title = "Revelar Roles",
@@ -206,9 +206,10 @@ local wasMinimizedBeforeConfirm = false
 -- Estados adicionais para recursos novos
 local safePlatform = nil
 local lastPositionBeforeSafeSpot = nil
-local lastCoinCollect = 0
 local announcedThisRound = false
 local lastShootTime = 0
+local hasTeleportedToGun = false
+local originalPositionBeforeGun = nil
 
 -- ==================== 3. CRIAÇÃO DE TODA A ESTRUTURA DE INTERFACE (UI) ====================
 local screenGui = Instance.new("ScreenGui")
@@ -497,20 +498,24 @@ ProfileDiv.ZIndex = 6
 
 local TabsContainer = Instance.new("ScrollingFrame", SidebarFrame)
 TabsContainer.Name = "TabsContainer"
-TabsContainer.Size = UDim2.new(1, 0, 1, -65)
+TabsContainer.Size = UDim2.new(1, 0, 1, -75) -- Ajustado espaço livre para não colidir com o profile
 TabsContainer.Position = UDim2.new(0, 0, 0, 5)
 TabsContainer.BackgroundTransparency = 1
 TabsContainer.BorderSizePixel = 0
 TabsContainer.ScrollBarThickness = 0
 TabsContainer.ZIndex = 7
 TabsContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
-TabsContainer.ElasticBehavior = Enum.ElasticBehavior.Never 
+TabsContainer.ElasticBehavior = Enum.ElasticBehavior.Always -- Adicionado efeito de ir e voltar (Bouncing)
 pcall(function() TabsContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y end)
 
 local TabsLayout = Instance.new("UIListLayout", TabsContainer)
 TabsLayout.SortOrder = Enum.SortOrder.LayoutOrder
 TabsLayout.Padding = UDim.new(0, 6)
 TabsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+local TabsPadding = Instance.new("UIPadding", TabsContainer)
+TabsPadding.PaddingBottom = UDim.new(0, 15)
+TabsPadding.PaddingTop = UDim.new(0, 5)
 
 -- Perfil de Usuário
 local UserProfileFrame = Instance.new("Frame", SidebarFrame)
@@ -572,7 +577,7 @@ togglesContainer.BorderSizePixel = 0
 togglesContainer.ScrollBarThickness = 0
 togglesContainer.ZIndex = 6
 togglesContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
-togglesContainer.ElasticBehavior = Enum.ElasticBehavior.Never 
+togglesContainer.ElasticBehavior = Enum.ElasticBehavior.Always
 pcall(function() togglesContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y end)
 
 local containerLayout = Instance.new("UIListLayout", togglesContainer)
@@ -826,30 +831,31 @@ local function CriarIconeProcedural(parent, tabName)
         buildTrail(5, 11, 8)
 
     elseif tabName == "Teleports" then
-        local line1 = Instance.new("Frame", iconContainer)
-        line1.Size = UDim2.new(0, 10, 0, 2)
-        line1.Position = UDim2.new(0.5, -5, 0.5, 3)
-        line1.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
-        line1.BorderSizePixel = 0
-        line1.ZIndex = 9
-        line1.Name = "AccentFill"
+        -- Ícone Alterado para uma Seta Moderna Minimalista (Up-Right Arrow)
+        local arrowBody = Instance.new("Frame", iconContainer)
+        arrowBody.Size = UDim2.new(0, 11, 0, 2)
+        arrowBody.Position = UDim2.new(0.5, -5, 0.5, -1)
+        arrowBody.Rotation = -45
+        arrowBody.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
+        arrowBody.BorderSizePixel = 0
+        arrowBody.Name = "AccentFill"
+        Instance.new("UICorner", arrowBody).CornerRadius = UDim.new(1, 0)
         
-        local line2 = Instance.new("Frame", iconContainer)
-        line2.Size = UDim2.new(0, 2, 0, 8)
-        line2.Position = UDim2.new(0.5, 3, 0.5, -5)
-        line2.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
-        line2.BorderSizePixel = 0
-        line2.ZIndex = 9
-        line2.Name = "AccentFill"
+        local head1 = Instance.new("Frame", iconContainer)
+        head1.Size = UDim2.new(0, 6, 0, 2)
+        head1.Position = UDim2.new(0.5, 0, 0.5, -5)
+        head1.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
+        head1.BorderSizePixel = 0
+        head1.Name = "AccentFill"
+        Instance.new("UICorner", head1).CornerRadius = UDim.new(1, 0)
         
-        local arrow = Instance.new("Frame", iconContainer)
-        arrow.Size = UDim2.new(0, 6, 0, 6)
-        arrow.Position = UDim2.new(0.5, 1, 0.5, -5)
-        arrow.Rotation = 45
-        arrow.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
-        arrow.BorderSizePixel = 0
-        arrow.ZIndex = 9
-        arrow.Name = "AccentFill"
+        local head2 = Instance.new("Frame", iconContainer)
+        head2.Size = UDim2.new(0, 2, 0, 6)
+        head2.Position = UDim2.new(0.5, 4, 0.5, -5)
+        head2.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
+        head2.BorderSizePixel = 0
+        head2.Name = "AccentFill"
+        Instance.new("UICorner", head2).CornerRadius = UDim.new(1, 0)
 
     elseif tabName == "Misc" then
         for i = 1, 3 do
@@ -1406,14 +1412,14 @@ AplicarEfeitoFisicoBotao(SearchBtn, Color3.fromRGB(255, 255, 255))
 AplicarEfeitoFisicoBotao(MinimizeBtn, Color3.fromRGB(255, 255, 255))
 AplicarEfeitoFisicoBotao(CloseBtn, Color3.fromRGB(255, 60, 60))
 
--- Criar Botões das Abas (Agora com 5 Abas)
+-- Criar Botões das Abas
 createTabBtn("Combat")
 createTabBtn("Visuals")
 createTabBtn("Movement")
 createTabBtn("Teleports")
 createTabBtn("Misc")
 
--- Criando as Opções de Configuração divididas nas novas abas
+-- Criando as Opções de Configuração divididas nas abas
 createToggle(togglesContainer, "AutoShoot", "Combat")
 createToggle(togglesContainer, "Reach", "Combat")
 createToggle(togglesContainer, "ESP", "Visuals")
@@ -1551,20 +1557,17 @@ end)
 renderConnection = RunService.RenderStepped:Connect(function()
     if Configs.AutoShoot then
         local char = player.Character
-        -- Checa se o jogador está com o item "Gun" (Arma do Xerife) equipado e ativo na mão
         local gunTool = char and char:FindFirstChild("Gun")
         if gunTool and gunTool:IsA("Tool") then
             local murderer, distancia = ObterMurderer()
             if murderer and murderer.Character and distancia < 250 then
                 local targetPart = murderer.Character:FindFirstChild("Head") or murderer.Character:FindFirstChild("HumanoidRootPart")
                 if targetPart then
-                    -- Snap instantâneo de câmera focado no alvo
                     local lookVector = (targetPart.Position - Camera.CFrame.Position).Unit
                     Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, Camera.CFrame.Position + lookVector)
                     
-                    -- Disparo Automático Real utilizando o acionador nativo da Tool da Roblox
                     local now = os.clock()
-                    if now - lastShootTime > 0.25 then -- Evita bugs de repetição excessiva do trigger
+                    if now - lastShootTime > 0.25 then 
                         lastShootTime = now
                         gunTool:Activate()
                     end
@@ -1575,7 +1578,7 @@ renderConnection = RunService.RenderStepped:Connect(function()
 end)
 
 -- Heartbeat Loop para Física, ESP, Teleportes e Coletor de Moedas
-hbConnection = RunService.Heartbeat:Connect(function()
+hbConnection = RunService.Heartbeat:Connect(function(dt)
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     local hum  = char and char:FindFirstChildOfClass("Humanoid")
@@ -1633,41 +1636,71 @@ hbConnection = RunService.Heartbeat:Connect(function()
         end
     end
 
-    -- 3. Teleporte para Arma Caída (TP to Gun)
+    -- 3. Teleporte Bumerangue Inteligente para Arma Caída (TP to Gun)
     if Configs.TpToGun and root then
-        local gunDrop = workspace:FindFirstChild("GunDrop")
+        local gunDrop = workspace:FindFirstChild("GunDrop") or workspace:FindFirstChild("Gun")
         if gunDrop then
-            -- Suporte estrito para o modelo ou parte física independente de atualizações do mapa
-            local targetCF = gunDrop:IsA("BasePart") and gunDrop.CFrame or (gunDrop:IsA("Model") and (gunDrop.PrimaryPart and gunDrop.PrimaryPart.CFrame or gunDrop:FindFirstChildOfClass("BasePart") and gunDrop:FindFirstChildOfClass("BasePart").CFrame))
-            if targetCF then
-                root.CFrame = targetCF * CFrame.new(0, 1.5, 0)
+            local targetPart = gunDrop:IsA("BasePart") and gunDrop or gunDrop:FindFirstChildOfClass("BasePart")
+            if targetPart and not hasTeleportedToGun then
+                hasTeleportedToGun = true
+                originalPositionBeforeGun = root.CFrame
+                
+                -- Vai até a arma instantaneamente
+                root.CFrame = targetPart.CFrame * CFrame.new(0, 1, 0)
+                
+                -- Retorna automaticamente e rápido para a posição segura anterior
+                task.spawn(function()
+                    task.wait(0.25) -- Tempo necessário para a engine coletar a arma
+                    if originalPositionBeforeGun and root and Configs.TpToGun then
+                        root.CFrame = originalPositionBeforeGun
+                    end
+                end)
             end
+        else
+            -- Reseta o estado quando a arma sumir do chão (coletada)
+            hasTeleportedToGun = false
+            originalPositionBeforeGun = nil
         end
     end
 
-    -- 4. Coletor Automático de Moedas Inteligente (Auto Collect)
+    -- 4. Coletor Automático de Moedas Avançado (Auto Collect de Forma Voando)
     if Configs.AutoCollect and root then
-        local now = os.clock()
-        if now - lastCoinCollect > 0.75 then -- Velocidade ajustada para evitar detecções e kicks do servidor
-            local closestCoin = nil
-            local closestDist = math.huge
-            
-            -- Procura proativamente por recipientes de moedas no mapa
-            for _, d in ipairs(workspace:GetDescendants()) do
-                if d.Name == "Coin_Container" or d.Name == "Coin" or d.Name == "CoinVisual" then
-                    local pPart = d:IsA("BasePart") and d or d:FindFirstChildOfClass("BasePart")
-                    if pPart then
-                        local dist = (root.Position - pPart.Position).Magnitude
-                        if dist < closestDist and dist < 400 then
-                            closestDist = dist
-                            closestCoin = pPart
-                        end
+        local closestCoin = nil
+        local closestDist = math.huge
+        
+        for _, d in ipairs(workspace:GetDescendants()) do
+            if d.Name == "Coin_Container" or d.Name == "Coin" or d.Name == "CoinVisual" or d.Name == "MainCoin" then
+                local pPart = d:IsA("BasePart") and d or d:FindFirstChildOfClass("BasePart")
+                if pPart then
+                    local dist = (root.Position - pPart.Position).Magnitude
+                    if dist < closestDist and dist < 500 then
+                        closestDist = dist
+                        closestCoin = pPart
                     end
                 end
             end
+        end
+        
+        if closestCoin then
+            local targetPos = closestCoin.Position
+            local currentPos = root.Position
+            local dist = (targetPos - currentPos).Magnitude
             
-            if closestCoin then
-                lastCoinCollect = now
+            if dist > 1.5 then
+                local flySpeed = 75 -- Velocidade avançada de voo linear suave
+                local moveAmount = flySpeed * dt
+                local direction = (targetPos - currentPos).Unit
+                
+                pcall(function()
+                    root.AssemblyLinearVelocity = Vector3.new(0, 0, 0) -- Evita puxões da física ou gravidade
+                end)
+                
+                if moveAmount >= dist then
+                    root.CFrame = CFrame.new(targetPos)
+                else
+                    root.CFrame = CFrame.new(currentPos + direction * moveAmount)
+                end
+            else
                 root.CFrame = closestCoin.CFrame
             end
         end
