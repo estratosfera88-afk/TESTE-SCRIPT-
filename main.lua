@@ -1,5 +1,5 @@
 -- [[
---     AKAT MM2 MAIN LOGIC - BACKEND ONLY [v3.4 - MOBILE & BYPASS FIX]
+--     AKAT MM2 MAIN LOGIC - FULLY UPDATED & FIXED [v3.6 - MOBILE & BYPASS]
 -- ]]
 
 local Players = game:GetService("Players")
@@ -16,6 +16,7 @@ local mouse = player:GetMouse()
 local gunDroppedThisRound = false
 local lastPositionBeforeTpToGun = nil 
 local trackingTpToGun = false
+_G.ForceAutoShoot = false
 
 -- Configurações expostas de forma Global
 local Configs = {
@@ -58,7 +59,7 @@ task.spawn(function()
                 end)
             end
             
-            if _G.Configs and _G.Configs.AutoShoot and self == mouse then
+            if _G.Configs and (_G.Configs.AutoShoot or _G.ForceAutoShoot) and self == mouse then
                 if key == "Hit" or key == "hit" then
                     local murderer = _G.AS_GetMurderer()
                     local pChar = murderer and murderer.Character
@@ -285,12 +286,11 @@ local function AS_Tick()
     if not head or not myRoot then return end
 
     local targetPos = head.Position
-    -- Alinha suavemente o personagem para olhar na direção horizontal correta sem travar controles físicos
     myRoot.CFrame = CFrame.new(myRoot.Position, Vector3.new(targetPos.X, myRoot.Position.Y, targetPos.Z))
     Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, targetPos), 0.20)
 end
 
--- ==================== LÓGICA DE PROCURA DE ITENS ====================
+-- ==================== LÓGICA DE PROCURA DE ITENS & SEGURANÇA ====================
 local function ObterArmaCaida(root)
     local gun = workspace:FindFirstChild("GunDrop", true)
     if gun then
@@ -333,6 +333,23 @@ local function ObterMoedaProxima(root)
     return closestCoin
 end
 
+local function IsBagFull()
+    local full = false
+    pcall(function()
+        local mainGui = player:FindFirstChild("PlayerGui") and player.PlayerGui:FindFirstChild("MainGui")
+        local gameGui = mainGui and mainGui:FindFirstChild("Game")
+        local coinBag = gameGui and gameGui:FindFirstChild("CoinBag")
+        local amount = coinBag and coinBag:FindFirstChild("Container") and coinBag.Container:FindFirstChild("Amount")
+        if amount and amount:IsA("TextLabel") then
+            local current, max = amount.Text:match("(%d+)/(%d+)")
+            if current and max and tonumber(current) >= tonumber(max) then
+                full = true
+            end
+        end
+    end)
+    return full
+end
+
 local function EnviarMensagemChat(msg)
     local TextChatService = game:GetService("TextChatService")
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -354,6 +371,9 @@ local function LimparEDesligarAbsolutamente()
     for k in pairs(Configs) do Configs[k] = false end
     ESP_Disable()
     if safePlatform then pcall(function() safePlatform:Destroy() end); safePlatform = nil end
+    if game:GetService("CoreGui"):FindFirstChild("AkatFloatingUI") then
+        game:GetService("CoreGui").AkatFloatingUI:Destroy()
+    end
     pcall(function()
         local char = player.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -372,6 +392,82 @@ local function LimparEDesligarAbsolutamente()
         end
     end)
 end
+
+-- ==================== CRIAÇÃO DO BOTÃO FLUTUANTE EXTENSO ====================
+local function CriarBotaoFlutuante()
+    if game:GetService("CoreGui"):FindFirstChild("AkatFloatingUI") then
+        game:GetService("CoreGui").AkatFloatingUI:Destroy()
+    end
+
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "AkatFloatingUI"
+    ScreenGui.Parent = game:GetService("CoreGui")
+    ScreenGui.ResetOnSpawn = false
+
+    local Button = Instance.new("TextButton")
+    Button.Name = "AutoShootButton"
+    Button.Parent = ScreenGui
+    Button.Size = UDim2.new(0, 175, 0, 46) -- Modelo um pouco mais extenso
+    Button.Position = UDim2.new(0.15, 0, 0.45, 0)
+    Button.Text = "Auto shoot"
+    Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Button.Font = Enum.Font.GothamBold
+    Button.TextSize = 15
+    Button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    Button.ClipsDescendants = true
+
+    local UICorner = Instance.new("UICorner")
+    UICorner.CornerRadius = UDim.new(0, 8)
+    UICorner.Parent = Button
+
+    local UIStroke = Instance.new("UIStroke")
+    UIStroke.Color = Color3.fromRGB(45, 5, 5)
+    UIStroke.Thickness = 1.5
+    UIStroke.Parent = Button
+
+    local UIGradient = Instance.new("UIGradient")
+    UIGradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(110, 0, 0)), -- Vermelho Escuro
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 15, 15))  -- Preto
+    })
+    UIGradient.Rotation = 45
+    UIGradient.Parent = Button
+
+    -- Sistema de Arrastar (Mobile & PC)
+    local dragging, dragInput, dragStart, startPos
+    Button.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = Button.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+    Button.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            Button.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+
+    Button.MouseButton1Click:Connect(function()
+        Button.TextSize = 13
+        task.wait(0.05)
+        Button.TextSize = 15
+        if _G.AkatCallbacks and _G.AkatCallbacks.FireShoot then
+            _G.AkatCallbacks.FireShoot()
+        end
+    end)
+end
+
+task.spawn(CriarBotaoFlutuante)
 
 -- ==================== PONTE DE COMUNICAÇÃO GLOBAL (UI -> BACKEND) ====================
 _G.AkatCallbacks = {
@@ -417,7 +513,6 @@ _G.AkatCallbacks = {
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         if not char or not hum then return end
 
-        -- Equipar automaticamente se estiver na mochila (Garante a posse no clique)
         local gunTool = char:FindFirstChild("Gun") or player.Backpack:FindFirstChild("Gun")
         if not gunTool then
             for _, item in ipairs(player.Backpack:GetChildren()) do
@@ -430,22 +525,30 @@ _G.AkatCallbacks = {
         end
 
         if gunTool then
-            if gunTool.Parent == player.Backpack then
-                hum:EquipTool(gunTool)
-                task.wait(0.08)
-            end
-
             local murderer = AS_GetMurderer()
             if murderer and murderer.Character then
                 local head = murderer.Character:FindFirstChild("Head") or murderer.Character:FindFirstChild("HumanoidRootPart")
                 local myRoot = char:FindFirstChild("HumanoidRootPart")
                 
                 if head and myRoot then
-                    -- Alinha perfeitamente antes de atirar para não errar a direção
+                    if gunTool.Parent == player.Backpack then
+                        hum:EquipTool(gunTool)
+                        task.wait(0.1)
+                    end
+
+                    _G.ForceAutoShoot = true
+                    
                     myRoot.CFrame = CFrame.new(myRoot.Position, Vector3.new(head.Position.X, myRoot.Position.Y, head.Position.Z))
-                    task.wait(0.02)
+                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, head.Position)
+                    task.wait(0.05)
+                    
                     pcall(function() 
-                        gunTool:Activate() -- Disparo Direto (Livre de bugs de Input no Mobile)
+                        gunTool:Activate() 
+                    end)
+                    
+                    task.spawn(function()
+                        task.wait(0.2)
+                        _G.ForceAutoShoot = false
                     end)
                 end
             end
@@ -455,6 +558,49 @@ _G.AkatCallbacks = {
         LimparEDesligarAbsolutamente()
     end
 }
+
+-- ==================== THREAD INDEPENDENTE DO AUTO COLLECT (SEM TRAVADAS) ====================
+task.spawn(function()
+    while true do
+        task.wait()
+        if Configs.AutoCollect then
+            local char = player.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            local hum  = char and char:FindFirstChildOfClass("Humanoid")
+            
+            if root and hum then
+                if IsBagFull() then
+                    hum.PlatformStand = false
+                    if safePlatform then
+                        root.CFrame = safePlatform.CFrame * CFrame.new(0, 3, 0)
+                    end
+                    task.wait(0.5)
+                else
+                    local target = ObterMoedaProxima(root)
+                    if target and target.Parent then
+                        hum.PlatformStand = true
+                        
+                        -- Ativa Noclip apenas no instante do voo/teleporte até a moeda
+                        for _, part in ipairs(char:GetChildren()) do
+                            if part:IsA("BasePart") then part.CanCollide = false end
+                        end
+                        
+                        root.Velocity = Vector3.new(0, 0, 0)
+                        root.CFrame = target.CFrame
+                        
+                        pcall(function()
+                            firetouchinterest(root, target, 0)
+                            firetouchinterest(root, target, 1)
+                        end)
+                        task.wait(0.06)
+                    else
+                        hum.PlatformStand = false
+                    end
+                end
+            end
+        end
+    end
+end)
 
 -- ==================== LOOP PRINCIPAL (HEARTBEAT) ====================
 hbConnection = RunService.Heartbeat:Connect(function(dt)
@@ -521,8 +667,8 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- ANTI FLING / NOCLIP GLOBAL
-    if Configs.AntiFling or Configs.AutoCollect then
+    -- ANTI FLING (Isolado de outros sistemas)
+    if Configs.AntiFling then
         for _, part in ipairs(char:GetChildren()) do
             if part:IsA("BasePart") then part.CanCollide = false end
         end
@@ -553,36 +699,6 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
             end
             trackingTpToGun = false
             Configs.TpToGun = false
-        end
-    end
-
-    -- AUTO COLLECT (MÉTODO FLY SUAVE VIA DELTATIME - SEGURO CONTRA KICK)
-    if Configs.AutoCollect then
-        if not currentCollectTarget or not currentCollectTarget.Parent or currentCollectTarget.Transparency >= 1 then
-            currentCollectTarget = ObterMoedaProxima(root)
-        end
-        
-        if currentCollectTarget then
-            hum.PlatformStand = true -- Desativa física padrão para estabilizar no ar
-            local targetPos = currentCollectTarget.Position
-            local currentPos = root.Position
-            local dist = (targetPos - currentPos).Magnitude
-            
-            local flySpeed = 36 -- Velocidade eficiente em studs por segundo (Bypass do Anti-cheat do MM2)
-            
-            if dist > 1.5 then
-                local moveStep = flySpeed * dt
-                local direcao = (targetPos - currentPos).Unit
-                -- Move o CFrame suavemente apontando para a moeda
-                root.CFrame = CFrame.new(currentPos + (direcao * math.min(dist, moveStep)), targetPos)
-            else
-                root.CFrame = CFrame.new(targetPos)
-            end
-            root.Velocity = Vector3.new(0, 0, 0)
-        end
-    else
-        if hum.PlatformStand and not Configs.SafeSpot then
-            hum.PlatformStand = false
         end
     end
 end)
