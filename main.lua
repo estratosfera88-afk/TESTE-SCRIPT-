@@ -1,5 +1,6 @@
 -- [[
 --     AKAT MM2 MAIN LOGIC - BACKEND ONLY [v3.2]
+--     INTEGRADO COM UI DINÂMICA UNIVERSAL
 -- ]]
 
 local Players = game:GetService("Players")
@@ -14,6 +15,56 @@ local mouse = player:GetMouse()
 
 -- Estado dinâmico da rodada
 local gunDroppedThisRound = false
+
+-- ==================== [NOVO] INJEÇÃO DE DADOS DINÂMICOS PARA A UI ====================
+_G.UIData = {
+    Subtitle = "MURDER MYSTERY 2 HUB",
+    MenuStructure = {
+        { TabKey = "Combat", Toggles = {"AutoShoot", "Reach"} },
+        { TabKey = "Visuals", Toggles = {"ESP"} },
+        { TabKey = "Movement", Toggles = {"Speed", "AntiFling"} },
+        { TabKey = "Teleports", Toggles = {"TpToGun", "SafeSpot"} },
+        { TabKey = "Misc", Toggles = {"AutoCollect", "ChatRoles"} }
+    },
+    Locales = {
+        PT = {
+            SearchPlaceholder = "Pesquisar...",
+            ConfirmCloseTitle = "Deseja fechar o script?",
+            ConfirmBtn = "Confirmar",
+            CancelBtn = "Cancelar",
+            Tabs = { Combat = "Combate", Visuals = "Visuais", Movement = "Movimento", Teleports = "Teleportes", Misc = "Diversos" },
+            Options = {
+                AutoShoot = { Title = "Atirar no Murder", Desc = "Ativa o botão flutuante de disparo direto e silencioso no Assassino." },
+                Reach = { Title = "Alcance da Faca", Desc = "Aumenta consideravelmente o alcance de ataque com a sua faca (18 studs)." },
+                ESP = { Title = "ESP Jogadores", Desc = "Destaca jogadores pelas paredes mostrando as funções exatas de cada um." },
+                Speed = { Title = "Velocidade", Desc = "Aumenta a velocidade de caminhada do seu personagem para 23 de forma estável." },
+                AntiFling = { Title = "Anti-Arremesso", Desc = "Bloqueia colisões que tentem te empurrar ou arremessar para longe." },
+                TpToGun = { Title = "Teleportar p/ Arma", Desc = "Inocentes se teleportam para a arma dropada no chão automaticamente." },
+                SafeSpot = { Title = "Lugar Seguro", Desc = "Cria uma plataforma invisível no céu para ficar totalmente protegido." },
+                AutoCollect = { Title = "Coletar Moedas", Desc = "Coleta moedas continuamente ao redor do mapa em alta velocidade." },
+                ChatRoles = { Title = "Revelar Funções", Desc = "Envia de forma automática no chat do servidor quem é o Assassino e o Xerife." }
+            }
+        },
+        EN = {
+            SearchPlaceholder = "Search...",
+            ConfirmCloseTitle = "Do you want to close the script?",
+            ConfirmBtn = "Confirm",
+            CancelBtn = "Cancel",
+            Tabs = { Combat = "Combat", Visuals = "Visuals", Movement = "Movement", Teleports = "Teleports", Misc = "Misc" },
+            Options = {
+                AutoShoot = { Title = "Shoot Murderer", Desc = "Enables a floating shoot button that perfectly hits the Murderer." },
+                Reach = { Title = "Knife Reach", Desc = "Significantly increases your knife attack reach (18 studs)." },
+                ESP = { Title = "Player ESP", Desc = "Highlights players through walls showing their exact live positions and roles." },
+                Speed = { Title = "WalkSpeed", Desc = "Slightly increases player walkspeed up to 23 smoothly." },
+                AntiFling = { Title = "Anti-Fling", Desc = "Disables collisions to prevent other players from flinging you." },
+                TpToGun = { Title = "TP to Gun", Desc = "Teleports to dropped gun automatically (Innocents only)." },
+                SafeSpot = { Title = "Safe Spot", Desc = "Teleports you to an invisible sky platform to remain completely safe." },
+                AutoCollect = { Title = "Auto Collect", Desc = "Smoothly collects coins continuously without clunky visual stops." },
+                ChatRoles = { Title = "Reveal Roles", Desc = "Sends a message in chat revealing active roles immediately." }
+            }
+        }
+    }
+}
 
 -- Configurações expostas de forma Global
 local Configs = {
@@ -560,7 +611,7 @@ task.spawn(function()
 end)
 
 -- ==================== CHAMANDO A CARGA DINÂMICA DA INTERFACE ====================
--- COLOQUE O LINK DIRECTO (RAW) DO SEU ARQUIVO DO GITHUB ABAIXO:
+-- COLOQUE O LINK DIRETO (RAW) DO SEU ARQUIVO DO GITHUB ABAIXO:
 local Link_Da_UI = "https://raw.githubusercontent.com/estratosfera88-afk/UI.lua/refs/heads/main/ui.lua"
 
 local Sucesso, Erro = pcall(function()
