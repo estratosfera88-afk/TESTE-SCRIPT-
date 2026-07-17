@@ -1,5 +1,5 @@
 -- [[
---     AKAT MM2 MAIN LOGIC - FULLY UPDATED & FIXED [v3.8 - MOBILE & BYPASS]
+--     AKAT MM2 MAIN LOGIC - FULLY UPDATED & FIXED [v4.0 - MOBILE & ANTI-KICK BYPASS]
 -- ]]
 
 local Players = game:GetService("Players")
@@ -232,7 +232,7 @@ local function ESP_Disable()
 end
 
 -- ==================== AUTO SHOOT SYSTEM ====================
-local AS = { lastShot = 0, cooldown = 0.22, maxRange = 300 }
+local AS = { lastShot = 0, cooldown = 0.35, maxRange = 250 }
 
 local function AS_HasGun()
     local char = player.Character
@@ -274,7 +274,19 @@ end
 _G.AS_GetMurderer = AS_GetMurderer
 
 local function AS_Tick()
-    -- Removido travamento de câmera/personagem para priorizar a trajetória livre (Silent Aim) requerida
+    if not Configs.AutoShoot then return end
+    
+    local hasGun, gunTool = AS_HasGun()
+    if not hasGun or not gunTool then return end
+    
+    local murderer = AS_GetMurderer()
+    if murderer and tick() - AS.lastShot >= AS.cooldown then
+        AS.lastShot = tick()
+        _G.ForceAutoShoot = true
+        pcall(function()
+            gunTool:Activate()
+        end)
+    end
 end
 
 -- ==================== LÓGICA DE PROCURA DE ITENS & SEGURANÇA ====================
@@ -399,37 +411,39 @@ local function CriarBotaoFlutuante()
     local Button = Instance.new("TextButton")
     Button.Name = "AutoShootButton"
     Button.Parent = ScreenGui
-    Button.Size = UDim2.new(0, 175, 0, 46) 
-    -- MODIFICADO: Posicionado à direita, longe do centro e de menus principais da UI
+    Button.Size = UDim2.new(0, 150, 0, 46) 
     Button.Position = UDim2.new(0.85, -87, 0.5, -23)
-    Button.Text = "Auto shoot"
+    Button.Text = "Auto Shoot: OFF"
     Button.TextColor3 = Color3.fromRGB(255, 255, 255)
     Button.Font = Enum.Font.GothamBold
-    Button.TextSize = 15
+    Button.TextSize = 14
     Button.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-    Button.BackgroundTransparency = 0.35
+    Button.BackgroundTransparency = 0.2
     Button.ClipsDescendants = true
 
     local UICorner = Instance.new("UICorner")
     UICorner.CornerRadius = UDim.new(0, 8)
     UICorner.Parent = Button
 
+    -- MODIFICADO: Contorno em Vermelho Escuro
     local UIStroke = Instance.new("UIStroke")
     UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    UIStroke.Thickness = 2
+    UIStroke.Thickness = 3
+    UIStroke.Color = Color3.fromRGB(139, 0, 0)
     UIStroke.Parent = Button
 
+    -- MODIFICADO: Fundo com Gradiente Preto Giratório Contínuo
     local UIGradient = Instance.new("UIGradient")
     UIGradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(130, 0, 0)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(15, 15, 15)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(130, 0, 0))
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(40, 10, 10)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))
     })
-    UIGradient.Parent = UIStroke
+    UIGradient.Parent = Button
 
     rotationConnection = RunService.RenderStepped:Connect(function()
         if UIGradient and UIGradient.Parent then
-            UIGradient.Rotation = (UIGradient.Rotation + 2) % 360
+            UIGradient.Rotation = (UIGradient.Rotation + 3) % 360
         else
             if rotationConnection then rotationConnection:Disconnect(); rotationConnection = nil end
         end
@@ -459,11 +473,15 @@ local function CriarBotaoFlutuante()
     end)
 
     Button.MouseButton1Click:Connect(function()
-        Button.TextSize = 13
-        task.wait(0.05)
-        Button.TextSize = 15
-        if _G.AkatCallbacks and _G.AkatCallbacks.FireShoot then
-            _G.AkatCallbacks.FireShoot()
+        Configs.AutoShoot = not Configs.AutoShoot
+        if Configs.AutoShoot then
+            Button.Text = "Auto Shoot: ON"
+            if _G.AkatCallbacks and _G.AkatCallbacks.FireShoot then
+                _G.AkatCallbacks.FireShoot()
+            end
+        else
+            Button.Text = "Auto Shoot: OFF"
+            _G.ForceAutoShoot = false
         end
     end)
 end
@@ -524,7 +542,6 @@ _G.AkatCallbacks = {
         end
     end,
     FireShoot = function()
-        -- MODIFICADO: Apenas pega a arma e ativa a trajetória silenciosa (Silent Aim) permanente
         local char = player.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         if not char or not hum then return end
@@ -540,11 +557,8 @@ _G.AkatCallbacks = {
             end
         end
 
-        if gunTool then
-            if gunTool.Parent == player.Backpack then
-                hum:EquipTool(gunTool)
-            end
-            _G.ForceAutoShoot = true -- Deixa a trajetória do projétil redirecionada para a cabeça do Murderer permanentemente
+        if gunTool and gunTool.Parent == player.Backpack then
+            hum:EquipTool(gunTool)
         end
     end,
     ShutdownAll = function()
@@ -552,10 +566,10 @@ _G.AkatCallbacks = {
     end
 }
 
--- ==================== THREAD INDEPENDENTE DO AUTO COLLECT (SISTEMA ANTI-KICK BYPASS) ====================
+-- ==================== THREAD DO AUTO COLLECT (ANTI-KICK MODIFICADO) ====================
 task.spawn(function()
     while true do
-        task.wait()
+        task.wait(0.2) -- Intervalo dinâmico de segurança contra detecções
         if Configs.AutoCollect then
             local char = player.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -575,8 +589,8 @@ task.spawn(function()
                         
                         local distance = (root.Position - target.Position).Magnitude
                         if distance > 0 then
-                            -- MODIFICAÇÃO ANTI-KICK: Usa Tweening Linear de alta velocidade (85 studs/s) simulando física realista pro servidor
-                            local speed = 85 
+                            -- CORREÇÃO ANTI-KICK: Velocidade suavizada que não quebra o limite de conferência de física do servidor Roblox
+                            local speed = 65 
                             local duration = distance / speed
                             local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
                             local tween = TweenService:Create(root, tweenInfo, {CFrame = target.CFrame})
@@ -600,7 +614,7 @@ task.spawn(function()
                             firetouchinterest(root, target, 0)
                             firetouchinterest(root, target, 1)
                         end)
-                        task.wait(0.05)
+                        task.wait(0.1) -- Pausa adaptativa pós coleta
                     else
                         hum.PlatformStand = false
                     end
