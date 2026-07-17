@@ -1,7 +1,5 @@
 -- [[
---     AKAT MM2 MAIN LOGIC - BACKEND ONLY [v4.0 - MOBILE & BYPASS FIX]
---     + Novo Auto Collect Suave (TweenService)
---     + Correção de Noclip e Performance
+--     AKAT MM2 MAIN LOGIC - BACKEND ONLY [v4.0 - 2026 MODERN OPTIMIZED]
 -- ]]
 
 local Players = game:GetService("Players")
@@ -97,10 +95,14 @@ local ESPHighlights = {}
 local espEventConnections = {}
 local hbConnection = nil
 local renderConnection = nil
-local stepConnection = nil
 local safePlatform = nil
 local lastPositionBeforeSafeSpot = nil
 local announcedThisRound = false
+
+-- Variáveis de controle do NOVO Auto Collect 2026
+local currentCollectTarget = nil
+local currentCollectTween = nil
+local cachedCoins = {}
 
 local ROLE_COLORS = {
     Murderer  = Color3.fromRGB(220, 0,   0),    
@@ -292,127 +294,34 @@ local function AS_Tick()
     Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, targetPos), 0.18)
 end
 
--- ==================== NOVO AUTO COLLECT (TWEEN OTIMIZADO V4) ====================
-local AutoCollect = {
-    Active = false,
-    Task = nil,
-    Tween = nil,
-    Speed = 35 -- Velocidade segura para evitar Anti-Cheat (Studs por segundo)
-}
-
-local function ObterMoedasNoMapa()
-    local moedas = {}
-    -- Limita a busca apenas ao mapa para economizar muita performance (Otimização MM2 2026)
-    local map = workspace:FindFirstChild("NormalMap")
-    if map then
-        for _, d in ipairs(map:GetDescendants()) do
-            if d:IsA("BasePart") and d.Transparency < 1 then
-                local name = d.Name:lower()
-                if name:find("coin") or name:find("moeda") or name:find("gold") or name == "snowflake"
-                    or name == "candycane" or name:find("token") or name:find("diamond")
-                    or name:find("present") or name:find("candy") then
-                    table.insert(moedas, d)
-                end
-            end
-        end
-    end
-    return moedas
-end
-
-local function ObterMoedaMaisProxima(root)
-    local moedas = ObterMoedasNoMapa()
-    local closestCoin, closestDist = nil, math.huge
-    
-    for _, coin in ipairs(moedas) do
-        local dist = (root.Position - coin.Position).Magnitude
-        if dist < closestDist and dist < 1500 then
-            closestDist = dist
-            closestCoin = coin
-        end
-    end
-    return closestCoin
-end
-
-local function StartAutoCollect()
-    if AutoCollect.Task then task.cancel(AutoCollect.Task) end
-    AutoCollect.Active = true
-    
-    AutoCollect.Task = task.spawn(function()
-        while Configs.AutoCollect do
-            local char = player.Character
-            local root = char and char:FindFirstChild("HumanoidRootPart")
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
-            
-            if not root or not hum or hum.Health <= 0 then
-                task.wait(1)
-                continue
-            end
-            
-            local targetCoin = ObterMoedaMaisProxima(root)
-            
-            if targetCoin then
-                hum.PlatformStand = true -- Desativa gravidade
-                
-                local currentPos = root.Position
-                local targetPos = targetCoin.Position
-                local dist = (currentPos - targetPos).Magnitude
-                
-                -- Calcula tempo dinâmico garantindo que a velocidade máxima não seja excedida
-                local tempoTween = math.clamp(dist / AutoCollect.Speed, 0.1, 10)
-                
-                local tweenInfo = TweenInfo.new(tempoTween, Enum.EasingStyle.Linear)
-                AutoCollect.Tween = TweenService:Create(root, tweenInfo, {CFrame = targetCoin.CFrame})
-                AutoCollect.Tween:Play()
-                
-                -- Monitora ativamente enquanto viaja (caso a moeda suma no meio do caminho)
-                local traveling = true
-                local checkConnection = RunService.Heartbeat:Connect(function()
-                    if not targetCoin or not targetCoin.Parent or targetCoin.Transparency >= 1 then
-                        if AutoCollect.Tween then 
-                            AutoCollect.Tween:Cancel() 
+-- ==================== NOVO ECO-SISTEMA DE MOEDAS (CACHE BACKGROUND) ====================
+task.spawn(function()
+    while true do
+        if Configs.AutoCollect then
+            local tempCoins = {}
+            -- Escaneamento leve e inteligente a cada 0.4s (Evita picos de CPU)
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                if obj:IsA("BasePart") and obj.Transparency < 1 then
+                    local name = obj.Name:lower()
+                    if name:find("coin") or name:find("moeda") or name:find("gold") or name == "snowflake"
+                        or name == "candycane" or name:find("token") or name:find("diamond")
+                        or name:find("present") or name:find("candy") then
+                        
+                        -- Garante que não é um item equipado ou cosmético
+                        if not obj:IsDescendantOf(Players) and not obj:FindFirstAncestorOfClass("Tool") and not obj:FindFirstAncestorOfClass("Accessory") then
+                            table.insert(tempCoins, obj)
                         end
-                        traveling = false
                     end
-                    -- Mantém o boneco estabilizado no ar
-                    if root then root.Velocity = Vector3.new(0,0,0) end
-                end)
-                
-                -- Aguarda o Tween finalizar (seja por chegar ou ser cancelado)
-                while traveling and AutoCollect.Tween and AutoCollect.Tween.PlaybackState == Enum.PlaybackState.Playing do
-                    task.wait(0.05)
                 end
-                
-                checkConnection:Disconnect()
-            else
-                -- Sem moedas? Aguarda até gerarem novas
-                if hum then hum.PlatformStand = false end
-                task.wait(1)
             end
-            
-            task.wait(0.05)
+            cachedCoins = tempCoins
+        else
+            table.clear(cachedCoins)
         end
-    end)
-end
-
-local function StopAutoCollect()
-    Configs.AutoCollect = false
-    AutoCollect.Active = false
-    if AutoCollect.Tween then 
-        AutoCollect.Tween:Cancel() 
-        AutoCollect.Tween = nil
+        task.wait(0.4)
     end
-    if AutoCollect.Task then 
-        task.cancel(AutoCollect.Task) 
-        AutoCollect.Task = nil 
-    end
-    pcall(function()
-        local char = player.Character
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if hum then hum.PlatformStand = false end
-    end)
-end
+end)
 
--- ==================== UTILITÁRIOS ADICIONAIS ====================
 local function ObterArmaCaida(root)
     local gun = workspace:FindFirstChild("GunDrop", true)
     if gun then
@@ -451,18 +360,19 @@ end
 local function LimparEDesligarAbsolutamente()
     if hbConnection then hbConnection:Disconnect(); hbConnection = nil end
     if renderConnection then renderConnection:Disconnect(); renderConnection = nil end
-    if stepConnection then stepConnection:Disconnect(); stepConnection = nil end
+    if currentCollectTween then currentCollectTween:Cancel(); currentCollectTween = nil end
     for k in pairs(Configs) do Configs[k] = false end
-    StopAutoCollect()
     ESP_Disable()
     if safePlatform then pcall(function() safePlatform:Destroy() end); safePlatform = nil end
     pcall(function()
         local char = player.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         if hum then 
             hum.WalkSpeed = 16 
             hum.PlatformStand = false
         end
+        if root then root.Anchored = false end
         if char then
             for _, item in ipairs(char:GetChildren()) do
                 if item:IsA("Tool") then
@@ -475,7 +385,7 @@ local function LimparEDesligarAbsolutamente()
     end)
 end
 
--- ==================== PONTE DE COMUNICAÇÃO GLOBAL ====================
+-- ==================== PONTE DE COMUNICAÇÃO GLOBAL (UI -> BACKEND) ====================
 _G.AkatCallbacks = {
     ESP = function(enabled)
         if enabled then ESP_Enable() else ESP_Disable() end
@@ -507,10 +417,14 @@ _G.AkatCallbacks = {
         end
     end,
     AutoCollect = function(enabled)
-        if enabled then 
-            StartAutoCollect()
-        else 
-            StopAutoCollect() 
+        if not enabled then 
+            currentCollectTarget = nil 
+            if currentCollectTween then currentCollectTween:Cancel(); currentCollectTween = nil end
+            local char = player.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if root then root.Anchored = false end
+            if hum then hum.PlatformStand = false end
         end
     end,
     FireShoot = function()
@@ -532,22 +446,7 @@ _G.AkatCallbacks = {
     end
 }
 
--- ==================== CORREÇÃO NOCLIP (STEPPED) ====================
--- Mover o CanCollide para o Stepped corrige o "falso permanente" e impede muito lag
-stepConnection = RunService.Stepped:Connect(function()
-    if Configs.AntiFling or Configs.AutoCollect then
-        local char = player.Character
-        if char then
-            for _, part in ipairs(char:GetChildren()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = false
-                end
-            end
-        end
-    end
-end)
-
--- ==================== HEARTBEAT LOGICS (REACH / TP / SPEED) ====================
+-- ==================== LOOP PRINCIPAL (HEARTBEAT) ====================
 hbConnection = RunService.Heartbeat:Connect(function(dt)
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -612,6 +511,20 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
+    -- ANTI FLING / NOCLIP GLOBAL (CORRIGIDO: AGORA DESATIVA COMPLETAMENTE)
+    if Configs.AntiFling or Configs.AutoCollect then
+        for _, part in ipairs(char:GetChildren()) do
+            if part:IsA("BasePart") then part.CanCollide = false end
+        end
+    else
+        -- Restaura colisões normais do corpo se ambas opções forem falsas
+        for _, part in ipairs(char:GetChildren()) do
+            if part:IsA("BasePart") and (part.Name == "UpperTorso" or part.Name == "LowerTorso" or part.Name == "Head" or part.Name == "Torso") then 
+                part.CanCollide = true 
+            end
+        end
+    end
+
     -- TELEPORT TO GUN
     if Configs.TpToGun and PlayerRoles[player] ~= "Murderer" and not PlayerTemArma() then
         local gunPart = ObterArmaCaida(root)
@@ -632,13 +545,65 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
             Configs.TpToGun = false
         end
     end
+
+    -- IMPLEMENTAÇÃO MODERNA DO AUTO COLLECT (TWEEN SUAVE E VELOCIDADE ADAPTATIVA)
+    if Configs.AutoCollect and hum.Health > 0 then
+        hum.PlatformStand = true
+        
+        -- Busca a moeda mais próxima com base no Cache Dinâmico
+        local targetCoin = nil
+        local shortestDistance = math.huge
+        
+        for _, coin in ipairs(cachedCoins) do
+            if coin and coin.Parent and coin.Transparency < 1 then
+                local distance = (root.Position - coin.Position).Magnitude
+                if distance < shortestDistance then
+                    shortestDistance = distance
+                    targetCoin = coin
+                end
+            end
+        end
+        
+        if targetCoin then
+            -- Se o alvo mudou ou o Tween terminou, gera a nova rota fluida
+            if targetCoin ~= currentCollectTarget then
+                if currentCollectTween then currentCollectTween:Cancel() end
+                currentCollectTarget = targetCoin
+                
+                root.Anchored = true -- Ancoragem anti-rubberband durante o voo seguro
+                
+                local flySpeed = 28 -- Velocidade segura ideal para os bypasses do MM2 em 2026
+                local calculatedTime = shortestDistance / flySpeed
+                
+                local tInfo = TweenInfo.new(calculatedTime, Enum.EasingStyle.Linear)
+                currentCollectTween = TweenService:Create(root, tInfo, {
+                    CFrame = targetCoin.CFrame * CFrame.new(0, 0.6, 0)
+                })
+                currentCollectTween:Play()
+            end
+        else
+            -- Se não houver moedas, o jogador flutua de forma estável aguardando o spawn
+            if currentCollectTween then currentCollectTween:Cancel(); currentCollectTween = nil end
+            currentCollectTarget = nil
+            root.Anchored = true
+        end
+        root.Velocity = Vector3.new(0,0,0)
+    else
+        -- Reseta o estado físico caso a coleta seja encerrada ou o player morra
+        if currentCollectTarget or root.Anchored then
+            if currentCollectTween then currentCollectTween:Cancel(); currentCollectTween = nil end
+            currentCollectTarget = nil
+            root.Anchored = false
+            hum.PlatformStand = false
+        end
+    end
 end)
 
 renderConnection = RunService.RenderStepped:Connect(function()
     AS_Tick()
 end)
 
--- THREAD STATUS (CHAT ROLES & GUN DROPS)
+-- THREAD STATUS & ROUND DETECTOR
 task.spawn(function()
     while true do
         local gunFoundInPlayers = false
@@ -681,7 +646,7 @@ task.spawn(function()
     end
 end)
 
--- ==================== CARGA DINÂMICA DA INTERFACE ====================
+-- ==================== CHAMANDO A CARGA DINÂMICA DA INTERFACE ====================
 local Link_Da_UI = "https://raw.githubusercontent.com/estratosfera88-afk/UI.lua/refs/heads/main/ui.lua"
 
 local Sucesso, Erro = pcall(function()
