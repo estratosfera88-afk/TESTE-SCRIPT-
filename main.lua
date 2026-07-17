@@ -1,5 +1,5 @@
 -- [[
---     AKAT MM2 MAIN LOGIC - FULLY UPDATED & FIXED [v3.7 - MOBILE & BYPASS]
+--     AKAT MM2 MAIN LOGIC - FULLY UPDATED & FIXED [v3.8 - MOBILE & BYPASS]
 -- ]]
 
 local Players = game:GetService("Players")
@@ -274,21 +274,7 @@ end
 _G.AS_GetMurderer = AS_GetMurderer
 
 local function AS_Tick()
-    if not Configs.AutoShoot then return end
-    local hasGun, gunTool = AS_HasGun()
-    if not hasGun or not gunTool then return end
-    local murderer = AS_GetMurderer()
-    if not murderer then return end
-
-    local pChar = murderer.Character
-    local head  = pChar and (pChar:FindFirstChild("Head") or pChar:FindFirstChild("HumanoidRootPart"))
-    local myChar = player.Character
-    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    if not head or not myRoot then return end
-
-    local targetPos = head.Position
-    myRoot.CFrame = CFrame.new(myRoot.Position, Vector3.new(targetPos.X, myRoot.Position.Y, targetPos.Z))
-    Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, targetPos), 0.20)
+    -- Removido travamento de câmera/personagem para priorizar a trajetória livre (Silent Aim) requerida
 end
 
 -- ==================== LÓGICA DE PROCURA DE ITENS & SEGURANÇA ====================
@@ -414,20 +400,20 @@ local function CriarBotaoFlutuante()
     Button.Name = "AutoShootButton"
     Button.Parent = ScreenGui
     Button.Size = UDim2.new(0, 175, 0, 46) 
-    Button.Position = UDim2.new(0.15, 0, 0.45, 0)
+    -- MODIFICADO: Posicionado à direita, longe do centro e de menus principais da UI
+    Button.Position = UDim2.new(0.85, -87, 0.5, -23)
     Button.Text = "Auto shoot"
     Button.TextColor3 = Color3.fromRGB(255, 255, 255)
     Button.Font = Enum.Font.GothamBold
     Button.TextSize = 15
-    Button.BackgroundColor3 = Color3.fromRGB(15, 15, 15) -- Fundo Preto
-    Button.BackgroundTransparency = 0.35 -- Preto Borrado / Translúcido estilo Acrylic UI
+    Button.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+    Button.BackgroundTransparency = 0.35
     Button.ClipsDescendants = true
 
     local UICorner = Instance.new("UICorner")
     UICorner.CornerRadius = UDim.new(0, 8)
     UICorner.Parent = Button
 
-    -- Contorno Dinâmico
     local UIStroke = Instance.new("UIStroke")
     UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     UIStroke.Thickness = 2
@@ -435,13 +421,12 @@ local function CriarBotaoFlutuante()
 
     local UIGradient = Instance.new("UIGradient")
     UIGradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(130, 0, 0)),   -- Vermelho Escuro
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(15, 15, 15)),-- Preto
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(130, 0, 0))    -- Vermelho Escuro
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(130, 0, 0)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(15, 15, 15)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(130, 0, 0))
     })
     UIGradient.Parent = UIStroke
 
-    -- Loop de Rotação Contínua do Gradient no Contorno
     rotationConnection = RunService.RenderStepped:Connect(function()
         if UIGradient and UIGradient.Parent then
             UIGradient.Rotation = (UIGradient.Rotation + 2) % 360
@@ -450,7 +435,6 @@ local function CriarBotaoFlutuante()
         end
     end)
 
-    -- Sistema de Arrastar (Mobile & PC)
     local dragging, dragInput, dragStart, startPos
     Button.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -526,7 +510,7 @@ _G.AkatCallbacks = {
             if hum then hum.PlatformStand = false end
         end
     end,
-    AutoShoot = function(enabled) -- Vinculado dinamicamente para ativar/desativar o botão junto com a UI
+    AutoShoot = function(enabled)
         Configs.AutoShoot = enabled
         if enabled then
             CriarBotaoFlutuante()
@@ -534,12 +518,13 @@ _G.AkatCallbacks = {
             DestruirBotaoFlutuante()
         end
     end,
-    ["Shoot murder"] = function(enabled) -- Mapeamento alternativo para compatibilidade direta de texto da UI
+    ["Shoot murder"] = function(enabled)
         if _G.AkatCallbacks.AutoShoot then
             _G.AkatCallbacks.AutoShoot(enabled)
         end
     end,
     FireShoot = function()
+        -- MODIFICADO: Apenas pega a arma e ativa a trajetória silenciosa (Silent Aim) permanente
         local char = player.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         if not char or not hum then return end
@@ -556,33 +541,10 @@ _G.AkatCallbacks = {
         end
 
         if gunTool then
-            local murderer = AS_GetMurderer()
-            if murderer and murderer.Character then
-                local head = murderer.Character:FindFirstChild("Head") or murderer.Character:FindFirstChild("HumanoidRootPart")
-                local myRoot = char:FindFirstChild("HumanoidRootPart")
-                
-                if head and myRoot then
-                    if gunTool.Parent == player.Backpack then
-                        hum:EquipTool(gunTool)
-                        task.wait(0.1)
-                    end
-
-                    _G.ForceAutoShoot = true
-                    
-                    myRoot.CFrame = CFrame.new(myRoot.Position, Vector3.new(head.Position.X, myRoot.Position.Y, head.Position.Z))
-                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, head.Position)
-                    task.wait(0.05)
-                    
-                    pcall(function() 
-                        gunTool:Activate() 
-                    end)
-                    
-                    task.spawn(function()
-                        task.wait(0.2)
-                        _G.ForceAutoShoot = false
-                    end)
-                end
+            if gunTool.Parent == player.Backpack then
+                hum:EquipTool(gunTool)
             end
+            _G.ForceAutoShoot = true -- Deixa a trajetória do projétil redirecionada para a cabeça do Murderer permanentemente
         end
     end,
     ShutdownAll = function()
@@ -590,7 +552,7 @@ _G.AkatCallbacks = {
     end
 }
 
--- ==================== THREAD INDEPENDENTE DO AUTO COLLECT (SEM TRAVADAS) ====================
+-- ==================== THREAD INDEPENDENTE DO AUTO COLLECT (SISTEMA ANTI-KICK BYPASS) ====================
 task.spawn(function()
     while true do
         task.wait()
@@ -611,19 +573,34 @@ task.spawn(function()
                     if target and target.Parent then
                         hum.PlatformStand = true
                         
-                        -- Ativa Noclip apenas no milissegundo de coleta da moeda
-                        for _, part in ipairs(char:GetChildren()) do
-                            if part:IsA("BasePart") then part.CanCollide = false end
+                        local distance = (root.Position - target.Position).Magnitude
+                        if distance > 0 then
+                            -- MODIFICAÇÃO ANTI-KICK: Usa Tweening Linear de alta velocidade (85 studs/s) simulando física realista pro servidor
+                            local speed = 85 
+                            local duration = distance / speed
+                            local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
+                            local tween = TweenService:Create(root, tweenInfo, {CFrame = target.CFrame})
+                            
+                            local noclipConn
+                            noclipConn = RunService.Stepped:Connect(function()
+                                if char then
+                                    for _, part in ipairs(char:GetChildren()) do
+                                        if part:IsA("BasePart") then part.CanCollide = false end
+                                    end
+                                end
+                            end)
+                            
+                            root.Velocity = Vector3.new(0, 0, 0)
+                            tween:Play()
+                            tween.Completed:Wait()
+                            if noclipConn then noclipConn:Disconnect() end
                         end
-                        
-                        root.Velocity = Vector3.new(0, 0, 0)
-                        root.CFrame = target.CFrame
                         
                         pcall(function()
                             firetouchinterest(root, target, 0)
                             firetouchinterest(root, target, 1)
                         end)
-                        task.wait(0.06)
+                        task.wait(0.05)
                     else
                         hum.PlatformStand = false
                     end
@@ -698,9 +675,8 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- ANTI FLING (CORRIGIDO: Sem noclip/atravessar paredes)
+    -- ANTI FLING
     if Configs.AntiFling then
-        -- Desativa colisão APENAS dos outros personagens contra você (Impede empurrões e instabilidade física)
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= player and p.Character then
                 for _, part in ipairs(p.Character:GetChildren()) do
@@ -708,7 +684,6 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
                 end
             end
         end
-        -- Trava e neutraliza forças externas anormais aplicadas na sua física root
         if math.abs(root.Velocity.Magnitude) > 60 or math.abs(root.RotVelocity.Magnitude) > 60 then
             root.Velocity = Vector3.new(0, 0, 0)
             root.RotVelocity = Vector3.new(0, 0, 0)
