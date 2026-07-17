@@ -1,5 +1,5 @@
 -- [[
---     AKAT MM2 MAIN LOGIC - BACKEND ONLY [v4.0 - 2026 MODERN OPTIMIZED]
+--     AKAT MM2 MAIN LOGIC - BACKEND ONLY [v3.3 - MOBILE & BYPASS FIX]
 -- ]]
 
 local Players = game:GetService("Players")
@@ -7,7 +7,7 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
-local VirtualInputManager = game:GetService("VirtualInputManager")
+local VirtualInputManager = game:GetService("VirtualInputManager") -- Adicionado para corrigir cliques no Mobile
 
 local player = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
@@ -15,7 +15,7 @@ local mouse = player:GetMouse()
 
 -- Estado dinâmico da rodada
 local gunDroppedThisRound = false
-local lastPositionBeforeTpToGun = nil 
+local lastPositionBeforeTpToGun = nil -- Guarda a posição original antes do TP da arma
 local trackingTpToGun = false
 
 -- Configurações expostas de forma Global
@@ -98,11 +98,7 @@ local renderConnection = nil
 local safePlatform = nil
 local lastPositionBeforeSafeSpot = nil
 local announcedThisRound = false
-
--- Variáveis de controle do NOVO Auto Collect 2026
 local currentCollectTarget = nil
-local currentCollectTween = nil
-local cachedCoins = {}
 
 local ROLE_COLORS = {
     Murderer  = Color3.fromRGB(220, 0,   0),    
@@ -294,34 +290,7 @@ local function AS_Tick()
     Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, targetPos), 0.18)
 end
 
--- ==================== NOVO ECO-SISTEMA DE MOEDAS (CACHE BACKGROUND) ====================
-task.spawn(function()
-    while true do
-        if Configs.AutoCollect then
-            local tempCoins = {}
-            -- Escaneamento leve e inteligente a cada 0.4s (Evita picos de CPU)
-            for _, obj in ipairs(workspace:GetDescendants()) do
-                if obj:IsA("BasePart") and obj.Transparency < 1 then
-                    local name = obj.Name:lower()
-                    if name:find("coin") or name:find("moeda") or name:find("gold") or name == "snowflake"
-                        or name == "candycane" or name:find("token") or name:find("diamond")
-                        or name:find("present") or name:find("candy") then
-                        
-                        -- Garante que não é um item equipado ou cosmético
-                        if not obj:IsDescendantOf(Players) and not obj:FindFirstAncestorOfClass("Tool") and not obj:FindFirstAncestorOfClass("Accessory") then
-                            table.insert(tempCoins, obj)
-                        end
-                    end
-                end
-            end
-            cachedCoins = tempCoins
-        else
-            table.clear(cachedCoins)
-        end
-        task.wait(0.4)
-    end
-end)
-
+-- ==================== LÓGICA DE TELEPORTE / AUTOCOLLECT ====================
 local function ObterArmaCaida(root)
     local gun = workspace:FindFirstChild("GunDrop", true)
     if gun then
@@ -342,6 +311,28 @@ local function PlayerTemArma()
     return false
 end
 
+local function ObterMoedaProxima(root)
+    local closestCoin, closestDist = nil, math.huge
+    for _, d in ipairs(workspace:GetDescendants()) do
+        if d:IsA("BasePart") and d.Transparency < 1 then
+            local name = d.Name:lower()
+            if name:find("coin") or name:find("moeda") or name:find("gold") or name == "snowflake"
+                or name == "candycane" or name:find("token") or name:find("diamond")
+                or name:find("present") or name:find("candy") then
+                if not d:IsDescendantOf(Players) and not d:FindFirstAncestorOfClass("Tool")
+                    and not d:FindFirstAncestorOfClass("Accessory") then
+                    local dist = (root.Position - d.Position).Magnitude
+                    if dist < closestDist and dist < 1500 then
+                        closestDist = dist
+                        closestCoin = d
+                    end
+                end
+            end
+        end
+    end
+    return closestCoin
+end
+
 local function EnviarMensagemChat(msg)
     local TextChatService = game:GetService("TextChatService")
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -360,19 +351,16 @@ end
 local function LimparEDesligarAbsolutamente()
     if hbConnection then hbConnection:Disconnect(); hbConnection = nil end
     if renderConnection then renderConnection:Disconnect(); renderConnection = nil end
-    if currentCollectTween then currentCollectTween:Cancel(); currentCollectTween = nil end
     for k in pairs(Configs) do Configs[k] = false end
     ESP_Disable()
     if safePlatform then pcall(function() safePlatform:Destroy() end); safePlatform = nil end
     pcall(function()
         local char = player.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         if hum then 
             hum.WalkSpeed = 16 
             hum.PlatformStand = false
         end
-        if root then root.Anchored = false end
         if char then
             for _, item in ipairs(char:GetChildren()) do
                 if item:IsA("Tool") then
@@ -419,11 +407,8 @@ _G.AkatCallbacks = {
     AutoCollect = function(enabled)
         if not enabled then 
             currentCollectTarget = nil 
-            if currentCollectTween then currentCollectTween:Cancel(); currentCollectTween = nil end
             local char = player.Character
-            local root = char and char:FindFirstChild("HumanoidRootPart")
             local hum = char and char:FindFirstChildOfClass("Humanoid")
-            if root then root.Anchored = false end
             if hum then hum.PlatformStand = false end
         end
     end,
@@ -434,6 +419,7 @@ _G.AkatCallbacks = {
             if murderer then
                 pcall(function() 
                     gunTool:Activate() 
+                    -- Simulação Virtual de Input (Garante o disparo em Mobile)
                     VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
                     task.wait(0.01)
                     VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
@@ -446,7 +432,7 @@ _G.AkatCallbacks = {
     end
 }
 
--- ==================== LOOP PRINCIPAL (HEARTBEAT) ====================
+-- ==================== CORREÇÃO E RESTAURAÇÃO DO HEARTBEAT/REACH ====================
 hbConnection = RunService.Heartbeat:Connect(function(dt)
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -461,7 +447,7 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         hum.WalkSpeed = 16
     end
 
-    -- KNIFE REACH v3
+    -- [RESTAURAÇÃO COMPLETA DO KNIFE REACH v3]
     if Configs.Reach then
         local myKnife = char:FindFirstChild("Knife") or char:FindFirstChild("Faca")
         if myKnife then
@@ -511,21 +497,21 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- ANTI FLING / NOCLIP GLOBAL (CORRIGIDO: AGORA DESATIVA COMPLETAMENTE)
+    -- ANTI FLING / NOCLIP GLOBAL
     if Configs.AntiFling or Configs.AutoCollect then
         for _, part in ipairs(char:GetChildren()) do
             if part:IsA("BasePart") then part.CanCollide = false end
         end
-    else
-        -- Restaura colisões normais do corpo se ambas opções forem falsas
-        for _, part in ipairs(char:GetChildren()) do
-            if part:IsA("BasePart") and (part.Name == "UpperTorso" or part.Name == "LowerTorso" or part.Name == "Head" or part.Name == "Torso") then 
-                part.CanCollide = true 
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= player and p.Character then
+                for _, part in ipairs(p.Character:GetChildren()) do
+                    if part:IsA("BasePart") then part.CanCollide = false end
+                end
             end
         end
     end
 
-    -- TELEPORT TO GUN
+    -- TELEPORT TO GUN (CORRIGIDO: RETORNA AO LUGAR ANTERIOR)
     if Configs.TpToGun and PlayerRoles[player] ~= "Murderer" and not PlayerTemArma() then
         local gunPart = ObterArmaCaida(root)
         if gunPart then
@@ -546,55 +532,33 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- IMPLEMENTAÇÃO MODERNA DO AUTO COLLECT (TWEEN SUAVE E VELOCIDADE ADAPTATIVA)
-    if Configs.AutoCollect and hum.Health > 0 then
-        hum.PlatformStand = true
-        
-        -- Busca a moeda mais próxima com base no Cache Dinâmico
-        local targetCoin = nil
-        local shortestDistance = math.huge
-        
-        for _, coin in ipairs(cachedCoins) do
-            if coin and coin.Parent and coin.Transparency < 1 then
-                local distance = (root.Position - coin.Position).Magnitude
-                if distance < shortestDistance then
-                    shortestDistance = distance
-                    targetCoin = coin
-                end
-            end
+    -- AUTO COLLECT (MÉTODO MM2 BYPASS FLUTUANDO E TREMENDO)
+    if Configs.AutoCollect then
+        if not currentCollectTarget or not currentCollectTarget.Parent or currentCollectTarget.Transparency >= 1 then
+            currentCollectTarget = ObterMoedaProxima(root)
         end
         
-        if targetCoin then
-            -- Se o alvo mudou ou o Tween terminou, gera a nova rota fluida
-            if targetCoin ~= currentCollectTarget then
-                if currentCollectTween then currentCollectTween:Cancel() end
-                currentCollectTarget = targetCoin
-                
-                root.Anchored = true -- Ancoragem anti-rubberband durante o voo seguro
-                
-                local flySpeed = 28 -- Velocidade segura ideal para os bypasses do MM2 em 2026
-                local calculatedTime = shortestDistance / flySpeed
-                
-                local tInfo = TweenInfo.new(calculatedTime, Enum.EasingStyle.Linear)
-                currentCollectTween = TweenService:Create(root, tInfo, {
-                    CFrame = targetCoin.CFrame * CFrame.new(0, 0.6, 0)
-                })
-                currentCollectTween:Play()
+        if currentCollectTarget then
+            hum.PlatformStand = true -- Deixa o boneco bobo no ar para estabilizar
+            local targetPos = currentCollectTarget.Position
+            local currentPos = root.Position
+            local dist = (targetPos - currentPos).Magnitude
+            
+            -- Geração de tremor clássico rápido (Vibration Shake Matrix)
+            local shakeX = math.sin(tick() * 70) * 0.5
+            local shakeY = 1.5 + math.cos(tick() * 70) * 0.3
+            local shakeZ = math.cos(tick() * 60) * 0.5
+            local shakeOffset = Vector3.new(shakeX, shakeY, shakeZ)
+            
+            if dist > 4 then
+                -- Interpolação veloz e contínua até a moeda (Evita kick por estourar distância máxima instantânea)
+                local direcao = (targetPos - currentPos).Unit * math.min(dist, 5.5)
+                root.CFrame = CFrame.new(currentPos + direcao + Vector3.new(0, shakeY - 1.5, 0))
+            else
+                -- Exatamente na moeda gerando a tremedeira rápida
+                root.CFrame = CFrame.new(targetPos + shakeOffset)
             end
-        else
-            -- Se não houver moedas, o jogador flutua de forma estável aguardando o spawn
-            if currentCollectTween then currentCollectTween:Cancel(); currentCollectTween = nil end
-            currentCollectTarget = nil
-            root.Anchored = true
-        end
-        root.Velocity = Vector3.new(0,0,0)
-    else
-        -- Reseta o estado físico caso a coleta seja encerrada ou o player morra
-        if currentCollectTarget or root.Anchored then
-            if currentCollectTween then currentCollectTween:Cancel(); currentCollectTween = nil end
-            currentCollectTarget = nil
-            root.Anchored = false
-            hum.PlatformStand = false
+            root.Velocity = Vector3.new(0, 0, 0)
         end
     end
 end)
@@ -603,7 +567,7 @@ renderConnection = RunService.RenderStepped:Connect(function()
     AS_Tick()
 end)
 
--- THREAD STATUS & ROUND DETECTOR
+-- THREAD STATUS
 task.spawn(function()
     while true do
         local gunFoundInPlayers = false
