@@ -1,5 +1,5 @@
 -- [[
---     AKAT MM2 MAIN LOGIC - BACKEND ONLY [v3.3 - MOBILE & BYPASS FIX]
+--     AKAT MM2 MAIN LOGIC - BACKEND ONLY [v3.4 - AUTO COLLECT v2]
 -- ]]
 
 local Players = game:GetService("Players")
@@ -7,18 +7,16 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
-local VirtualInputManager = game:GetService("VirtualInputManager") -- Adicionado para corrigir cliques no Mobile
+local VirtualInputManager = game:GetService("VirtualInputManager")
 
 local player = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local mouse = player:GetMouse()
 
--- Estado dinâmico da rodada
 local gunDroppedThisRound = false
-local lastPositionBeforeTpToGun = nil -- Guarda a posição original antes do TP da arma
+local lastPositionBeforeTpToGun = nil
 local trackingTpToGun = false
 
--- Configurações expostas de forma Global
 local Configs = {
     ESP = false,
     AutoShoot = false,
@@ -42,7 +40,7 @@ task.spawn(function()
         setreadonly(gmt, false)
         oldNamecall = gmt.__namecall
         oldIndex = gmt.__index
-        
+
         gmt.__namecall = newcclosure(function(self, ...)
             local method = getnamecallmethod()
             if tostring(method):lower() == "kick" and self == player then
@@ -51,14 +49,14 @@ task.spawn(function()
             end
             return oldNamecall(self, ...)
         end)
-        
+
         gmt.__index = newcclosure(function(self, key)
             if tostring(key):lower() == "kick" and self == player then
                 return newcclosure(function()
                     warn("[AKAT ANTI-BAN] Kick indireto bloqueado!")
                 end)
             end
-            
+
             if _G.Configs and _G.Configs.AutoShoot and self == mouse then
                 if key == "Hit" or key == "hit" then
                     local murderer = _G.AS_GetMurderer()
@@ -72,7 +70,7 @@ task.spawn(function()
                     if head then return head end
                 end
             end
-            
+
             return oldIndex(self, key)
         end)
         setreadonly(gmt, true)
@@ -98,13 +96,12 @@ local renderConnection = nil
 local safePlatform = nil
 local lastPositionBeforeSafeSpot = nil
 local announcedThisRound = false
-local currentCollectTarget = nil
 
 local ROLE_COLORS = {
-    Murderer  = Color3.fromRGB(220, 0,   0),    
-    Sheriff   = Color3.fromRGB(0,   120, 255),  
-    Hero      = Color3.fromRGB(255, 220, 0),    
-    Innocent  = Color3.fromRGB(0,   200, 80),   
+    Murderer = Color3.fromRGB(220, 0,   0),
+    Sheriff  = Color3.fromRGB(0,   120, 255),
+    Hero     = Color3.fromRGB(255, 220, 0),
+    Innocent = Color3.fromRGB(0,   200, 80),
 }
 
 -- ==================== SISTEMAS AUXILIARES E DETECÇÕES ====================
@@ -290,7 +287,7 @@ local function AS_Tick()
     Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, targetPos), 0.18)
 end
 
--- ==================== LÓGICA DE TELEPORTE / AUTOCOLLECT ====================
+-- ==================== LÓGICA DE TELEPORTE ====================
 local function ObterArmaCaida(root)
     local gun = workspace:FindFirstChild("GunDrop", true)
     if gun then
@@ -309,28 +306,6 @@ end
 local function PlayerTemArma()
     if player.Backpack:FindFirstChild("Gun") or (player.Character and player.Character:FindFirstChild("Gun")) then return true end
     return false
-end
-
-local function ObterMoedaProxima(root)
-    local closestCoin, closestDist = nil, math.huge
-    for _, d in ipairs(workspace:GetDescendants()) do
-        if d:IsA("BasePart") and d.Transparency < 1 then
-            local name = d.Name:lower()
-            if name:find("coin") or name:find("moeda") or name:find("gold") or name == "snowflake"
-                or name == "candycane" or name:find("token") or name:find("diamond")
-                or name:find("present") or name:find("candy") then
-                if not d:IsDescendantOf(Players) and not d:FindFirstAncestorOfClass("Tool")
-                    and not d:FindFirstAncestorOfClass("Accessory") then
-                    local dist = (root.Position - d.Position).Magnitude
-                    if dist < closestDist and dist < 1500 then
-                        closestDist = dist
-                        closestCoin = d
-                    end
-                end
-            end
-        end
-    end
-    return closestCoin
 end
 
 local function EnviarMensagemChat(msg)
@@ -357,8 +332,8 @@ local function LimparEDesligarAbsolutamente()
     pcall(function()
         local char = player.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if hum then 
-            hum.WalkSpeed = 16 
+        if hum then
+            hum.WalkSpeed = 16
             hum.PlatformStand = false
         end
         if char then
@@ -372,6 +347,216 @@ local function LimparEDesligarAbsolutamente()
         end
     end)
 end
+
+-- ==================== AUTO COLLECT v2 - SISTEMA MODERNO MM2 2026 ====================
+local AC = {
+    active          = false,
+    currentTarget   = nil,
+    moveConnection  = nil,
+    scanThread      = nil,
+    roundWatcher    = nil,
+    collectedCache  = {},
+    SCAN_INTERVAL   = 0.35,
+    COLLECT_RADIUS  = 4,
+    MAX_COIN_DIST   = 1600,
+    MOVE_SPEED      = 8,
+    SWAP_THRESHOLD  = 8,   -- Diferença mínima (studs) para trocar de alvo
+}
+
+local COIN_NAMES = {
+    "coin", "moeda", "gold", "snowflake", "candycane", "token",
+    "diamond", "present", "candy", "gem", "collectible", "shard",
+    "crystal", "orb", "star", "doubloon", "emerald", "ruby",
+}
+
+local function AC_IsCoinName(name)
+    local lower = name:lower()
+    for _, kw in ipairs(COIN_NAMES) do
+        if lower:find(kw) then return true end
+    end
+    return false
+end
+
+local function AC_IsValidCoin(part)
+    if not part or not part.Parent then return false end
+    if not part:IsA("BasePart") then return false end
+    if part.Transparency >= 1 then return false end
+    if part:IsDescendantOf(Players) then return false end
+    if part:FindFirstAncestorOfClass("Tool") then return false end
+    if part:FindFirstAncestorOfClass("Accessory") then return false end
+    if not AC_IsCoinName(part.Name) then return false end
+    return true
+end
+
+local function AC_FindNearest(root)
+    if not root then return nil end
+    local origin  = root.Position
+    local best, bestDist = nil, AC.MAX_COIN_DIST
+    for _, desc in ipairs(workspace:GetDescendants()) do
+        if AC_IsValidCoin(desc) and not AC.collectedCache[desc] then
+            local d = (origin - desc.Position).Magnitude
+            if d < bestDist then
+                bestDist = d
+                best = desc
+            end
+        end
+    end
+    return best
+end
+
+local function AC_ClearCache()
+    for inst in pairs(AC.collectedCache) do
+        if not inst or not inst.Parent then
+            AC.collectedCache[inst] = nil
+        end
+    end
+end
+
+local function AC_StopMovement()
+    if AC.moveConnection then
+        AC.moveConnection:Disconnect()
+        AC.moveConnection = nil
+    end
+    AC.currentTarget = nil
+end
+
+local function AC_StopScan()
+    -- scanThread é um task.spawn; só sinalizamos via Configs.AutoCollect = false
+    AC.scanThread = nil
+end
+
+local function AC_StartCollection()
+    if AC.moveConnection then return end
+
+    AC.moveConnection = RunService.Heartbeat:Connect(function(dt)
+        if not Configs.AutoCollect then
+            AC_StopMovement()
+            return
+        end
+
+        local char = player.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        local hum  = char and char:FindFirstChildOfClass("Humanoid")
+        if not root or not hum or hum.Health <= 0 then return end
+
+        local target = AC.currentTarget
+
+        -- Valida alvo atual
+        if target then
+            if not AC_IsValidCoin(target) then
+                AC.collectedCache[target] = true
+                AC.currentTarget = nil
+                return
+            end
+
+            local dist = (root.Position - target.Position).Magnitude
+
+            -- Chegou na moeda
+            if dist <= AC.COLLECT_RADIUS then
+                AC.collectedCache[target] = true
+                AC.currentTarget = nil
+                return
+            end
+
+            -- Movimento suave com Lerp de posição
+            local targetPos  = target.Position
+            local currentPos = root.Position
+            local speed      = math.min(AC.MOVE_SPEED * dt * 60, dist)
+            local newPos     = currentPos + (targetPos - currentPos).Unit * speed
+
+            -- Raycast para altura do chão
+            local rpParams = RaycastParams.new()
+            rpParams.FilterDescendantsInstances = { char }
+            rpParams.FilterType = Enum.RaycastFilterType.Exclude
+
+            local hit = workspace:Raycast(
+                Vector3.new(newPos.X, currentPos.Y + 5, newPos.Z),
+                Vector3.new(0, -25, 0),
+                rpParams
+            )
+            local groundY = hit and (hit.Position.Y + 3) or currentPos.Y
+            local finalY  = currentPos.Y + (groundY - currentPos.Y) * 0.2
+
+            root.CFrame = CFrame.new(
+                Vector3.new(newPos.X, finalY, newPos.Z),
+                Vector3.new(targetPos.X, finalY, targetPos.Z)
+            )
+        end
+    end)
+end
+
+local function AC_StartScan()
+    if AC.scanThread then return end
+
+    AC.scanThread = task.spawn(function()
+        while Configs.AutoCollect do
+            AC_ClearCache()
+
+            local char = player.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            local hum  = char and char:FindFirstChildOfClass("Humanoid")
+
+            if root and hum and hum.Health > 0 then
+                if not AC.currentTarget or not AC_IsValidCoin(AC.currentTarget) then
+                    AC.currentTarget = AC_FindNearest(root)
+                else
+                    local nearest = AC_FindNearest(root)
+                    if nearest and nearest ~= AC.currentTarget then
+                        local dCurrent = (root.Position - AC.currentTarget.Position).Magnitude
+                        local dNearest = (root.Position - nearest.Position).Magnitude
+                        if dNearest < dCurrent - AC.SWAP_THRESHOLD then
+                            AC.currentTarget = nearest
+                        end
+                    end
+                end
+            end
+
+            task.wait(AC.SCAN_INTERVAL)
+        end
+
+        -- Desativado externamente
+        AC_StopMovement()
+        AC.scanThread = nil
+    end)
+end
+
+-- Watcher de rodada: reinicia o AC automaticamente entre partidas
+local function AC_WatchRound()
+    if AC.roundWatcher then return end
+
+    AC.roundWatcher = task.spawn(function()
+        local wasRoundActive = false
+
+        while true do
+            task.wait(1.2)
+
+            local roundActive = false
+            for _, p in ipairs(Players:GetPlayers()) do
+                if PlayerRoles[p] == "Murderer" then
+                    roundActive = true
+                    break
+                end
+            end
+
+            if roundActive ~= wasRoundActive then
+                if not roundActive then
+                    -- Rodada terminou → limpa tudo
+                    AC.collectedCache = {}
+                    AC_StopMovement()
+                    AC_StopScan()
+                elseif Configs.AutoCollect then
+                    -- Nova rodada → aguarda moedas aparecerem e reinicia
+                    task.wait(2)
+                    AC_StartCollection()
+                    AC_StartScan()
+                end
+                wasRoundActive = roundActive
+            end
+        end
+    end)
+end
+
+AC_WatchRound()
 
 -- ==================== PONTE DE COMUNICAÇÃO GLOBAL (UI -> BACKEND) ====================
 _G.AkatCallbacks = {
@@ -405,10 +590,18 @@ _G.AkatCallbacks = {
         end
     end,
     AutoCollect = function(enabled)
-        if not enabled then 
-            currentCollectTarget = nil 
+        if enabled then
+            AC.collectedCache = {}
+            AC.currentTarget  = nil
+            AC_StartCollection()
+            AC_StartScan()
+        else
+            AC_StopMovement()
+            AC_StopScan()
+            AC.collectedCache = {}
+            AC.currentTarget  = nil
             local char = player.Character
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            local hum  = char and char:FindFirstChildOfClass("Humanoid")
             if hum then hum.PlatformStand = false end
         end
     end,
@@ -417,9 +610,8 @@ _G.AkatCallbacks = {
         if hasGun and gunTool then
             local murderer = AS_GetMurderer()
             if murderer then
-                pcall(function() 
-                    gunTool:Activate() 
-                    -- Simulação Virtual de Input (Garante o disparo em Mobile)
+                pcall(function()
+                    gunTool:Activate()
                     VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
                     task.wait(0.01)
                     VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
@@ -432,12 +624,11 @@ _G.AkatCallbacks = {
     end
 }
 
--- ==================== CORREÇÃO E RESTAURAÇÃO DO HEARTBEAT/REACH ====================
+-- ==================== HEARTBEAT PRINCIPAL ====================
 hbConnection = RunService.Heartbeat:Connect(function(dt)
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     local hum  = char and char:FindFirstChildOfClass("Humanoid")
-
     if not root or not hum then return end
 
     -- WALK SPEED
@@ -447,7 +638,7 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         hum.WalkSpeed = 16
     end
 
-    -- [RESTAURAÇÃO COMPLETA DO KNIFE REACH v3]
+    -- KNIFE REACH v3
     if Configs.Reach then
         local myKnife = char:FindFirstChild("Knife") or char:FindFirstChild("Faca")
         if myKnife then
@@ -463,20 +654,17 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
                     rp.Material = Enum.Material.ForceField
                     rp.CanCollide = false
                     rp.Massless = true
-                    
                     local weld = Instance.new("Weld", rp)
                     weld.Part0 = handle
                     weld.Part1 = rp
                     rp.Parent = handle
                 end
-                
                 for _, p in ipairs(Players:GetPlayers()) do
                     if p ~= player and p.Character then
                         local enemyRoot = p.Character:FindFirstChild("HumanoidRootPart")
-                        local enemyHum = p.Character:FindFirstChildOfClass("Humanoid")
+                        local enemyHum  = p.Character:FindFirstChildOfClass("Humanoid")
                         if enemyRoot and enemyHum and enemyHum.Health > 0 then
-                            local dist = (root.Position - enemyRoot.Position).Magnitude
-                            if dist <= 18 then
+                            if (root.Position - enemyRoot.Position).Magnitude <= 18 then
                                 pcall(function()
                                     firetouchinterest(enemyRoot, handle, 0)
                                     firetouchinterest(enemyRoot, handle, 1)
@@ -497,7 +685,7 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- ANTI FLING / NOCLIP GLOBAL
+    -- ANTI FLING / NOCLIP
     if Configs.AntiFling or Configs.AutoCollect then
         for _, part in ipairs(char:GetChildren()) do
             if part:IsA("BasePart") then part.CanCollide = false end
@@ -511,7 +699,7 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- TELEPORT TO GUN (CORRIGIDO: RETORNA AO LUGAR ANTERIOR)
+    -- TELEPORT TO GUN
     if Configs.TpToGun and PlayerRoles[player] ~= "Murderer" and not PlayerTemArma() then
         local gunPart = ObterArmaCaida(root)
         if gunPart then
@@ -531,67 +719,41 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
             Configs.TpToGun = false
         end
     end
-
-    -- AUTO COLLECT (MÉTODO MM2 BYPASS FLUTUANDO E TREMENDO)
-    if Configs.AutoCollect then
-        if not currentCollectTarget or not currentCollectTarget.Parent or currentCollectTarget.Transparency >= 1 then
-            currentCollectTarget = ObterMoedaProxima(root)
-        end
-        
-        if currentCollectTarget then
-            hum.PlatformStand = true -- Deixa o boneco bobo no ar para estabilizar
-            local targetPos = currentCollectTarget.Position
-            local currentPos = root.Position
-            local dist = (targetPos - currentPos).Magnitude
-            
-            -- Geração de tremor clássico rápido (Vibration Shake Matrix)
-            local shakeX = math.sin(tick() * 70) * 0.5
-            local shakeY = 1.5 + math.cos(tick() * 70) * 0.3
-            local shakeZ = math.cos(tick() * 60) * 0.5
-            local shakeOffset = Vector3.new(shakeX, shakeY, shakeZ)
-            
-            if dist > 4 then
-                -- Interpolação veloz e contínua até a moeda (Evita kick por estourar distância máxima instantânea)
-                local direcao = (targetPos - currentPos).Unit * math.min(dist, 5.5)
-                root.CFrame = CFrame.new(currentPos + direcao + Vector3.new(0, shakeY - 1.5, 0))
-            else
-                -- Exatamente na moeda gerando a tremedeira rápida
-                root.CFrame = CFrame.new(targetPos + shakeOffset)
-            end
-            root.Velocity = Vector3.new(0, 0, 0)
-        end
-    end
 end)
 
+-- ==================== RENDER STEPPED ====================
 renderConnection = RunService.RenderStepped:Connect(function()
     AS_Tick()
 end)
 
--- THREAD STATUS
+-- ==================== THREAD DE STATUS / CHAT ROLES ====================
 task.spawn(function()
     while true do
-        local gunFoundInPlayers = false
+        local gunFoundInPlayers  = false
         local knifeFoundInPlayers = false
         local currentMurderer, currentSheriff = nil, nil
-        
+
         for _, p in ipairs(Players:GetPlayers()) do
             local role = PlayerRoles[p]
             if role == "Murderer" then currentMurderer = p end
             if role == "Sheriff"  then currentSheriff  = p end
-            
+
             if p.Character then
-                if p.Character:FindFirstChild("Gun") or p.Backpack:FindFirstChild("Gun") then gunFoundInPlayers = true end
-                if p.Character:FindFirstChild("Knife") or p.Backpack:FindFirstChild("Knife") then knifeFoundInPlayers = true end
+                local bp = p:FindFirstChild("Backpack")
+                if p.Character:FindFirstChild("Gun") or (bp and bp:FindFirstChild("Gun")) then gunFoundInPlayers = true end
+                if p.Character:FindFirstChild("Knife") or (bp and bp:FindFirstChild("Knife")) then knifeFoundInPlayers = true end
             end
-            
+
             if Configs.ESP and p ~= player then
                 ESP_UpdatePlayer(p)
             end
         end
-        
+
         local gunDropExists = workspace:FindFirstChild("GunDrop", true) ~= nil
         if gunDropExists then gunDroppedThisRound = true end
-        if not gunFoundInPlayers and not gunDropExists and not knifeFoundInPlayers then gunDroppedThisRound = false end
+        if not gunFoundInPlayers and not gunDropExists and not knifeFoundInPlayers then
+            gunDroppedThisRound = false
+        end
 
         if not currentMurderer and not currentSheriff then
             announcedThisRound = false
@@ -606,11 +768,12 @@ task.spawn(function()
             end
             EnviarMensagemChat(msg)
         end
+
         task.wait(0.4)
     end
 end)
 
--- ==================== CHAMANDO A CARGA DINÂMICA DA INTERFACE ====================
+-- ==================== CARREGAMENTO DA UI ====================
 local Link_Da_UI = "https://raw.githubusercontent.com/estratosfera88-afk/UI.lua/refs/heads/main/ui.lua"
 
 local Sucesso, Erro = pcall(function()
