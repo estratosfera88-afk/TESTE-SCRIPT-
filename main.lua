@@ -257,6 +257,10 @@ local currentCollectTarget = nil
 local lastCoinSearch = 0
 local wasAutoCollecting = false
 
+-- Variáveis de segurança do Auto Collect
+local lastCoinCollectedTime = 0
+local coinCollectionCooldown = 0.7
+
 -- ==================== 3. CRIAÇÃO DE TODA A ESTRUTURA DE INTERFACE (UI) ====================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "DeltaAkatUniversalUI"
@@ -721,6 +725,11 @@ local function DetectarRoleReal(p)
     if string.find(roleStr, "murder") or string.find(roleStr, "assassino") then return "Murderer" end
     if string.find(roleStr, "sheriff") or string.find(roleStr, "xerife") or string.find(roleStr, "hero") then return "Sheriff" end
     return "Survivor"
+end
+
+-- Detecção inteligente e robusta de partida ativa no MM2
+local function IsRoundActive()
+    return workspace:FindFirstChild("Spawns", true) ~= nil or workspace:FindFirstChild("CoinContainer", true) ~= nil
 end
 
 local function ObterMurderer()
@@ -1420,6 +1429,23 @@ local function EnviarMensagemChat(msg)
     end)
 end
 
+-- ==================== NOVO CLIQUE FLUIDO E MODERNO DO BOTÃO FLUTUANTE ====================
+local function AnimarCliqueFloatBtn()
+    local originalSize = UDim2.new(0, 44, 0, 44)
+    local targetSize = UDim2.new(0, 38, 0, 38)
+    
+    -- Transição moderna, suave e sem movimentos abruptos utilizando Sine
+    local shrink = TweenService:Create(FloatBtn, TweenInfo.new(0.12, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = targetSize})
+    local expand = TweenService:Create(FloatBtn, TweenInfo.new(0.15, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Size = originalSize})
+    
+    shrink:Play()
+    local c
+    c = shrink.Completed:Connect(function()
+        expand:Play()
+        c:Disconnect()
+    end)
+end
+
 -- ==================== 5. INSTANCIAÇÃO DINÂMICA DE ELEMENTOS E EVENTOS ====================
 
 local function AplicarEfeitoFisicoBotao(btn, hoverColor)
@@ -1557,23 +1583,6 @@ btnYes.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
--- ==================== NOVO CLIQUE ULTRA-RÁPIDO DO BOTÃO FLUTUANTE ====================
-local function AnimarCliqueFloatBtn()
-    local originalSize = UDim2.new(0, 44, 0, 44)
-    local targetSize = UDim2.new(0, 34, 0, 34) -- Reduz um pouco mais para maior impacto visual
-    
-    -- Transição instantânea e retorno elástico super veloz
-    local shrink = TweenService:Create(FloatBtn, TweenInfo.new(0.04, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = targetSize})
-    local expand = TweenService:Create(FloatBtn, TweenInfo.new(0.08, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = originalSize})
-    
-    shrink:Play()
-    local c
-    c = shrink.Completed:Connect(function()
-        expand:Play()
-        c:Disconnect()
-    end)
-end
-
 MinimizeBtn.MouseButton1Click:Connect(executarMinimizacao)
 
 FloatBtn.MouseButton1Click:Connect(function()
@@ -1603,15 +1612,46 @@ task.spawn(function()
         local currentMurderer = nil
         local currentSheriff = nil
         
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= player then 
+        local roundActive = IsRoundActive()
+        
+        if roundActive then
+            local anyoneHasWeapon = false
+            local tempRoles = {}
+            
+            for _, p in ipairs(Players:GetPlayers()) do
                 local role = DetectarRoleReal(p)
-                PlayerRoles[p] = role
-                if role == "Murderer" then currentMurderer = p end
-                if role == "Sheriff" then currentSheriff = p end
+                tempRoles[p] = role
+                if role == "Murderer" then 
+                    currentMurderer = p 
+                    anyoneHasWeapon = true
+                elseif role == "Sheriff" then 
+                    currentSheriff = p 
+                    anyoneHasWeapon = true
+                end
+            end
+            
+            -- Se existe ao menos um papel ativo na partida, atualizamos o cache normalmente
+            if anyoneHasWeapon then
+                for p, role in pairs(tempRoles) do
+                    PlayerRoles[p] = role
+                end
+            else
+                -- Se a partida está ativa mas ninguém tem arma (fim da partida recente)
+                -- Mantemos congelados os papéis anteriores até a transição para o lobby
+                for p in pairs(PlayerRoles) do
+                    if not Players:FindFirstChild(p.Name) then
+                        PlayerRoles[p] = nil
+                    end
+                end
+            end
+        else
+            -- Se não está em partida (está no Lobby), limpa os papéis específicos
+            for _, p in ipairs(Players:GetPlayers()) do
+                PlayerRoles[p] = "Survivor"
             end
         end
         
+        -- Lógica do ChatRoles
         if not currentMurderer and not currentSheriff then
             announcedThisRound = false
         elseif Configs.ChatRoles and (currentMurderer or currentSheriff) and not announcedThisRound then
@@ -1626,11 +1666,11 @@ task.spawn(function()
             EnviarMensagemChat(msg)
         end
         
-        task.wait(0.4)
+        task.wait(0.2)
     end
 end)
 
--- AIMBOT
+-- AIMBOT (Corrigido para mirar de forma precisa e direta na cabeça)
 renderConnection = RunService.RenderStepped:Connect(function()
     if Configs.AutoShoot then
         local char = player.Character
@@ -1638,7 +1678,8 @@ renderConnection = RunService.RenderStepped:Connect(function()
         if gunTool and gunTool:IsA("Tool") then
             local murderer, distancia = ObterMurderer()
             if murderer and murderer.Character and distancia < 250 then
-                local targetPart = murderer.Character:FindFirstChild("HumanoidRootPart") or murderer.Character:FindFirstChild("Head")
+                -- Correção de mira: prioriza a cabeça (Head) e usa o Torso apenas como alternativa
+                local targetPart = murderer.Character:FindFirstChild("Head") or murderer.Character:FindFirstChild("HumanoidRootPart")
                 local myRoot = char:FindFirstChild("HumanoidRootPart")
                 if targetPart and myRoot then
                     local targetPos = targetPart.Position
@@ -1685,7 +1726,7 @@ local function PlayerTemArma()
     return false
 end
 
--- AUTO COLLECT
+-- AUTO COLLECT (Obter moeda mais próxima com segurança)
 local function ObterMoedaProxima(root)
     local closestCoin = nil
     local closestDist = math.huge
@@ -1728,6 +1769,7 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
+    -- ESP (Corrigido para atualizar em tempo real e redefinir apenas ao retornar ao lobby)
     if Configs.ESP then
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= player and p.Character then
@@ -1741,7 +1783,17 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
                     hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
                     hl.Parent = pChar
                 end
+                
+                -- Se a partida estiver ativa, valida na hora se o jogador está com a arma (muda na hora para azul)
                 local role = PlayerRoles[p] or "Survivor"
+                if IsRoundActive() then
+                    local realRoleNow = DetectarRoleReal(p)
+                    if realRoleNow == "Sheriff" or realRoleNow == "Murderer" then
+                        role = realRoleNow
+                        PlayerRoles[p] = realRoleNow
+                    end
+                end
+                
                 if role == "Murderer" then
                     hl.FillColor = Color3.fromRGB(255, 0, 0)
                     hl.OutlineColor = Color3.fromRGB(255, 0, 0)
@@ -1749,8 +1801,9 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
                     hl.FillColor = Color3.fromRGB(0, 110, 255)
                     hl.OutlineColor = Color3.fromRGB(0, 110, 255)
                 else
-                    hl.FillColor = Color3.fromRGB(0, 255, 0)
-                    hl.OutlineColor = Color3.fromRGB(0, 255, 0)
+                    -- Sobreviventes normais exibidos em amarelo
+                    hl.FillColor = Color3.fromRGB(255, 255, 0)
+                    hl.OutlineColor = Color3.fromRGB(255, 255, 0)
                 end
             end
         end
@@ -1763,98 +1816,113 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- TELEPORT TO GUN
+    -- TELEPORT TO GUN (Corrigido: Murderer não executa o teleporte)
     if Configs.TpToGun and root and not PlayerTemArma() then
-        local gunDrop = ObterArmaCaida(root)
-        if gunDrop and not hasTeleportedToGun then
-            hasTeleportedToGun = true
-            originalPositionBeforeGun = root.CFrame
-            
-            pcall(function()
-                root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-                root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-            end)
-            
-            root.CFrame = gunDrop.CFrame * CFrame.new(0, 1.2, 0)
-            
-            task.spawn(function()
-                task.wait(0.35) 
-                if originalPositionBeforeGun and root and Configs.TpToGun then
-                    root.CFrame = originalPositionBeforeGun
-                end
-                task.wait(1.5) 
-                hasTeleportedToGun = false
-            end)
+        local localRole = PlayerRoles[player] or DetectarRoleReal(player)
+        if localRole ~= "Murderer" then -- Verificação de segurança adicionada
+            local gunDrop = ObterArmaCaida(root)
+            if gunDrop and not hasTeleportedToGun then
+                hasTeleportedToGun = true
+                originalPositionBeforeGun = root.CFrame
+                
+                pcall(function()
+                    root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                    root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+                end)
+                
+                root.CFrame = gunDrop.CFrame * CFrame.new(0, 1.2, 0)
+                
+                task.spawn(function()
+                    task.wait(0.35) 
+                    if originalPositionBeforeGun and root and Configs.TpToGun then
+                        root.CFrame = originalPositionBeforeGun
+                    end
+                    task.wait(1.5) 
+                    hasTeleportedToGun = false
+                end)
+            end
         end
     end
 
-    -- AUTO COLLECT
+    -- AUTO COLLECT (Totalmente reconstruído para evitar "Invalid Position" e bypassar Anticheat)
     if Configs.AutoCollect and root then
-        if currentCollectTarget and (not currentCollectTarget.Parent or not currentCollectTarget:IsDescendantOf(workspace) or currentCollectTarget.Transparency >= 1) then
-            currentCollectTarget = nil
-        end
-
-        if not currentCollectTarget and os.clock() - lastCoinSearch > 0.15 then
-            lastCoinSearch = os.clock()
-            currentCollectTarget = ObterMoedaProxima(root)
-        end
-
-        if currentCollectTarget then
-            wasAutoCollecting = true
-            
-            if hum then
+        -- Cooldown de segurança para não teletransportar consecutivamente de forma instantânea
+        if os.clock() - lastCoinCollectedTime < coinCollectionCooldown then
+            if wasAutoCollecting then
                 pcall(function() hum.PlatformStand = true end)
-            end
-
-            if char then
-                for _, part in ipairs(char:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = false
-                    end
-                end
-            end
-
-            local targetPos = currentCollectTarget.Position
-            local currentPos = root.Position
-            local dist = (targetPos - currentPos).Magnitude
-            
-            pcall(function()
                 root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-                root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-            end)
-            
-            if dist > 1 then
-                local flySpeed = 85 
-                local moveAmount = flySpeed * dt
-                local direction = (targetPos - currentPos).Unit
-                
-                if moveAmount >= dist then
-                    root.CFrame = CFrame.new(targetPos)
-                else
-                    root.CFrame = CFrame.new(currentPos + direction * moveAmount)
-                end
-            else
-                root.CFrame = CFrame.new(targetPos)
-                if firetouchinterest then
-                    firetouchinterest(root, currentCollectTarget, 0)
-                    firetouchinterest(root, currentCollectTarget, 1)
-                end
             end
         else
-            if wasAutoCollecting then
-                wasAutoCollecting = false
+            if currentCollectTarget and (not currentCollectTarget.Parent or not currentCollectTarget:IsDescendantOf(workspace) or currentCollectTarget.Transparency >= 1) then
+                currentCollectTarget = nil
+                lastCoinCollectedTime = os.clock() -- Inicia delay após o sumiço da moeda
+            end
+
+            if not currentCollectTarget and os.clock() - lastCoinSearch > 0.15 then
+                lastCoinSearch = os.clock()
+                currentCollectTarget = ObterMoedaProxima(root)
+            end
+
+            if currentCollectTarget then
+                wasAutoCollecting = true
+                
                 if hum then
-                    pcall(function() hum.PlatformStand = false end)
+                    pcall(function() hum.PlatformStand = true end)
                 end
+
                 if char then
-                    for _, part in ipairs(char:GetChildren()) do
-                        if part:IsA("BasePart") and (part.Name == "HumanoidRootPart" or part.Name == "Head" or part.Name == "Torso" or part.Name == "UpperTorso" or part.Name == "LowerTorso") then
-                            part.CanCollide = true
+                    for _, part in ipairs(char:GetDescendants()) do
+                        if part:IsA("BasePart") then
+                            part.CanCollide = false
                         end
                     end
                 end
-                if root then
+
+                local targetPos = currentCollectTarget.Position
+                local currentPos = root.Position
+                local dist = (targetPos - currentPos).Magnitude
+                
+                pcall(function()
                     root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                    root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+                end)
+                
+                -- Deslocamento linear suave e controlado (Velocidade segura = 28)
+                if dist > 1.5 then
+                    local flySpeed = 28 
+                    local moveAmount = flySpeed * dt
+                    local direction = (targetPos - currentPos).Unit
+                    
+                    if moveAmount >= dist then
+                        root.CFrame = CFrame.new(targetPos)
+                    else
+                        root.CFrame = CFrame.new(currentPos + direction * moveAmount)
+                    end
+                else
+                    root.CFrame = CFrame.new(targetPos)
+                    if firetouchinterest then
+                        firetouchinterest(root, currentCollectTarget, 0)
+                        firetouchinterest(root, currentCollectTarget, 1)
+                    end
+                    currentCollectTarget = nil
+                    lastCoinCollectedTime = os.clock() -- Sucesso de coleta: aplica o cooldown antes da próxima
+                end
+            else
+                if wasAutoCollecting then
+                    wasAutoCollecting = false
+                    if hum then
+                        pcall(function() hum.PlatformStand = false end)
+                    end
+                    if char then
+                        for _, part in ipairs(char:GetChildren()) do
+                            if part:IsA("BasePart") and (part.Name == "HumanoidRootPart" or part.Name == "Head" or part.Name == "Torso" or part.Name == "UpperTorso" or part.Name == "LowerTorso") then
+                                part.CanCollide = true
+                            end
+                        end
+                    end
+                    if root then
+                        root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                    end
                 end
             end
         end
