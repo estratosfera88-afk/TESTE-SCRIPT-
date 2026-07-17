@@ -1,5 +1,5 @@
 -- [[
---     AKAT MM2 SCRIPT [BETA v2.5] - ESP & AUTOSHOOT REWRITTEN + ANTI-BAN
+--     AKAT MM2 SCRIPT [BETA v3.0] - ESP + AUTO SHOOT REWRITE 2026
 -- ]]
 
 local Players = game:GetService("Players")
@@ -18,20 +18,18 @@ task.spawn(function()
         setreadonly(gmt, false)
         local oldIndex = gmt.__index
         local oldNamecall = gmt.__namecall
-
         gmt.__namecall = newcclosure(function(self, ...)
             local method = getnamecallmethod()
             if tostring(method):lower() == "kick" and self == player then
-                warn("[AKAT ANTI-BAN] Tentativa de Kick bloqueada com sucesso!")
+                warn("[AKAT ANTI-BAN] Tentativa de Kick bloqueada!")
                 return nil
             end
             return oldNamecall(self, ...)
         end)
-
         gmt.__index = newcclosure(function(self, key)
             if tostring(key):lower() == "kick" and self == player then
                 return newcclosure(function()
-                    warn("[AKAT ANTI-BAN] Tentativa de chamada de Kick indireta bloqueada!")
+                    warn("[AKAT ANTI-BAN] Kick indireto bloqueado!")
                 end)
             end
             return oldIndex(self, key)
@@ -42,15 +40,10 @@ task.spawn(function()
     local function applyBypass(character)
         if not character then return end
         local humanoid = character:WaitForChild("Humanoid", 5)
-        if humanoid then
-            if hookproperty then
-                pcall(function()
-                    hookproperty(humanoid, "WalkSpeed", 16)
-                end)
-            end
+        if humanoid and hookproperty then
+            pcall(function() hookproperty(humanoid, "WalkSpeed", 16) end)
         end
     end
-
     player.CharacterAdded:Connect(applyBypass)
     if player.Character then applyBypass(player.Character) end
 end)
@@ -82,42 +75,15 @@ local Locales = {
             Misc = "Diversos"
         },
         Options = {
-            AutoShoot = {
-                Title = "Atirar no Murder",
-                Desc = "Mira e dispara a arma automaticamente no Assassino ao equipá-la."
-            },
-            Reach = {
-                Title = "Alcance da Faca",
-                Desc = "Aumenta consideravelmente o alcance de ataque com a sua faca."
-            },
-            ESP = {
-                Title = "ESP Jogadores",
-                Desc = "Destaca na parede os jogadores de acordo com suas funções."
-            },
-            Speed = {
-                Title = "Velocidade",
-                Desc = "Aumenta levemente a velocidade do personagem para 23."
-            },
-            AntiFling = {
-                Title = "Anti-Arremesso",
-                Desc = "Bloqueia colisões que tentem te empurrar ou arremessar."
-            },
-            TpToGun = {
-                Title = "Teleportar p/ Arma",
-                Desc = "Teletransporta para a arma dropada e retorna ao local original rapidamente."
-            },
-            SafeSpot = {
-                Title = "Lugar Seguro",
-                Desc = "Cria uma plataforma invisível no céu para ficar totalmente seguro."
-            },
-            AutoCollect = {
-                Title = "Coletar Moedas",
-                Desc = "Voa suavemente coletando cada moeda com cooldown para evitar kick."
-            },
-            ChatRoles = {
-                Title = "Revelar Funções",
-                Desc = "Envia de forma limpa no chat quem é o Assassino e o Xerife."
-            }
+            AutoShoot = { Title = "Atirar no Murder", Desc = "Mira e dispara automaticamente no Assassino ao equipar a arma." },
+            Reach = { Title = "Alcance da Faca", Desc = "Aumenta consideravelmente o alcance de ataque com a sua faca." },
+            ESP = { Title = "ESP Jogadores", Desc = "Destaca jogadores pelas paredes com cores por função em tempo real." },
+            Speed = { Title = "Velocidade", Desc = "Aumenta levemente a velocidade do personagem para 23." },
+            AntiFling = { Title = "Anti-Arremesso", Desc = "Bloqueia colisões que tentem te empurrar ou arremessar." },
+            TpToGun = { Title = "Teleportar p/ Arma", Desc = "Teletransporta para a arma dropada e retorna ao local original." },
+            SafeSpot = { Title = "Lugar Seguro", Desc = "Cria uma plataforma invisível no céu para ficar totalmente seguro." },
+            AutoCollect = { Title = "Coletar Moedas", Desc = "Move suavemente até cada moeda com cooldown anti-kick integrado." },
+            ChatRoles = { Title = "Revelar Funções", Desc = "Envia no chat quem é o Assassino e o Xerife." }
         },
         Intro = '<font color="#FFFFFF">Scripts por | </font><font color="#8B0000">Comunidade AKAT</font>'
     },
@@ -134,42 +100,15 @@ local Locales = {
             Misc = "Misc"
         },
         Options = {
-            AutoShoot = {
-                Title = "Shoot Murderer",
-                Desc = "Automatically aims and fires the gun at the Murderer when held."
-            },
-            Reach = {
-                Title = "Knife Reach",
-                Desc = "Significantly increases your knife attack reach."
-            },
-            ESP = {
-                Title = "Player ESP",
-                Desc = "Highlights players through walls based on their active roles."
-            },
-            Speed = {
-                Title = "WalkSpeed",
-                Desc = "Slightly increases player walkspeed up to 23."
-            },
-            AntiFling = {
-                Title = "Anti-Fling",
-                Desc = "Disables collisions to prevent other players from flinging you."
-            },
-            TpToGun = {
-                Title = "TP to Gun",
-                Desc = "Teleports to the dropped gun and instantly returns to your spot."
-            },
-            SafeSpot = {
-                Title = "Safe Spot",
-                Desc = "Teleports you to an invisible sky platform to remain completely safe."
-            },
-            AutoCollect = {
-                Title = "Auto Collect",
-                Desc = "Smoothly collects each coin with cooldown to avoid anti-cheat kicks."
-            },
-            ChatRoles = {
-                Title = "Reveal Roles",
-                Desc = "Automatically sends a message in public chat revealing active roles."
-            }
+            AutoShoot = { Title = "Shoot Murderer", Desc = "Automatically aims and fires at the Murderer when holding a gun." },
+            Reach = { Title = "Knife Reach", Desc = "Significantly increases your knife attack reach." },
+            ESP = { Title = "Player ESP", Desc = "Highlights players through walls with role-based colors in real time." },
+            Speed = { Title = "WalkSpeed", Desc = "Slightly increases player walkspeed up to 23." },
+            AntiFling = { Title = "Anti-Fling", Desc = "Disables collisions to prevent other players from flinging you." },
+            TpToGun = { Title = "TP to Gun", Desc = "Teleports to the dropped gun and instantly returns to your spot." },
+            SafeSpot = { Title = "Safe Spot", Desc = "Teleports you to an invisible sky platform to remain completely safe." },
+            AutoCollect = { Title = "Auto Collect", Desc = "Smoothly moves to each coin with built-in anti-kick cooldown." },
+            ChatRoles = { Title = "Reveal Roles", Desc = "Sends a message in chat revealing active roles." }
         },
         Intro = '<font color="#FFFFFF">Scripts by | </font><font color="#8B0000">AKAT Community</font>'
     },
@@ -180,48 +119,21 @@ local Locales = {
         CancelBtn = "Cancelar",
         Tabs = {
             Combat = "Combate",
-            Visuals = "Visuales",
+            Visuales = "Visuales",
             Movement = "Movimiento",
             Teleports = "Teleportes",
             Misc = "Varios"
         },
         Options = {
-            AutoShoot = {
-                Title = "Disparar al Asesino",
-                Desc = "Apunta y dispara la pistola automáticamente al Asesino al equiparla."
-            },
-            Reach = {
-                Title = "Alcance del Cuchillo",
-                Desc = "Aumenta considerablemente el alcance de ataque con tu cuchillo."
-            },
-            ESP = {
-                Title = "ESP Jugadores",
-                Desc = "Resalta a los jugadores a través de las paredes según sus roles."
-            },
-            Speed = {
-                Title = "Velocidad",
-                Desc = "Aumenta ligeramente la velocidad del personaje a 23."
-            },
-            AntiFling = {
-                Title = "Anti-Fling",
-                Desc = "Bloquea colisiones para evitar que te empujen o lancen."
-            },
-            TpToGun = {
-                Title = "TP a la Arma",
-                Desc = "Teletransporta a la pistola tirada y regresa a tu lugar velozmente."
-            },
-            SafeSpot = {
-                Title = "Lugar Seguro",
-                Desc = "Te teletransporta a una plataforma invisible en el cielo para estar a salvo."
-            },
-            AutoCollect = {
-                Title = "Auto Monedas",
-                Desc = "Recoge monedas suavemente con cooldown para evitar expulsión."
-            },
-            ChatRoles = {
-                Title = "Revelar Roles",
-                Desc = "Envía automáticamente en el chat quién es el Asesino y el Sheriff."
-            }
+            AutoShoot = { Title = "Disparar al Asesino", Desc = "Apunta y dispara automáticamente al Asesino al equipar la pistola." },
+            Reach = { Title = "Alcance del Cuchillo", Desc = "Aumenta considerablemente el alcance de ataque con tu cuchillo." },
+            ESP = { Title = "ESP Jugadores", Desc = "Resalta jugadores a través de paredes con colores por rol en tiempo real." },
+            Speed = { Title = "Velocidad", Desc = "Aumenta ligeramente la velocidad del personaje a 23." },
+            AntiFling = { Title = "Anti-Fling", Desc = "Bloquea colisiones para evitar que te empujen o lancen." },
+            TpToGun = { Title = "TP a la Arma", Desc = "Teletransporta a la pistola tirada y regresa a tu lugar." },
+            SafeSpot = { Title = "Lugar Seguro", Desc = "Te teletransporta a una plataforma invisible en el cielo." },
+            AutoCollect = { Title = "Auto Monedas", Desc = "Se mueve suavemente hacia cada moneda con cooldown anti-kick." },
+            ChatRoles = { Title = "Revelar Roles", Desc = "Envía en el chat quién es el Asesino y el Sheriff." }
         },
         Intro = '<font color="#FFFFFF">Scripts por | </font><font color="#8B0000">Comunidad AKAT</font>'
     }
@@ -235,340 +147,285 @@ local menuAberto = true
 local isMinimized = false
 local hbConnection = nil
 local renderConnection = nil
+local PlayerRoles = {}
+local originalTrans = {}
 local confirmBlur = nil
 local isConfirmOpen = false
 local wasMinimizedBeforeConfirm = false
 
 local safePlatform = nil
 local lastPositionBeforeSafeSpot = nil
+local announcedThisRound = false
 local hasTeleportedToGun = false
 local originalPositionBeforeGun = nil
 local currentCollectTarget = nil
 local lastCoinSearch = 0
 local wasAutoCollecting = false
-local lastCoinCollectTime = 0       -- cooldown entre moedas (anti-kick)
-local COIN_COLLECT_COOLDOWN = 0.7   -- segundos entre coletas
-local COIN_FLY_SPEED = 28           -- studs/s (seguro vs anticheat)
+local lastCoinCollectTime = 0  -- cooldown anti-kick
 
-local originalTrans = {}
+-- ==================== ESP v3 - SISTEMA DE DETECÇÃO DE ROLE ====================
+-- Mapa de highlights ativos: [player] = Highlight instance
+local ESPHighlights = {}
 
--- ============================================================
---  ESP v2 - SISTEMA COMPLETO REESCRITO
--- ============================================================
--- Papéis detectados em tempo real, mapeados por Player object.
--- Categorias: "Murderer" | "Sheriff" | "Hero" | "Innocent"
--- "Hero" = sobrevivente que pegou a arma dropada do Sheriff morto.
--- ============================================================
-
-local ESPRoles = {}          -- [player] = "Murderer"|"Sheriff"|"Hero"|"Innocent"
-local ESPHighlights = {}     -- [player] = Highlight instance
-
-local ESP_COLORS = {
-    Murderer = { fill = Color3.fromRGB(220,  30,  30), outline = Color3.fromRGB(255,   0,   0) },
-    Sheriff  = { fill = Color3.fromRGB(  0,  80, 220), outline = Color3.fromRGB(  0, 110, 255) },
-    Hero     = { fill = Color3.fromRGB(220, 180,   0), outline = Color3.fromRGB(255, 215,   0) },
-    Innocent = { fill = Color3.fromRGB(  0, 180,  60), outline = Color3.fromRGB(  0, 255,  80) },
+-- Cores exatas por role
+local ROLE_COLORS = {
+    Murderer  = Color3.fromRGB(220, 0,   0),    -- Vermelho
+    Sheriff   = Color3.fromRGB(0,   120, 255),  -- Azul
+    Hero      = Color3.fromRGB(255, 220, 0),    -- Amarelo (sobrevivente com arma dropada)
+    Innocent  = Color3.fromRGB(0,   200, 80),   -- Verde
 }
 
--- Retorna true se a tool parece uma faca (Murder)
-local function IsMurderTool(tool)
-    if not tool or not tool:IsA("Tool") then return false end
-    local n = tool.Name:lower()
-    return n:find("knife") or n:find("faca") or n:find("sword") or n:find("cutelo") or n:find("blade")
-end
-
--- Retorna true se a tool parece uma arma de fogo (Sheriff / Hero)
-local function IsGunTool(tool)
-    if not tool or not tool:IsA("Tool") then return false end
-    local n = tool.Name:lower()
-    return n:find("gun") or n:find("pistol") or n:find("revolver") or n:find("sheriff") or n:find("arma") or n:find("rifle")
-end
-
--- Detecta o papel real de um jogador neste momento
-local function DetectRoleNow(p)
+-- Detecta role via múltiplos métodos com prioridade hierárquica
+local function ESP_DetectRole(p)
     if not p or not p.Parent then return "Innocent" end
 
-    -- Verifica atributos nativos do MM2 primeiro (mais confiável para o início de round)
-    local nativeRole = p:GetAttribute("Role") or p:GetAttribute("role") or p:GetAttribute("Funcao") or p:GetAttribute("MM2Role")
-    if nativeRole then
-        local r = tostring(nativeRole):lower()
+    -- 1. Atributos nativos do MM2 (mais confiável, disponível ANTES de entregar armas)
+    local function checkAttr(target)
+        if not target then return nil end
+        local role = target:GetAttribute("Role") or target:GetAttribute("role")
+            or target:GetAttribute("Funcao") or target:GetAttribute("MMRole")
+            or target:GetAttribute("PlayerRole") or target:GetAttribute("gameRole")
+        if not role then return nil end
+        local r = tostring(role):lower()
         if r:find("murder") or r:find("assassin") then return "Murderer" end
         if r:find("sheriff") or r:find("xerife")   then return "Sheriff"  end
-        if r:find("hero")                           then return "Hero"     end
+        if r:find("hero")   or r:find("heroi")     then return "Hero"     end
+        return nil
     end
 
-    -- Verifica tools no character e backpack
-    local function scanContainer(container)
+    local attrRole = checkAttr(p) or checkAttr(p.Character)
+    if attrRole then return attrRole end
+
+    -- 2. IntValue/StringValue "Role" dentro do player (MM2 usa isso em versões antigas)
+    local roleVal = p:FindFirstChild("Role") or (p.Character and p.Character:FindFirstChild("Role"))
+    if roleVal then
+        local r = tostring(roleVal.Value):lower()
+        if r:find("murder") or r:find("assassin") then return "Murderer" end
+        if r:find("sheriff") or r:find("xerife")   then return "Sheriff"  end
+        if r:find("hero")   or r:find("heroi")     then return "Hero"     end
+    end
+
+    -- 3. Ferramentas no personagem / backpack (detecta Hero = sobrevivente com arma)
+    local function scanTools(container)
         if not container then return nil end
         for _, item in ipairs(container:GetChildren()) do
-            if IsMurderTool(item) then return "Murderer" end
-            if IsGunTool(item)    then
-                -- Se o atributo nativo diz que é Inocente mas tem arma → é Hero
-                if nativeRole and tostring(nativeRole):lower():find("innoc") then
+            if item:IsA("Tool") then
+                local n = item.Name:lower()
+                if n:find("knife") or n:find("faca") or n:find("sword") then
+                    return "Murderer"
+                elseif n:find("gun") or n:find("pistol") or n:find("revolver")
+                    or n:find("sheriff") or n:find("arma") then
+                    -- Se o dono não é o xerife oficial, é um Hero
+                    local official = checkAttr(p)
+                    if official == "Sheriff" then return "Sheriff" end
                     return "Hero"
                 end
-                return "Sheriff"
             end
         end
         return nil
     end
 
-    local roleChar = scanContainer(p.Character)
-    if roleChar then return roleChar end
-    local roleBP = scanContainer(p:FindFirstChild("Backpack"))
-    if roleBP then return roleBP end
+    local toolRole = scanTools(p.Character) or scanTools(p:FindFirstChild("Backpack"))
+    if toolRole then return toolRole end
 
     return "Innocent"
 end
 
--- Cria ou atualiza o Highlight de um jogador
-local function ESP_ApplyHighlight(p)
-    if not p or not p.Character then return end
-    local pChar = p.Character
+-- Cria ou atualiza o highlight de um jogador
+local function ESP_UpdatePlayer(p)
+    if not p or not p.Character then
+        -- Remove highlight se não há personagem
+        if ESPHighlights[p] then
+            pcall(function() ESPHighlights[p]:Destroy() end)
+            ESPHighlights[p] = nil
+        end
+        return
+    end
 
-    -- Cria highlight se não existir
-    local hl = ESPHighlights[p]
-    if not hl or not hl.Parent then
+    local char = p.Character
+    local role = ESP_DetectRole(p)
+    PlayerRoles[p] = role
+
+    local color = ROLE_COLORS[role] or ROLE_COLORS.Innocent
+
+    local hl = char:FindFirstChild("AkatESP")
+    if not hl then
         hl = Instance.new("Highlight")
-        hl.Name = "AkatESPHighlight"
+        hl.Name = "AkatESP"
+        hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
         hl.FillTransparency = 0.3
         hl.OutlineTransparency = 0
-        hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        hl.Parent = pChar
+        hl.Parent = char
         ESPHighlights[p] = hl
-    else
-        -- Reparenta se o personagem mudou
-        if hl.Parent ~= pChar then
-            hl.Parent = pChar
-        end
     end
 
-    local role = ESPRoles[p] or "Innocent"
-    local c = ESP_COLORS[role] or ESP_COLORS.Innocent
-    hl.FillColor    = c.fill
-    hl.OutlineColor = c.outline
+    hl.FillColor    = color
+    hl.OutlineColor = color
 end
 
--- Remove o Highlight de um jogador
-local function ESP_RemoveHighlight(p)
-    local hl = ESPHighlights[p]
-    if hl then
-        pcall(function() hl:Destroy() end)
+-- Remove todos os highlights
+local function ESP_ClearAll()
+    for p, hl in pairs(ESPHighlights) do
+        pcall(function() if hl and hl.Parent then hl:Destroy() end end)
+        ESPHighlights[p] = nil
+        PlayerRoles[p] = nil
+    end
+end
+
+-- Conexões de evento do ESP (reconecta a cada rodada)
+local espEventConnections = {}
+
+local function ESP_ConnectPlayer(p)
+    if p == player then return end
+
+    -- Atualiza quando o personagem for adicionado/trocado
+    local c1 = p.CharacterAdded:Connect(function(char)
+        task.wait(0.1)
+        ESP_UpdatePlayer(p)
+        -- Re-observa ferramentas dentro do novo personagem
+        char.ChildAdded:Connect(function() task.wait(0.05); ESP_UpdatePlayer(p) end)
+        char.ChildRemoved:Connect(function() task.wait(0.05); ESP_UpdatePlayer(p) end)
+    end)
+
+    -- Atualiza quando backpack muda (pegou arma, perdeu arma)
+    local bp = p:FindFirstChild("Backpack")
+    local c2 = bp and bp.ChildAdded:Connect(function() task.wait(0.05); ESP_UpdatePlayer(p) end)
+    local c3 = bp and bp.ChildRemoved:Connect(function() task.wait(0.05); ESP_UpdatePlayer(p) end)
+
+    -- Atualiza quando atributo de role muda
+    local c4 = p:GetAttributeChangedSignal("Role"):Connect(function() ESP_UpdatePlayer(p) end)
+    local c5 = p:GetAttributeChangedSignal("role"):Connect(function() ESP_UpdatePlayer(p) end)
+    local c6 = p:GetAttributeChangedSignal("MMRole"):Connect(function() ESP_UpdatePlayer(p) end)
+
+    espEventConnections[p] = { c1, c2, c3, c4, c5, c6 }
+
+    -- Primeira varredura imediata
+    ESP_UpdatePlayer(p)
+end
+
+local function ESP_DisconnectPlayer(p)
+    if espEventConnections[p] then
+        for _, c in ipairs(espEventConnections[p]) do
+            if c then pcall(function() c:Disconnect() end) end
+        end
+        espEventConnections[p] = nil
+    end
+    if ESPHighlights[p] then
+        pcall(function() ESPHighlights[p]:Destroy() end)
         ESPHighlights[p] = nil
     end
+    PlayerRoles[p] = nil
 end
 
--- Remove todos os highlights (quando ESP desliga)
-local function ESP_ClearAll()
-    for p, _ in pairs(ESPHighlights) do
-        ESP_RemoveHighlight(p)
+-- Inicia/desliga o ESP
+local function ESP_Enable()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= player then ESP_ConnectPlayer(p) end
     end
-    ESPHighlights = {}
-end
-
--- Thread dedicada ao ESP: roda a 10 Hz para não custar FPS
-local espThread = nil
-local function ESP_StartThread()
-    if espThread then return end
-    espThread = task.spawn(function()
-        while true do
-            task.wait(0.1)
-            if not Configs.ESP then
-                ESP_ClearAll()
-                -- Fica em idle até reativar
-                repeat task.wait(0.2) until Configs.ESP
-            end
-
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= player then
-                    -- Atualiza papel em tempo real
-                    local newRole = DetectRoleNow(p)
-                    ESPRoles[p] = newRole
-
-                    if p.Character and p.Character:FindFirstChildOfClass("Humanoid") then
-                        local hum = p.Character:FindFirstChildOfClass("Humanoid")
-                        if hum.Health > 0 then
-                            ESP_ApplyHighlight(p)
-                        else
-                            -- Morreu: remove highlight
-                            ESP_RemoveHighlight(p)
-                        end
-                    else
-                        ESP_RemoveHighlight(p)
-                    end
-                end
-            end
-
-            -- Limpa highlights de jogadores que saíram
-            for p, _ in pairs(ESPHighlights) do
-                if not p.Parent or not Players:FindFirstChild(p.Name) then
-                    ESP_RemoveHighlight(p)
-                    ESPRoles[p] = nil
-                end
-            end
-        end
+    Players.PlayerAdded:Connect(function(p)
+        if Configs.ESP then ESP_ConnectPlayer(p) end
+    end)
+    Players.PlayerRemoving:Connect(function(p)
+        ESP_DisconnectPlayer(p)
     end)
 end
 
--- Reconecta highlights quando personagem é carregado / regenerado
-Players.PlayerAdded:Connect(function(p)
-    p.CharacterAdded:Connect(function()
-        task.wait(0.5)
-        if Configs.ESP then
-            ESPRoles[p] = DetectRoleNow(p)
-            ESP_ApplyHighlight(p)
-        end
-    end)
-end)
-for _, p in ipairs(Players:GetPlayers()) do
-    if p ~= player then
-        p.CharacterAdded:Connect(function()
-            task.wait(0.5)
-            if Configs.ESP then
-                ESPRoles[p] = DetectRoleNow(p)
-                ESP_ApplyHighlight(p)
+local function ESP_Disable()
+    for _, p in ipairs(Players:GetPlayers()) do
+        ESP_DisconnectPlayer(p)
+    end
+    ESP_ClearAll()
+end
+
+-- ==================== AUTO SHOOT v3 ====================
+-- Estado do Auto Shoot
+local AS = {
+    lastShot    = 0,
+    cooldown    = 0.22,   -- segundos entre tiros
+    maxRange    = 300,    -- distância máxima de mira
+    active      = false,
+}
+
+-- Retorna true se o player local tem uma arma equipada (Sheriff ou Hero)
+local function AS_HasGun()
+    local char = player.Character
+    if not char then return false, nil end
+    for _, item in ipairs(char:GetChildren()) do
+        if item:IsA("Tool") then
+            local n = item.Name:lower()
+            if n:find("gun") or n:find("pistol") or n:find("revolver") or n:find("sheriff") then
+                return true, item
             end
+        end
+    end
+    -- Verifica backpack também (não equipada ainda)
+    return false, nil
+end
+
+-- Retorna o Murderer mais próximo com vida
+local function AS_GetMurderer()
+    local myChar = player.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return nil, nil end
+
+    local bestTarget, bestDist = nil, AS.maxRange
+
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= player and PlayerRoles[p] == "Murderer" then
+            local pChar = p.Character
+            local pRoot = pChar and pChar:FindFirstChild("HumanoidRootPart")
+            local pHum  = pChar and pChar:FindFirstChildOfClass("Humanoid")
+            if pRoot and pHum and pHum.Health > 0 then
+                local dist = (myRoot.Position - pRoot.Position).Magnitude
+                if dist < bestDist then
+                    bestDist   = dist
+                    bestTarget = p
+                end
+            end
+        end
+    end
+    return bestTarget, bestDist
+end
+
+-- Loop principal do Auto Shoot (chamado a cada RenderStepped)
+local function AS_Tick()
+    if not Configs.AutoShoot then return end
+
+    local hasGun, gunTool = AS_HasGun()
+    if not hasGun or not gunTool then return end
+
+    local murderer, dist = AS_GetMurderer()
+    if not murderer then return end
+
+    local pChar = murderer.Character
+    local head  = pChar and (pChar:FindFirstChild("Head") or pChar:FindFirstChild("HumanoidRootPart"))
+    if not head then return end
+
+    local myChar = player.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return end
+
+    -- Mira suave na cabeça do murder
+    local targetPos = head.Position
+    local lookDir   = (targetPos - Camera.CFrame.Position)
+
+    -- Rotaciona personagem para o alvo (eixo horizontal apenas, sem inclinar)
+    myRoot.CFrame = CFrame.new(myRoot.Position, Vector3.new(targetPos.X, myRoot.Position.Y, targetPos.Z))
+
+    -- Rotaciona câmera para a cabeça (mira precisa)
+    Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPos)
+
+    -- Dispara com cooldown
+    local now = os.clock()
+    if now - AS.lastShot >= AS.cooldown then
+        AS.lastShot = now
+        pcall(function()
+            gunTool:Activate()
         end)
     end
 end
 
--- Inicia a thread do ESP no carregamento
-ESP_StartThread()
-
--- ============================================================
---  AUTO SHOOT v2 - SISTEMA COMPLETO REESCRITO
--- ============================================================
--- Detecta arma no char/backpack, mira no head do Murderer,
--- dispara via RemoteEvent nativo do MM2 para máxima compatibilidade.
--- Funciona no Delta Mobile e PC.
--- ============================================================
-
-local lastShootTime     = 0
-local SHOOT_COOLDOWN    = 0.22   -- segundos entre tiros (evita flood)
-local SHOOT_MAX_DIST    = 300    -- studs — distância máxima de engajamento
-
--- Verifica se o jogador local tem a arma equipada (character ou backpack)
-local function LocalHasGun()
-    local char = player.Character
-    if char then
-        for _, t in ipairs(char:GetChildren()) do
-            if IsGunTool(t) then return t end
-        end
-    end
-    local bp = player:FindFirstChild("Backpack")
-    if bp then
-        for _, t in ipairs(bp:GetChildren()) do
-            if IsGunTool(t) then return t end
-        end
-    end
-    return nil
-end
-
--- Obtém o Murderer mais próximo com vida
-local function GetClosestMurderer()
-    local myRoot = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-    if not myRoot then return nil, math.huge end
-
-    local best, bestDist = nil, math.huge
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= player and p.Character then
-            local hum  = p.Character:FindFirstChildOfClass("Humanoid")
-            local root = p.Character:FindFirstChild("HumanoidRootPart")
-            -- Considera Murderer pela detecção em tempo real do ESP
-            if hum and root and hum.Health > 0 and DetectRoleNow(p) == "Murderer" then
-                local dist = (myRoot.Position - root.Position).Magnitude
-                if dist < bestDist then
-                    bestDist = dist
-                    best = p
-                end
-            end
-        end
-    end
-    return best, bestDist
-end
-
--- Dispara a arma via Activate (compatível com Delta Mobile e PC)
--- Equipa a tool no character antes se necessário
-local function AutoShoot_Fire(gunTool, targetChar)
-    if not gunTool or not targetChar then return end
-
-    local targetHead = targetChar:FindFirstChild("Head")
-    local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
-    local aimPart    = targetHead or targetRoot
-    if not aimPart then return end
-
-    local myRoot = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-    if not myRoot then return end
-
-    -- Rotaciona o personagem e câmera em direção ao alvo
-    local targetPos = aimPart.Position
-    local lookAt    = Vector3.new(targetPos.X, myRoot.Position.Y, targetPos.Z)
-    myRoot.CFrame   = CFrame.new(myRoot.Position, lookAt)
-
-    -- CFrame da câmera apontando para a cabeça (mobile não precisa de clique)
-    Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPos)
-
-    -- Equipa a tool se ainda está na backpack
-    if gunTool.Parent ~= player.Character then
-        player.Character.Humanoid:EquipTool(gunTool)
-        task.wait(0.05)
-    end
-
-    -- Tenta disparar pelos caminhos disponíveis:
-    -- 1) Activate nativo
-    -- 2) FireServer via RemoteEvent interno da tool (MM2 usa "Shoot" ou "Fire")
-    local fired = false
-
-    -- Caminho 1: Activate
-    local okActivate = pcall(function() gunTool:Activate() end)
-    if okActivate then fired = true end
-
-    -- Caminho 2: RemoteEvent interno (fallback mobile)
-    if not fired then
-        for _, v in ipairs(gunTool:GetDescendants()) do
-            if v:IsA("RemoteEvent") then
-                local n = v.Name:lower()
-                if n:find("shoot") or n:find("fire") or n:find("shot") then
-                    pcall(function() v:FireServer(targetPos) end)
-                    fired = true
-                    break
-                end
-            end
-        end
-    end
-end
-
--- Thread do AutoShoot (RenderStepped para responsividade)
-local autoShootConnection = nil
-local function AutoShoot_Start()
-    if autoShootConnection then return end
-    autoShootConnection = RunService.RenderStepped:Connect(function()
-        if not Configs.AutoShoot then return end
-
-        local gunTool = LocalHasGun()
-        if not gunTool then return end
-
-        local murderer, dist = GetClosestMurderer()
-        if not murderer or dist > SHOOT_MAX_DIST then return end
-
-        local now = os.clock()
-        if now - lastShootTime < SHOOT_COOLDOWN then return end
-
-        lastShootTime = now
-        task.spawn(AutoShoot_Fire, gunTool, murderer.Character)
-    end)
-end
-AutoShoot_Start()
-
--- ============================================================
--- Detecção de papel para ChatRoles (usa o novo sistema)
--- ============================================================
-local PlayerRoles = ESPRoles   -- alias: ambos apontam para a mesma tabela
-
-local announcedThisRound = false
-
--- ==================== 3. CRIAÇÃO DA INTERFACE (UI) ====================
-
+-- ==================== 3. CRIAÇÃO DE TODA A ESTRUTURA DE INTERFACE (UI) ====================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "DeltaAkatUniversalUI"
 screenGui.ResetOnSpawn = false
@@ -578,8 +435,8 @@ local uiParent = player:FindFirstChild("PlayerGui")
 if gethui then
     uiParent = gethui()
 else
-    local successCore, coreGui = pcall(function() return game:GetService("CoreGui") end)
-    if successCore and coreGui then uiParent = coreGui end
+    local ok, cg = pcall(function() return game:GetService("CoreGui") end)
+    if ok and cg then uiParent = cg end
 end
 
 if uiParent:FindFirstChild("DeltaAkatUniversalUI") then
@@ -587,7 +444,7 @@ if uiParent:FindFirstChild("DeltaAkatUniversalUI") then
 end
 screenGui.Parent = uiParent
 
--- Botão Flutuante (AKAT) - NA ESQUERDA
+-- Botão Flutuante
 local FloatBtn = Instance.new("ImageButton", screenGui)
 FloatBtn.Name = "FloatBtn"
 FloatBtn.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -604,13 +461,13 @@ floatCorner.CornerRadius = UDim.new(0, 8)
 
 local FloatStroke = Instance.new("UIStroke", FloatBtn)
 FloatStroke.Thickness = 1
-FloatStroke.Color = Color3.fromRGB(255, 255, 255)
+FloatStroke.Color = Color3.fromRGB(139, 0, 0)
 
 local StrokeGradient = Instance.new("UIGradient", FloatStroke)
 StrokeGradient.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0,   Color3.fromHex("#8B0000")),
+    ColorSequenceKeypoint.new(0, Color3.fromHex("#8B0000")),
     ColorSequenceKeypoint.new(0.5, Color3.fromRGB(15, 15, 15)),
-    ColorSequenceKeypoint.new(1,   Color3.fromHex("#8B0000"))
+    ColorSequenceKeypoint.new(1, Color3.fromHex("#8B0000"))
 })
 
 task.spawn(function()
@@ -654,9 +511,7 @@ mainFrame.BackgroundColor3 = Color3.fromHex("#0A0A0A")
 mainFrame.BorderSizePixel = 0
 mainFrame.ClipsDescendants = true
 mainFrame.ZIndex = 5
-local mainCorner = Instance.new("UICorner", mainFrame)
-mainCorner.CornerRadius = UDim.new(0, 9)
-
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 9)
 local frameStroke = Instance.new("UIStroke", mainFrame)
 frameStroke.Color = Color3.fromHex("#161616")
 frameStroke.Thickness = 1
@@ -686,14 +541,14 @@ subtitle.Name = "Subtitle"
 subtitle.Size = UDim2.new(0, 200, 0, 14)
 subtitle.Position = UDim2.new(0, 16, 0, 28)
 subtitle.BackgroundTransparency = 1
-subtitle.Text = "MM2 SCRIPT [BETA v2.5]"
+subtitle.Text = "MM2 SCRIPT [BETA v3.0]"
 subtitle.TextColor3 = Color3.fromHex("#555555")
 subtitle.TextSize = 10
 subtitle.Font = Enum.Font.Gotham
 subtitle.TextXAlignment = Enum.TextXAlignment.Left
 subtitle.ZIndex = 6
 
--- Barra de Pesquisa Animada
+-- Barra de Pesquisa
 local searchBarFrame = Instance.new("Frame", topBar)
 searchBarFrame.Name = "SearchBarFrame"
 searchBarFrame.AnchorPoint = Vector2.new(1, 0.5)
@@ -702,9 +557,7 @@ searchBarFrame.Size = UDim2.new(0, 0, 0, 26)
 searchBarFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 searchBarFrame.ClipsDescendants = true
 searchBarFrame.ZIndex = 7
-
-local searchCorner = Instance.new("UICorner", searchBarFrame)
-searchCorner.CornerRadius = UDim.new(0, 13)
+Instance.new("UICorner", searchBarFrame).CornerRadius = UDim.new(0, 13)
 local searchStroke = Instance.new("UIStroke", searchBarFrame)
 searchStroke.Color = Color3.fromHex("#1F1F1F")
 searchStroke.Thickness = 1
@@ -714,7 +567,7 @@ searchTextBox.Name = "SearchTextBox"
 searchTextBox.Size = UDim2.new(1, -20, 1, 0)
 searchTextBox.Position = UDim2.new(0, 12, 0, 0)
 searchTextBox.BackgroundTransparency = 1
-searchTextBox.PlaceholderText = "Pesquisar..."
+searchTextBox.PlaceholderText = "Search..."
 searchTextBox.PlaceholderColor3 = Color3.fromRGB(100, 100, 100)
 searchTextBox.Text = ""
 searchTextBox.TextColor3 = Color3.fromRGB(230, 230, 230)
@@ -723,7 +576,7 @@ searchTextBox.TextSize = 11
 searchTextBox.TextXAlignment = Enum.TextXAlignment.Left
 searchTextBox.ZIndex = 8
 
--- Botões superiores
+-- Botões Superiores
 local topButtons = Instance.new("Frame", topBar)
 topButtons.Size = UDim2.new(0, 128, 0, 26)
 topButtons.Position = UDim2.new(1, -144, 0.5, -13)
@@ -847,9 +700,7 @@ SidebarFrame.Position = UDim2.new(0, 0, 0, 53)
 SidebarFrame.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
 SidebarFrame.BorderSizePixel = 0
 SidebarFrame.ZIndex = 6
-
-local SidebarCorner = Instance.new("UICorner", SidebarFrame)
-SidebarCorner.CornerRadius = UDim.new(0, 9)
+Instance.new("UICorner", SidebarFrame).CornerRadius = UDim.new(0, 9)
 
 local SidebarSeparator = Instance.new("Frame", SidebarFrame)
 SidebarSeparator.Size = UDim2.new(0, 1, 1, 0)
@@ -893,9 +744,7 @@ UserProfileFrame.Position = UDim2.new(0, 8, 1, -58)
 UserProfileFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 UserProfileFrame.BorderSizePixel = 0
 UserProfileFrame.ZIndex = 7
-
-local ProfileCorner = Instance.new("UICorner", UserProfileFrame)
-ProfileCorner.CornerRadius = UDim.new(0, 6)
+Instance.new("UICorner", UserProfileFrame).CornerRadius = UDim.new(0, 6)
 local ProfileBorder = Instance.new("UIStroke", UserProfileFrame)
 ProfileBorder.Color = Color3.fromRGB(24, 24, 24)
 ProfileBorder.Thickness = 1
@@ -968,7 +817,7 @@ local confirmLabel = Instance.new("TextLabel", confirmFrame)
 confirmLabel.Size = UDim2.new(1, 0, 0, 30)
 confirmLabel.Position = UDim2.new(0, 0, 0.35, -10)
 confirmLabel.BackgroundTransparency = 1
-confirmLabel.Text = "Deseja fechar o script?"
+confirmLabel.Text = "Do you want to close the script?"
 confirmLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
 confirmLabel.Font = Enum.Font.GothamBold
 confirmLabel.TextSize = 14
@@ -978,7 +827,7 @@ local btnYes = Instance.new("TextButton", confirmFrame)
 btnYes.Size = UDim2.new(0, 110, 0, 34)
 btnYes.Position = UDim2.new(0.5, -115, 0.55, 0)
 btnYes.BackgroundColor3 = Color3.fromHex("#8B0000")
-btnYes.Text = "Confirmar"
+btnYes.Text = "Confirm"
 btnYes.TextColor3 = Color3.fromRGB(255, 255, 255)
 btnYes.Font = Enum.Font.GothamMedium
 btnYes.TextSize = 12
@@ -989,12 +838,13 @@ local btnNo = Instance.new("TextButton", confirmFrame)
 btnNo.Size = UDim2.new(0, 110, 0, 34)
 btnNo.Position = UDim2.new(0.5, 5, 0.55, 0)
 btnNo.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
-btnNo.Text = "Cancelar"
+btnNo.Text = "Cancel"
 btnNo.TextColor3 = Color3.fromRGB(180, 180, 180)
 btnNo.Font = Enum.Font.GothamMedium
 btnNo.TextSize = 12
 btnNo.ZIndex = 51
 Instance.new("UICorner", btnNo).CornerRadius = UDim.new(0, 6)
+
 
 -- ==================== 4. FUNÇÕES DE SUPORTE ====================
 
@@ -1024,26 +874,25 @@ local function AplicarFadeSincronizado(raiz, fadeOut, duracao)
         RegistrarTransparencias(obj)
         local orig = originalTrans[obj]
         if not orig then return end
-
         if orig.BackgroundTransparency then
-            local target = fadeOut and 1 or orig.BackgroundTransparency
-            if duracao == 0 then obj.BackgroundTransparency = target else TweenService:Create(obj, info, {BackgroundTransparency = target}):Play() end
+            local t = fadeOut and 1 or orig.BackgroundTransparency
+            if duracao == 0 then obj.BackgroundTransparency = t else TweenService:Create(obj, info, {BackgroundTransparency = t}):Play() end
         end
         if orig.TextTransparency then
-            local target = fadeOut and 1 or orig.TextTransparency
-            if duracao == 0 then obj.TextTransparency = target else TweenService:Create(obj, info, {TextTransparency = target}):Play() end
+            local t = fadeOut and 1 or orig.TextTransparency
+            if duracao == 0 then obj.TextTransparency = t else TweenService:Create(obj, info, {TextTransparency = t}):Play() end
         end
         if orig.TextStrokeTransparency then
-            local target = fadeOut and 1 or orig.TextStrokeTransparency
-            if duracao == 0 then obj.TextStrokeTransparency = target else TweenService:Create(obj, info, {TextStrokeTransparency = target}):Play() end
+            local t = fadeOut and 1 or orig.TextStrokeTransparency
+            if duracao == 0 then obj.TextStrokeTransparency = t else TweenService:Create(obj, info, {TextStrokeTransparency = t}):Play() end
         end
         if orig.ImageTransparency then
-            local target = fadeOut and 1 or (obj.Name == "Shadow3D" and 0.5 or orig.ImageTransparency)
-            if duracao == 0 then obj.ImageTransparency = target else TweenService:Create(obj, info, {ImageTransparency = target}):Play() end
+            local t = fadeOut and 1 or (obj.Name == "Shadow3D" and 0.5 or orig.ImageTransparency)
+            if duracao == 0 then obj.ImageTransparency = t else TweenService:Create(obj, info, {ImageTransparency = t}):Play() end
         end
         if orig.Transparency then
-            local target = fadeOut and 1 or orig.Transparency
-            if duracao == 0 then obj.Transparency = target else TweenService:Create(obj, info, {Transparency = target}):Play() end
+            local t = fadeOut and 1 or orig.Transparency
+            if duracao == 0 then obj.Transparency = t else TweenService:Create(obj, info, {Transparency = t}):Play() end
         end
     end
     tratarObjeto(raiz)
@@ -1052,29 +901,25 @@ end
 
 local function AplicarFadeIdioma(fadeOut, duracao)
     local info = TweenInfo.new(duracao, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-
     for _, btn in pairs(tabButtons) do
         local label = btn:FindFirstChild("Label")
         if label then
             RegistrarTransparencias(label)
             local orig = originalTrans[label]
-            local target = fadeOut and 1 or (orig and orig.TextTransparency or 0)
-            TweenService:Create(label, info, {TextTransparency = target}):Play()
+            local t = fadeOut and 1 or (orig and orig.TextTransparency or 0)
+            TweenService:Create(label, info, {TextTransparency = t}):Play()
         end
     end
-
     for _, child in ipairs(togglesContainer:GetDescendants()) do
         if child:IsA("TextLabel") then
             RegistrarTransparencias(child)
             local orig = originalTrans[child]
-            local target = fadeOut and 1 or (orig and orig.TextTransparency or 0)
-            TweenService:Create(child, info, {TextTransparency = target}):Play()
+            local t = fadeOut and 1 or (orig and orig.TextTransparency or 0)
+            TweenService:Create(child, info, {TextTransparency = t}):Play()
         end
     end
-
     RegistrarTransparencias(searchTextBox)
-    local targetST = fadeOut and 1 or 0
-    TweenService:Create(searchTextBox, info, {TextTransparency = targetST}):Play()
+    TweenService:Create(searchTextBox, info, {TextTransparency = fadeOut and 1 or 0}):Play()
 end
 
 local function CriarIconeProcedural(parent, tabName)
@@ -1084,14 +929,12 @@ local function CriarIconeProcedural(parent, tabName)
     iconContainer.Position = UDim2.new(0, 12, 0.5, -8)
     iconContainer.BackgroundTransparency = 1
     iconContainer.ZIndex = 9
-
     local imageLabel = Instance.new("ImageLabel", iconContainer)
     imageLabel.Name = "AccentImage"
     imageLabel.Size = UDim2.new(1, 0, 1, 0)
     imageLabel.BackgroundTransparency = 1
     imageLabel.ZIndex = 10
     imageLabel.ImageColor3 = Color3.fromRGB(180, 180, 180)
-
     if tabName == "Movement" then
         imageLabel.Image = "rbxthumb://type=Asset&id=116118153718196&w=150&h=150"
     elseif tabName == "Teleports" then
@@ -1121,16 +964,11 @@ end
 local function AtualizarIdioma()
     local langData = Locales[currentLanguage]
     if not langData then return end
-
     searchTextBox.PlaceholderText = langData.SearchPlaceholder
-
     for tabName, btn in pairs(tabButtons) do
         local label = btn:FindFirstChild("Label")
-        if label then
-            label.Text = langData.Tabs[tabName] or tabName
-        end
+        if label then label.Text = langData.Tabs[tabName] or tabName end
     end
-
     for _, child in ipairs(togglesContainer:GetChildren()) do
         if child:IsA("Frame") and child.Name ~= "UIListLayout" and child.Name ~= "UIPadding" then
             local configKey = child:GetAttribute("ConfigKey")
@@ -1142,7 +980,6 @@ local function AtualizarIdioma()
             end
         end
     end
-
     confirmLabel.Text = langData.ConfirmCloseTitle
     btnYes.Text = langData.ConfirmBtn
     btnNo.Text  = langData.CancelBtn
@@ -1151,31 +988,25 @@ end
 local function filterToggles(currentActiveTab, query)
     local searchQuery = (query or ""):lower()
     local itemIndex = 0
-
     for _, child in ipairs(togglesContainer:GetChildren()) do
         if child:IsA("Frame") and child.Name ~= "UIListLayout" and child.Name ~= "UIPadding" then
             local itemTab = child:GetAttribute("Tab") or "Combat"
             local shouldBeVisible = false
-
             if searchQuery ~= "" then
                 local titleLabel = child:FindFirstChild("Title")
                 shouldBeVisible = titleLabel and titleLabel.Text:lower():find(searchQuery) ~= nil
             else
                 shouldBeVisible = (itemTab == currentActiveTab)
             end
-
             child.Visible = shouldBeVisible
-
             if shouldBeVisible then
                 itemIndex = itemIndex + 1
                 child.Size = UDim2.new(1, -8, 0, 0)
                 child.BackgroundTransparency = 1
-
                 local t = child:FindFirstChild("Title")
                 local d = child:FindFirstChild("Description")
                 if t then t.TextTransparency = 1 end
                 if d then d.TextTransparency = 1 end
-
                 task.delay((itemIndex - 1) * 0.03, function()
                     TweenService:Create(child, TweenInfo.new(0.25, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {
                         Size = UDim2.new(1, -8, 0, 56),
@@ -1192,7 +1023,6 @@ end
 local function selectTab(tabName)
     activeTab = tabName
     local animSpeed = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-
     for name, btn in pairs(tabButtons) do
         local label = btn:FindFirstChild("Label")
         local iconContainer = btn:FindFirstChild("Icon")
@@ -1206,7 +1036,6 @@ local function selectTab(tabName)
             RecolorirIcone(iconContainer, Color3.fromRGB(180, 180, 180), animSpeed)
         end
     end
-
     togglesContainer.CanvasPosition = Vector2.new(0, 0)
     searchTextBox.Text = ""
     filterToggles(tabName, "")
@@ -1220,12 +1049,8 @@ local function createTabBtn(tabName)
     tabBtn.Text = ""
     tabBtn.ZIndex = 8
     tabBtn.AutoButtonColor = false
-
-    local corner = Instance.new("UICorner", tabBtn)
-    corner.CornerRadius = UDim.new(0, 5)
-
+    Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 5)
     CriarIconeProcedural(tabBtn, tabName)
-
     local tabLabel = Instance.new("TextLabel", tabBtn)
     tabLabel.Name = "Label"
     tabLabel.Size = UDim2.new(1, -44, 1, 0)
@@ -1237,21 +1062,13 @@ local function createTabBtn(tabName)
     tabLabel.TextSize = 11
     tabLabel.TextXAlignment = Enum.TextXAlignment.Left
     tabLabel.ZIndex = 9
-
     tabBtn.MouseButton1Down:Connect(function()
-        TweenService:Create(tabBtn, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            Size = UDim2.new(1, -24, 0, 30)
-        }):Play()
+        TweenService:Create(tabBtn, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, -24, 0, 30)}):Play()
     end)
-
     local function restaurarTamanho()
-        TweenService:Create(tabBtn, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-            Size = UDim2.new(1, -16, 0, 32)
-        }):Play()
+        TweenService:Create(tabBtn, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(1, -16, 0, 32)}):Play()
     end
-
     tabBtn.MouseButton1Up:Connect(restaurarTamanho)
-
     tabBtn.MouseLeave:Connect(function()
         restaurarTamanho()
         if activeTab ~= tabName then
@@ -1260,7 +1077,6 @@ local function createTabBtn(tabName)
             RecolorirIcone(tabBtn:FindFirstChild("Icon"), Color3.fromRGB(180, 180, 180), TweenInfo.new(0.15, Enum.EasingStyle.Quad))
         end
     end)
-
     tabBtn.MouseEnter:Connect(function()
         if activeTab ~= tabName then
             TweenService:Create(tabBtn, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundColor3 = Color3.fromRGB(22, 22, 22)}):Play()
@@ -1268,20 +1084,22 @@ local function createTabBtn(tabName)
             RecolorirIcone(tabBtn:FindFirstChild("Icon"), Color3.fromRGB(220, 220, 220), TweenInfo.new(0.15, Enum.EasingStyle.Quad))
         end
     end)
-
-    tabBtn.MouseButton1Click:Connect(function()
-        selectTab(tabName)
-    end)
-
+    tabBtn.MouseButton1Click:Connect(function() selectTab(tabName) end)
     tabButtons[tabName] = tabBtn
 end
 
 local ConfigCallbacks = {
+    ESP = function(enabled)
+        if enabled then
+            ESP_Enable()
+        else
+            ESP_Disable()
+        end
+    end,
     SafeSpot = function(enabled)
         local char = player.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
         if not root then return end
-
         if enabled then
             lastPositionBeforeSafeSpot = root.CFrame
             if not safePlatform or not safePlatform.Parent then
@@ -1297,21 +1115,15 @@ local ConfigCallbacks = {
             end
             root.CFrame = safePlatform.CFrame * CFrame.new(0, 3, 0)
         else
-            if safePlatform then
-                safePlatform:Destroy()
-                safePlatform = nil
-            end
+            if safePlatform then safePlatform:Destroy(); safePlatform = nil end
             if lastPositionBeforeSafeSpot then
                 root.CFrame = lastPositionBeforeSafeSpot
                 lastPositionBeforeSafeSpot = nil
             end
         end
     end,
-
     AutoCollect = function(enabled)
-        if not enabled then
-            currentCollectTarget = nil
-        end
+        if not enabled then currentCollectTarget = nil end
     end
 }
 
@@ -1324,12 +1136,10 @@ local function createToggle(parent, configKey, tabCategory)
     toggleFrame:SetAttribute("Tab", tabCategory)
     toggleFrame:SetAttribute("ConfigKey", configKey)
     toggleFrame.Parent = parent
-
     Instance.new("UICorner", toggleFrame).CornerRadius = UDim.new(0, 6)
     local stroke = Instance.new("UIStroke", toggleFrame)
     stroke.Color = Color3.fromHex("#141414")
     stroke.Thickness = 1
-
     local titleLabel = Instance.new("TextLabel", toggleFrame)
     titleLabel.Name = "Title"
     titleLabel.Size = UDim2.new(0.65, 0, 0, 16)
@@ -1340,7 +1150,6 @@ local function createToggle(parent, configKey, tabCategory)
     titleLabel.TextSize = 11
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     titleLabel.ZIndex = 6
-
     local descLabel = Instance.new("TextLabel", toggleFrame)
     descLabel.Name = "Description"
     descLabel.Size = UDim2.new(0.65, 0, 0, 28)
@@ -1353,69 +1162,53 @@ local function createToggle(parent, configKey, tabCategory)
     descLabel.TextYAlignment = Enum.TextYAlignment.Top
     descLabel.TextWrapped = true
     descLabel.ZIndex = 6
-
     local switchTrack = Instance.new("Frame", toggleFrame)
     switchTrack.Size = UDim2.new(0, 40, 0, 20)
     switchTrack.Position = UDim2.new(1, -52, 0.5, -10)
     switchTrack.BackgroundColor3 = Configs[configKey] and Color3.fromHex("#8B0000") or Color3.fromRGB(30, 30, 30)
     switchTrack.ZIndex = 6
     Instance.new("UICorner", switchTrack).CornerRadius = UDim.new(1, 0)
-
     local trackStroke = Instance.new("UIStroke", switchTrack)
     trackStroke.Color = Color3.fromRGB(45, 45, 45)
     trackStroke.Thickness = 1
-
     local switchCircle = Instance.new("Frame", switchTrack)
     switchCircle.Size = UDim2.new(0, 14, 0, 14)
     switchCircle.Position = Configs[configKey] and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
     switchCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     switchCircle.ZIndex = 7
     Instance.new("UICorner", switchCircle).CornerRadius = UDim.new(1, 0)
-
     local triggerBtn = Instance.new("TextButton", toggleFrame)
     triggerBtn.Size = UDim2.new(1, 0, 1, 0)
     triggerBtn.BackgroundTransparency = 1
     triggerBtn.Text = ""
     triggerBtn.ZIndex = 8
-
     triggerBtn.MouseButton1Click:Connect(function()
         Configs[configKey] = not Configs[configKey]
         local targetPos   = Configs[configKey] and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
         local targetColor = Configs[configKey] and Color3.fromHex("#8B0000") or Color3.fromRGB(30, 30, 30)
-
-        local toggleAnim = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-        TweenService:Create(switchCircle, toggleAnim, {Position = targetPos}):Play()
-        TweenService:Create(switchTrack, toggleAnim, {BackgroundColor3 = targetColor}):Play()
-
-        if ConfigCallbacks[configKey] then
-            task.spawn(ConfigCallbacks[configKey], Configs[configKey])
-        end
+        local anim = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        TweenService:Create(switchCircle, anim, {Position = targetPos}):Play()
+        TweenService:Create(switchTrack, anim, {BackgroundColor3 = targetColor}):Play()
+        if ConfigCallbacks[configKey] then task.spawn(ConfigCallbacks[configKey], Configs[configKey]) end
     end)
 end
 
 local function LimparEDesligarAbsolutamente()
-    if hbConnection then hbConnection:Disconnect() hbConnection = nil end
-    if autoShootConnection then autoShootConnection:Disconnect() autoShootConnection = nil end
-
+    if hbConnection then hbConnection:Disconnect(); hbConnection = nil end
+    if renderConnection then renderConnection:Disconnect(); renderConnection = nil end
     for k in pairs(Configs) do Configs[k] = false end
-
-    ESP_ClearAll()
-
-    if safePlatform then pcall(function() safePlatform:Destroy() end) safePlatform = nil end
-
+    ESP_Disable()
+    if safePlatform then pcall(function() safePlatform:Destroy() end); safePlatform = nil end
     pcall(function()
         local char = player.Character
-        local hum  = char and char:FindFirstChildOfClass("Humanoid")
-        if hum then
-            hum.WalkSpeed = 16
-            hum.PlatformStand = false
-        end
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if hum then hum.WalkSpeed = 16; hum.PlatformStand = false end
         if char then
             for _, item in ipairs(char:GetChildren()) do
                 if item:IsA("Tool") then
                     local handle = item:FindFirstChild("Handle")
-                    local reachPart = handle and handle:FindFirstChild("AkatReachPart")
-                    if reachPart then reachPart:Destroy() end
+                    local rp = handle and handle:FindFirstChild("AkatReachPart")
+                    if rp then rp:Destroy() end
                 end
             end
         end
@@ -1425,7 +1218,6 @@ end
 local function AlternarConfirmacao(exibir)
     isConfirmOpen = exibir
     local tempoAnim = 0.15
-
     if exibir then
         if not confirmBlur then
             confirmBlur = Instance.new("BlurEffect")
@@ -1440,7 +1232,6 @@ local function AlternarConfirmacao(exibir)
     else
         AplicarFadeSincronizado(confirmFrame, true, tempoAnim)
         if confirmBlur then TweenService:Create(confirmBlur, TweenInfo.new(tempoAnim, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = 0}):Play() end
-
         if wasMinimizedBeforeConfirm then
             AplicarFadeSincronizado(SidebarFrame, true, 0.15)
             AplicarFadeSincronizado(togglesContainer, true, 0.15)
@@ -1454,11 +1245,10 @@ local function AlternarConfirmacao(exibir)
                 end
             end)
         end
-
         task.delay(tempoAnim, function()
             if not isConfirmOpen then
                 confirmFrame.Visible = false
-                if confirmBlur then confirmBlur:Destroy() confirmBlur = nil end
+                if confirmBlur then confirmBlur:Destroy(); confirmBlur = nil end
             end
         end)
     end
@@ -1468,7 +1258,6 @@ local function executarMinimizacao()
     if isConfirmOpen then return end
     isMinimized = not isMinimized
     local windowAnim = TweenInfo.new(0.16, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-
     if isMinimized then
         AplicarFadeSincronizado(SidebarFrame, true, 0.1)
         AplicarFadeSincronizado(togglesContainer, true, 0.1)
@@ -1497,17 +1286,14 @@ local function alternarVisibilidadeMenu()
     menuAberto = not menuAberto
     local tempoAnim = 0.12
     local windowAnim = TweenInfo.new(tempoAnim, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-
     if menuAberto then
         mainWrapper.Visible = true
         togglesContainer.Visible = false
         SidebarFrame.Visible = false
         div.Visible = false
-
         mainWrapper.Size = UDim2.new(0, 480, 0, isMinimized and 40 or 270)
         AplicarFadeSincronizado(mainWrapper, true, 0)
         AplicarFadeSincronizado(mainWrapper, false, tempoAnim)
-
         local pop = TweenService:Create(mainWrapper, windowAnim, {Size = UDim2.new(0, 520, 0, isMinimized and 52 or 300)})
         pop:Play()
         pop.Completed:Connect(function()
@@ -1537,12 +1323,11 @@ local function ConfigurarArrastarAkat(inst)
     local drag = false
     local startPos, dragStart, dragInput
     inst.InputBegan:Connect(function(input)
-        if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             drag = true
             dragStart = input.Position
             startPos = inst.Position
             dragInput = input
-
             local connection
             connection = input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
@@ -1602,18 +1387,15 @@ local function ExecutarIntroAkat()
 
     local correndoBrilho = true
     task.spawn(function()
-        local infoFadeOut = TweenInfo.new(0.6, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
-        local infoFadeIn  = TweenInfo.new(0.6, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+        local i1 = TweenInfo.new(0.6, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
         while correndoBrilho do
-            local tw1 = TweenService:Create(IntroText, infoFadeOut, {TextTransparency = 0.4})
-            local tw2 = TweenService:Create(IntroLine, infoFadeOut, {BackgroundTransparency = 0.4})
-            tw1:Play() tw2:Play()
-            tw1.Completed:Wait()
+            local t1 = TweenService:Create(IntroText, i1, {TextTransparency = 0.4})
+            local t2 = TweenService:Create(IntroLine, i1, {BackgroundTransparency = 0.4})
+            t1:Play(); t2:Play(); t1.Completed:Wait()
             if not correndoBrilho then break end
-            local tw3 = TweenService:Create(IntroText, infoFadeIn, {TextTransparency = 0})
-            local tw4 = TweenService:Create(IntroLine, infoFadeIn, {BackgroundTransparency = 0})
-            tw3:Play() tw4:Play()
-            tw3.Completed:Wait()
+            local t3 = TweenService:Create(IntroText, i1, {TextTransparency = 0})
+            local t4 = TweenService:Create(IntroLine, i1, {BackgroundTransparency = 0})
+            t3:Play(); t4:Play(); t3.Completed:Wait()
         end
     end)
 
@@ -1653,14 +1435,14 @@ local function EnviarMensagemChat(msg)
             local channel = TextChatService.TextChannels:FindFirstChild("RBXGeneral")
             if channel then channel:SendAsync(msg) end
         else
-            local chatEvent = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents") and
-                              ReplicatedStorage.DefaultChatSystemChatEvents:FindFirstChild("SayMessageRequest")
+            local chatEvent = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
+                and ReplicatedStorage.DefaultChatSystemChatEvents:FindFirstChild("SayMessageRequest")
             if chatEvent then chatEvent:FireServer(msg, "All") end
         end
     end)
 end
 
--- ==================== 5. INSTANCIAÇÃO DE ELEMENTOS E EVENTOS ====================
+-- ==================== 5. EVENTOS DE INTERFACE ====================
 
 local function AplicarEfeitoFisicoBotao(btn, hoverColor)
     btn.MouseEnter:Connect(function()
@@ -1694,9 +1476,9 @@ local function AplicarEfeitoFisicoBotao(btn, hoverColor)
 end
 
 AplicarEfeitoFisicoBotao(LanguageBtn, Color3.fromRGB(255, 255, 255))
-AplicarEfeitoFisicoBotao(SearchBtn,   Color3.fromRGB(255, 255, 255))
+AplicarEfeitoFisicoBotao(SearchBtn, Color3.fromRGB(255, 255, 255))
 AplicarEfeitoFisicoBotao(MinimizeBtn, Color3.fromRGB(255, 255, 255))
-AplicarEfeitoFisicoBotao(CloseBtn,    Color3.fromRGB(255,  60,  60))
+AplicarEfeitoFisicoBotao(CloseBtn, Color3.fromRGB(255, 60, 60))
 
 createTabBtn("Combat")
 createTabBtn("Visuals")
@@ -1717,13 +1499,13 @@ createToggle(togglesContainer, "ChatRoles",   "Misc")
 local searchOpen = false
 SearchBtn.MouseButton1Click:Connect(function()
     searchOpen = not searchOpen
-    local searchAnimInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    local info = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
     if searchOpen then
-        TweenService:Create(searchBarFrame, searchAnimInfo, {Size = UDim2.new(0, 160, 0, 26)}):Play()
+        TweenService:Create(searchBarFrame, info, {Size = UDim2.new(0, 160, 0, 26)}):Play()
         searchTextBox:CaptureFocus()
     else
         searchTextBox.Text = ""
-        TweenService:Create(searchBarFrame, searchAnimInfo, {Size = UDim2.new(0, 0, 0, 26)}):Play()
+        TweenService:Create(searchBarFrame, info, {Size = UDim2.new(0, 0, 0, 26)}):Play()
         searchTextBox:ReleaseFocus()
         filterToggles(activeTab, "")
     end
@@ -1737,24 +1519,15 @@ local languageTransitioning = false
 LanguageBtn.MouseButton1Click:Connect(function()
     if languageTransitioning then return end
     languageTransitioning = true
-
     AplicarFadeIdioma(true, 0.1)
     task.wait(0.1)
-
-    if currentLanguage == "EN" then
-        currentLanguage = "PT"
-    elseif currentLanguage == "PT" then
-        currentLanguage = "ES"
-    else
-        currentLanguage = "EN"
-    end
-
+    if currentLanguage == "EN" then currentLanguage = "PT"
+    elseif currentLanguage == "PT" then currentLanguage = "ES"
+    else currentLanguage = "EN" end
     LanguageBtn.Text = currentLanguage
     AtualizarIdioma()
-
     AplicarFadeIdioma(false, 0.12)
     task.wait(0.12)
-
     languageTransitioning = false
 end)
 
@@ -1769,12 +1542,9 @@ CloseBtn.MouseButton1Click:Connect(function()
         togglesContainer.Visible = true
         AplicarFadeSincronizado(SidebarFrame, false, 0)
         AplicarFadeSincronizado(togglesContainer, false, 0)
-        local expandTween = TweenService:Create(mainWrapper, TweenInfo.new(0.2, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {Size = UDim2.new(0, 520, 0, 300)})
-        expandTween:Play()
-        task.spawn(function()
-            expandTween.Completed:Wait()
-            AlternarConfirmacao(true)
-        end)
+        local t = TweenService:Create(mainWrapper, TweenInfo.new(0.2, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {Size = UDim2.new(0, 520, 0, 300)})
+        t:Play()
+        task.spawn(function() t.Completed:Wait(); AlternarConfirmacao(true) end)
     else
         AlternarConfirmacao(true)
     end
@@ -1793,26 +1563,16 @@ btnYes.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
--- ==================== ANIMAÇÃO SUAVE DO BOTÃO FLUTUANTE ====================
--- Pulso suave com Sine 0.12s — profissional e sem brusquidão
+-- ==================== BOTÃO FLUTUANTE: ANIMAÇÃO SUAVE (SINE 0.12s) ====================
 local function AnimarCliqueFloatBtn()
     local originalSize = UDim2.new(0, 44, 0, 44)
-    local shrunkSize   = UDim2.new(0, 38, 0, 38)
-
-    local shrink = TweenService:Create(FloatBtn,
-        TweenInfo.new(0.12, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
-        { Size = shrunkSize })
-
-    local expand = TweenService:Create(FloatBtn,
-        TweenInfo.new(0.12, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
-        { Size = originalSize })
-
+    local targetSize   = UDim2.new(0, 36, 0, 36)
+    -- Shrink suave com Sine
+    local shrink = TweenService:Create(FloatBtn, TweenInfo.new(0.12, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = targetSize})
+    -- Expand suave com Sine de volta
+    local expand = TweenService:Create(FloatBtn, TweenInfo.new(0.12, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = originalSize})
     shrink:Play()
-    local c
-    c = shrink.Completed:Connect(function()
-        expand:Play()
-        c:Disconnect()
-    end)
+    local c; c = shrink.Completed:Connect(function() expand:Play(); c:Disconnect() end)
 end
 
 MinimizeBtn.MouseButton1Click:Connect(executarMinimizacao)
@@ -1839,20 +1599,31 @@ end)
 
 -- ==================== 6. THREADS EM SEGUNDO PLANO ====================
 
--- ChatRoles — usa ESPRoles para anunciar Murder/Sheriff no chat
+-- Thread ESP: varredura periódica de roles (garante que nenhum update de evento seja perdido)
+task.spawn(function()
+    while true do
+        if Configs.ESP then
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= player then
+                    ESP_UpdatePlayer(p)
+                end
+            end
+        end
+        task.wait(0.5)  -- Intervalo de reconciliação
+    end
+end)
+
+-- Thread ChatRoles
 task.spawn(function()
     while true do
         local currentMurderer, currentSheriff = nil, nil
-
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= player then
-                local role = ESPRoles[p] or DetectRoleNow(p)
-                ESPRoles[p] = role
+                local role = PlayerRoles[p]
                 if role == "Murderer" then currentMurderer = p end
                 if role == "Sheriff"  then currentSheriff  = p end
             end
         end
-
         if not currentMurderer and not currentSheriff then
             announcedThisRound = false
         elseif Configs.ChatRoles and (currentMurderer or currentSheriff) and not announcedThisRound then
@@ -1866,12 +1637,16 @@ task.spawn(function()
             end
             EnviarMensagemChat(msg)
         end
-
         task.wait(0.4)
     end
 end)
 
--- Teleport to Gun — helper
+-- ==================== AUTO SHOOT: RenderStepped ====================
+renderConnection = RunService.RenderStepped:Connect(function()
+    AS_Tick()
+end)
+
+-- ==================== FUNÇÕES AUXILIARES TELEPORT E AUTOCOLLECT ====================
 local function ObterArmaCaida(root)
     local gun = workspace:FindFirstChild("GunDrop", true)
     if gun then
@@ -1899,18 +1674,16 @@ local function PlayerTemArma()
     return false
 end
 
--- Auto Collect — helper
 local function ObterMoedaProxima(root)
     local closestCoin, closestDist = nil, math.huge
     for _, d in ipairs(workspace:GetDescendants()) do
         if d:IsA("BasePart") and d.Transparency < 1 then
             local name = d.Name:lower()
-            if name:find("coin") or name:find("moeda") or name:find("gold") or
-               name == "snowflake" or name == "candycane" or name:find("token") or
-               name:find("diamond") or name:find("present") or name:find("candy") then
-                if not d:IsDescendantOf(Players) and
-                   not d:FindFirstAncestorOfClass("Tool") and
-                   not d:FindFirstAncestorOfClass("Accessory") then
+            if name:find("coin") or name:find("moeda") or name:find("gold") or name == "snowflake"
+                or name == "candycane" or name:find("token") or name:find("diamond")
+                or name:find("present") or name:find("candy") then
+                if not d:IsDescendantOf(Players) and not d:FindFirstAncestorOfClass("Tool")
+                    and not d:FindFirstAncestorOfClass("Accessory") then
                     local dist = (root.Position - d.Position).Magnitude
                     if dist < closestDist and dist < 1500 then
                         closestDist = dist
@@ -1923,13 +1696,13 @@ local function ObterMoedaProxima(root)
     return closestCoin
 end
 
--- Heartbeat principal
+-- ==================== HEARTBEAT: LÓGICA DE JOGO ====================
 hbConnection = RunService.Heartbeat:Connect(function(dt)
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     local hum  = char and char:FindFirstChildOfClass("Humanoid")
 
-    -- Anti-Fling
+    -- ANTI-FLING
     if Configs.AntiFling then
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= player and p.Character then
@@ -1946,7 +1719,7 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- Teleport to Gun
+    -- TELEPORT TO GUN
     if Configs.TpToGun and root and not PlayerTemArma() then
         local gunDrop = ObterArmaCaida(root)
         if gunDrop and not hasTeleportedToGun then
@@ -1968,42 +1741,35 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- ============================================================
-    --  AUTO COLLECT v2 — velocidade segura + cooldown anti-kick
-    -- ============================================================
+    -- AUTO COLLECT (velocidade segura 28 studs/s + cooldown 0.7s entre moedas)
     if Configs.AutoCollect and root then
-        -- Invalida alvo se sumiu
         if currentCollectTarget and (
-            not currentCollectTarget.Parent or
-            not currentCollectTarget:IsDescendantOf(workspace) or
-            currentCollectTarget.Transparency >= 1
+            not currentCollectTarget.Parent
+            or not currentCollectTarget:IsDescendantOf(workspace)
+            or currentCollectTarget.Transparency >= 1
         ) then
             currentCollectTarget = nil
-            lastCoinCollectTime  = os.clock()   -- inicia cooldown após coleta
+            lastCoinCollectTime = os.clock()  -- inicia cooldown ao coletar
         end
 
-        -- Busca próxima moeda respeitando cooldown
-        if not currentCollectTarget and os.clock() - lastCoinSearch > 0.15 then
+        if not currentCollectTarget and os.clock() - lastCoinSearch > 0.15
+            and os.clock() - lastCoinCollectTime >= 0.7 then  -- cooldown anti-kick
             lastCoinSearch = os.clock()
-            if os.clock() - lastCoinCollectTime >= COIN_COLLECT_COOLDOWN then
-                currentCollectTarget = ObterMoedaProxima(root)
-            end
+            currentCollectTarget = ObterMoedaProxima(root)
         end
 
         if currentCollectTarget then
             wasAutoCollecting = true
-
             if hum then pcall(function() hum.PlatformStand = true end) end
-
             if char then
                 for _, part in ipairs(char:GetDescendants()) do
                     if part:IsA("BasePart") then part.CanCollide = false end
                 end
             end
 
-            local targetPos  = currentCollectTarget.Position
+            local targetPos = currentCollectTarget.Position
             local currentPos = root.Position
-            local dist       = (targetPos - currentPos).Magnitude
+            local dist = (targetPos - currentPos).Magnitude
 
             pcall(function()
                 root.AssemblyLinearVelocity  = Vector3.new(0, 0, 0)
@@ -2011,8 +1777,8 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
             end)
 
             if dist > 1 then
-                -- Movimento suave a velocidade segura
-                local moveAmount = COIN_FLY_SPEED * dt
+                local flySpeed   = 28   -- seguro anti-detecção
+                local moveAmount = flySpeed * dt
                 local direction  = (targetPos - currentPos).Unit
                 if moveAmount >= dist then
                     root.CFrame = CFrame.new(targetPos)
@@ -2033,8 +1799,8 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
                 if char then
                     for _, part in ipairs(char:GetChildren()) do
                         if part:IsA("BasePart") and (
-                            part.Name == "HumanoidRootPart" or part.Name == "Head" or
-                            part.Name == "Torso" or part.Name == "UpperTorso" or part.Name == "LowerTorso"
+                            part.Name == "HumanoidRootPart" or part.Name == "Head"
+                            or part.Name == "Torso" or part.Name == "UpperTorso" or part.Name == "LowerTorso"
                         ) then
                             part.CanCollide = true
                         end
@@ -2051,8 +1817,8 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
             if char then
                 for _, part in ipairs(char:GetChildren()) do
                     if part:IsA("BasePart") and (
-                        part.Name == "HumanoidRootPart" or part.Name == "Head" or
-                        part.Name == "Torso" or part.Name == "UpperTorso" or part.Name == "LowerTorso"
+                        part.Name == "HumanoidRootPart" or part.Name == "Head"
+                        or part.Name == "Torso" or part.Name == "UpperTorso" or part.Name == "LowerTorso"
                     ) then
                         part.CanCollide = true
                     end
@@ -2062,12 +1828,12 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- Speed
+    -- SPEED
     if char and root and hum then
-        local velocidadeAlvo = Configs.Speed and 23 or 16
-        if hum.WalkSpeed ~= velocidadeAlvo then hum.WalkSpeed = velocidadeAlvo end
+        local targetSpeed = Configs.Speed and 23 or 16
+        if hum.WalkSpeed ~= targetSpeed then hum.WalkSpeed = targetSpeed end
 
-        -- Knife Reach
+        -- REACH (Knife)
         local knife = char:FindFirstChild("Knife")
         if knife and knife:IsA("Tool") then
             local handle = knife:FindFirstChild("Handle")
