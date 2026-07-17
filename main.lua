@@ -1,5 +1,5 @@
 -- [[
---     AKAT MM2 MAIN LOGIC - BACKEND ONLY [v3.2]
+--     AKAT MM2 MAIN LOGIC - BACKEND ONLY [v3.3 - MOBILE & BYPASS FIX]
 -- ]]
 
 local Players = game:GetService("Players")
@@ -7,6 +7,7 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
+local VirtualInputManager = game:GetService("VirtualInputManager") -- Adicionado para corrigir cliques no Mobile
 
 local player = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
@@ -14,6 +15,8 @@ local mouse = player:GetMouse()
 
 -- Estado dinâmico da rodada
 local gunDroppedThisRound = false
+local lastPositionBeforeTpToGun = nil -- Guarda a posição original antes do TP da arma
+local trackingTpToGun = false
 
 -- Configurações expostas de forma Global
 local Configs = {
@@ -354,7 +357,10 @@ local function LimparEDesligarAbsolutamente()
     pcall(function()
         local char = player.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if hum then hum.WalkSpeed = 16 end
+        if hum then 
+            hum.WalkSpeed = 16 
+            hum.PlatformStand = false
+        end
         if char then
             for _, item in ipairs(char:GetChildren()) do
                 if item:IsA("Tool") then
@@ -399,14 +405,25 @@ _G.AkatCallbacks = {
         end
     end,
     AutoCollect = function(enabled)
-        if not enabled then currentCollectTarget = nil end
+        if not enabled then 
+            currentCollectTarget = nil 
+            local char = player.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if hum then hum.PlatformStand = false end
+        end
     end,
     FireShoot = function()
         local hasGun, gunTool = AS_HasGun()
         if hasGun and gunTool then
             local murderer = AS_GetMurderer()
             if murderer then
-                pcall(function() gunTool:Activate() end)
+                pcall(function() 
+                    gunTool:Activate() 
+                    -- Simulação Virtual de Input (Garante o disparo em Mobile)
+                    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+                    task.wait(0.01)
+                    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+                end)
             end
         end
     end,
@@ -480,34 +497,68 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- ANTI FLING
-    if Configs.AntiFling then
+    -- ANTI FLING / NOCLIP GLOBAL
+    if Configs.AntiFling or Configs.AutoCollect then
+        for _, part in ipairs(char:GetChildren()) do
+            if part:IsA("BasePart") then part.CanCollide = false end
+        end
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= player and p.Character then
                 for _, part in ipairs(p.Character:GetChildren()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = false
-                    end
+                    if part:IsA("BasePart") then part.CanCollide = false end
                 end
             end
         end
     end
 
-    -- TELEPORT TO GUN
+    -- TELEPORT TO GUN (CORRIGIDO: RETORNA AO LUGAR ANTERIOR)
     if Configs.TpToGun and PlayerRoles[player] ~= "Murderer" and not PlayerTemArma() then
         local gunPart = ObterArmaCaida(root)
         if gunPart then
+            if not trackingTpToGun then
+                lastPositionBeforeTpToGun = root.CFrame
+                trackingTpToGun = true
+            end
             root.CFrame = gunPart.CFrame * CFrame.new(0, 3, 0)
+        end
+    else
+        if trackingTpToGun then
+            if lastPositionBeforeTpToGun then
+                root.CFrame = lastPositionBeforeTpToGun
+                lastPositionBeforeTpToGun = nil
+            end
+            trackingTpToGun = false
+            Configs.TpToGun = false
         end
     end
 
-    -- AUTO COLLECT
+    -- AUTO COLLECT (MÉTODO MM2 BYPASS FLUTUANDO E TREMENDO)
     if Configs.AutoCollect then
         if not currentCollectTarget or not currentCollectTarget.Parent or currentCollectTarget.Transparency >= 1 then
             currentCollectTarget = ObterMoedaProxima(root)
         end
+        
         if currentCollectTarget then
-            root.CFrame = currentCollectTarget.CFrame
+            hum.PlatformStand = true -- Deixa o boneco bobo no ar para estabilizar
+            local targetPos = currentCollectTarget.Position
+            local currentPos = root.Position
+            local dist = (targetPos - currentPos).Magnitude
+            
+            -- Geração de tremor clássico rápido (Vibration Shake Matrix)
+            local shakeX = math.sin(tick() * 70) * 0.5
+            local shakeY = 1.5 + math.cos(tick() * 70) * 0.3
+            local shakeZ = math.cos(tick() * 60) * 0.5
+            local shakeOffset = Vector3.new(shakeX, shakeY, shakeZ)
+            
+            if dist > 4 then
+                -- Interpolação veloz e contínua até a moeda (Evita kick por estourar distância máxima instantânea)
+                local direcao = (targetPos - currentPos).Unit * math.min(dist, 5.5)
+                root.CFrame = CFrame.new(currentPos + direcao + Vector3.new(0, shakeY - 1.5, 0))
+            else
+                -- Exatamente na moeda gerando a tremedeira rápida
+                root.CFrame = CFrame.new(targetPos + shakeOffset)
+            end
+            root.Velocity = Vector3.new(0, 0, 0)
         end
     end
 end)
@@ -560,7 +611,6 @@ task.spawn(function()
 end)
 
 -- ==================== CHAMANDO A CARGA DINÂMICA DA INTERFACE ====================
--- COLOQUE O LINK DIRECTO (RAW) DO SEU ARQUIVO DO GITHUB ABAIXO:
 local Link_Da_UI = "https://raw.githubusercontent.com/estratosfera88-afk/UI.lua/refs/heads/main/ui.lua"
 
 local Sucesso, Erro = pcall(function()
