@@ -1,5 +1,5 @@
 -- [[
---     AKAT MM2 MAIN LOGIC - FULLY UPDATED & FIXED [v3.6 - MOBILE & BYPASS]
+--     AKAT MM2 MAIN LOGIC - FULLY UPDATED & FIXED [v3.7 - MOBILE & BYPASS]
 -- ]]
 
 local Players = game:GetService("Players")
@@ -17,6 +17,7 @@ local gunDroppedThisRound = false
 local lastPositionBeforeTpToGun = nil 
 local trackingTpToGun = false
 _G.ForceAutoShoot = false
+local rotationConnection = nil
 
 -- Configurações expostas de forma Global
 local Configs = {
@@ -365,15 +366,22 @@ local function EnviarMensagemChat(msg)
     end)
 end
 
+local function DestruirBotaoFlutuante()
+    if rotationConnection then
+        rotationConnection:Disconnect()
+        rotationConnection = nil
+    end
+    local existing = game:GetService("CoreGui"):FindFirstChild("AkatFloatingUI")
+    if existing then existing:Destroy() end
+end
+
 local function LimparEDesligarAbsolutamente()
     if hbConnection then hbConnection:Disconnect(); hbConnection = nil end
     if renderConnection then renderConnection:Disconnect(); renderConnection = nil end
     for k in pairs(Configs) do Configs[k] = false end
     ESP_Disable()
     if safePlatform then pcall(function() safePlatform:Destroy() end); safePlatform = nil end
-    if game:GetService("CoreGui"):FindFirstChild("AkatFloatingUI") then
-        game:GetService("CoreGui").AkatFloatingUI:Destroy()
-    end
+    DestruirBotaoFlutuante()
     pcall(function()
         local char = player.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -393,11 +401,9 @@ local function LimparEDesligarAbsolutamente()
     end)
 end
 
--- ==================== CRIAÇÃO DO BOTÃO FLUTUANTE EXTENSO ====================
+-- ==================== GERENCIADOR E CRIAÇÃO DO BOTÃO FLUTUANTE ====================
 local function CriarBotaoFlutuante()
-    if game:GetService("CoreGui"):FindFirstChild("AkatFloatingUI") then
-        game:GetService("CoreGui").AkatFloatingUI:Destroy()
-    end
+    DestruirBotaoFlutuante()
 
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "AkatFloatingUI"
@@ -407,31 +413,42 @@ local function CriarBotaoFlutuante()
     local Button = Instance.new("TextButton")
     Button.Name = "AutoShootButton"
     Button.Parent = ScreenGui
-    Button.Size = UDim2.new(0, 175, 0, 46) -- Modelo um pouco mais extenso
+    Button.Size = UDim2.new(0, 175, 0, 46) 
     Button.Position = UDim2.new(0.15, 0, 0.45, 0)
     Button.Text = "Auto shoot"
     Button.TextColor3 = Color3.fromRGB(255, 255, 255)
     Button.Font = Enum.Font.GothamBold
     Button.TextSize = 15
-    Button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    Button.BackgroundColor3 = Color3.fromRGB(15, 15, 15) -- Fundo Preto
+    Button.BackgroundTransparency = 0.35 -- Preto Borrado / Translúcido estilo Acrylic UI
     Button.ClipsDescendants = true
 
     local UICorner = Instance.new("UICorner")
     UICorner.CornerRadius = UDim.new(0, 8)
     UICorner.Parent = Button
 
+    -- Contorno Dinâmico
     local UIStroke = Instance.new("UIStroke")
-    UIStroke.Color = Color3.fromRGB(45, 5, 5)
-    UIStroke.Thickness = 1.5
+    UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    UIStroke.Thickness = 2
     UIStroke.Parent = Button
 
     local UIGradient = Instance.new("UIGradient")
     UIGradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(110, 0, 0)), -- Vermelho Escuro
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 15, 15))  -- Preto
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(130, 0, 0)),   -- Vermelho Escuro
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(15, 15, 15)),-- Preto
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(130, 0, 0))    -- Vermelho Escuro
     })
-    UIGradient.Rotation = 45
-    UIGradient.Parent = Button
+    UIGradient.Parent = UIStroke
+
+    -- Loop de Rotação Contínua do Gradient no Contorno
+    rotationConnection = RunService.RenderStepped:Connect(function()
+        if UIGradient and UIGradient.Parent then
+            UIGradient.Rotation = (UIGradient.Rotation + 2) % 360
+        else
+            if rotationConnection then rotationConnection:Disconnect(); rotationConnection = nil end
+        end
+    end)
 
     -- Sistema de Arrastar (Mobile & PC)
     local dragging, dragInput, dragStart, startPos
@@ -467,14 +484,14 @@ local function CriarBotaoFlutuante()
     end)
 end
 
-task.spawn(CriarBotaoFlutuante)
-
 -- ==================== PONTE DE COMUNICAÇÃO GLOBAL (UI -> BACKEND) ====================
 _G.AkatCallbacks = {
     ESP = function(enabled)
+        Configs.ESP = enabled
         if enabled then ESP_Enable() else ESP_Disable() end
     end,
     SafeSpot = function(enabled)
+        Configs.SafeSpot = enabled
         local char = player.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
         if not root then return end
@@ -501,11 +518,25 @@ _G.AkatCallbacks = {
         end
     end,
     AutoCollect = function(enabled)
+        Configs.AutoCollect = enabled
         if not enabled then 
             currentCollectTarget = nil 
             local char = player.Character
             local hum = char and char:FindFirstChildOfClass("Humanoid")
             if hum then hum.PlatformStand = false end
+        end
+    end,
+    AutoShoot = function(enabled) -- Vinculado dinamicamente para ativar/desativar o botão junto com a UI
+        Configs.AutoShoot = enabled
+        if enabled then
+            CriarBotaoFlutuante()
+        else
+            DestruirBotaoFlutuante()
+        end
+    end,
+    ["Shoot murder"] = function(enabled) -- Mapeamento alternativo para compatibilidade direta de texto da UI
+        if _G.AkatCallbacks.AutoShoot then
+            _G.AkatCallbacks.AutoShoot(enabled)
         end
     end,
     FireShoot = function()
@@ -580,7 +611,7 @@ task.spawn(function()
                     if target and target.Parent then
                         hum.PlatformStand = true
                         
-                        -- Ativa Noclip apenas no instante do voo/teleporte até a moeda
+                        -- Ativa Noclip apenas no milissegundo de coleta da moeda
                         for _, part in ipairs(char:GetChildren()) do
                             if part:IsA("BasePart") then part.CanCollide = false end
                         end
@@ -667,17 +698,20 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- ANTI FLING (Isolado de outros sistemas)
+    -- ANTI FLING (CORRIGIDO: Sem noclip/atravessar paredes)
     if Configs.AntiFling then
-        for _, part in ipairs(char:GetChildren()) do
-            if part:IsA("BasePart") then part.CanCollide = false end
-        end
+        -- Desativa colisão APENAS dos outros personagens contra você (Impede empurrões e instabilidade física)
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= player and p.Character then
                 for _, part in ipairs(p.Character:GetChildren()) do
                     if part:IsA("BasePart") then part.CanCollide = false end
                 end
             end
+        end
+        -- Trava e neutraliza forças externas anormais aplicadas na sua física root
+        if math.abs(root.Velocity.Magnitude) > 60 or math.abs(root.RotVelocity.Magnitude) > 60 then
+            root.Velocity = Vector3.new(0, 0, 0)
+            root.RotVelocity = Vector3.new(0, 0, 0)
         end
     end
 
