@@ -306,7 +306,7 @@ local function AS_GetMurderer()
 end
 _G.AS_GetMurderer = AS_GetMurderer
 
--- ==================== ESTRUTURA DE INTERFACE (UI TRANSPARENTE / VERTICAL LIST) ====================
+-- ==================== INTERFACE (UI TRANSPARENTE / VERTICAL LIST) ====================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "DeltaAkatUniversalUI"
 screenGui.ResetOnSpawn = false
@@ -332,13 +332,13 @@ Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(0, 8)
 local FloatStroke = Instance.new("UIStroke", FloatBtn)
 FloatStroke.Thickness = 1.5
 
--- [NOVO] BOTÃO FLUTUANTE EXTENSO AUTO SHOOT PARA MOBILE
+-- BOTÃO FLUTUANTE EXTENSO AUTO SHOOT PARA MOBILE
 local AutoShootMobileBtn = Instance.new("TextButton", screenGui)
 AutoShootMobileBtn.Name = "AutoShootMobileBtn"
 AutoShootMobileBtn.Size = UDim2.new(0, 150, 0, 44)
 AutoShootMobileBtn.Position = UDim2.new(0.78, 0, 0.55, 0)
 AutoShootMobileBtn.BackgroundColor3 = Color3.fromHex("#0A0A0A")
-AutoShootMobileBtn.BackgroundTransparency = 0.25 -- Transparência combinando com a UI principal
+AutoShootMobileBtn.BackgroundTransparency = 0.25
 AutoShootMobileBtn.Text = "AUTO SHOOT"
 AutoShootMobileBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 AutoShootMobileBtn.Font = Enum.Font.GothamBold
@@ -362,7 +362,7 @@ local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
 mainFrame.Size = UDim2.new(1, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromHex("#0A0A0A")
-mainFrame.BackgroundTransparency = 0.25 -- [ALTERAÇÃO] Transparente mostrando o fundo do jogo
+mainFrame.BackgroundTransparency = 0.25
 mainFrame.BorderSizePixel = 0
 mainFrame.ClipsDescendants = true
 mainFrame.ZIndex = 5
@@ -490,7 +490,6 @@ div.BackgroundColor3 = Color3.fromHex("#1F1F1F")
 div.BorderSizePixel = 0
 div.ZIndex = 6
 
--- [ALTERAÇÃO] TogglesContainer expandido ocupando toda a largura, as abas agora são uma lista contínua empilhada
 local togglesContainer = Instance.new("ScrollingFrame", mainFrame)
 togglesContainer.Name = "TogglesContainer"
 togglesContainer.Size = UDim2.new(1, -24, 1, -64)
@@ -544,7 +543,7 @@ btnNo.TextSize = 12
 btnNo.ZIndex = 51
 Instance.new("UICorner", btnNo).CornerRadius = UDim.new(0, 6)
 
--- ==================== SISTEMA DE ANIMAÇÃO DOS GRADIENTES (UI DEFEIT COOP) ====================
+-- ==================== ANIMACAO DOS GRADIENTES ====================
 local function AplicarEfeitoGradienteLoop(strokeObj)
     local gradient = Instance.new("UIGradient", strokeObj)
     gradient.Color = ColorSequence.new({
@@ -565,7 +564,7 @@ end
 AplicarEfeitoGradienteLoop(FloatStroke)
 AplicarEfeitoGradienteLoop(ASButtonStroke)
 
--- ==================== FUNÇÕES DE ATUALIZAÇÃO E CRIAÇÃO DA LISTA ESTÁTICA ====================
+-- ==================== RECURSOS DA LISTA INTERNA ====================
 local function RegistrarTransparencias(objeto)
     if originalTrans[objeto] then return end
     if objeto:IsA("Frame") or objeto:IsA("ScrollingFrame") then
@@ -764,7 +763,7 @@ local function createToggleInList(parent, configKey, category, order)
     end)
 end
 
--- ==================== INSTANCIAÇÃO DINÂMICA DA LISTA ÚNICA ====================
+-- ==================== INICIALIZACAO DE ELEMENTOS DA LISTA ====================
 local layoutCounter = 1
 
 CriarCabecalhoSecao(togglesContainer, "Combat", layoutCounter) layoutCounter = layoutCounter + 1
@@ -786,18 +785,17 @@ CriarCabecalhoSecao(togglesContainer, "Misc", layoutCounter) layoutCounter = lay
 createToggleInList(togglesContainer, "AutoCollect", "Misc", layoutCounter) layoutCounter = layoutCounter + 1
 createToggleInList(togglesContainer, "ChatRoles", "Misc", layoutCounter) layoutCounter = layoutCounter + 1
 
--- ==================== LOGICA DE DISPARO DO BOTÃO FLUTUANTE MÓVEL ====================
+-- ==================== MOBILE AUTO SHOOT CLICK CONNECTOR ====================
 AutoShootMobileBtn.MouseButton1Click:Connect(function()
     local hasGun, gunTool = AS_HasGun()
     if hasGun and gunTool then
         pcall(function()
-            -- O clique força a ativação imediata da ferramenta. O redirecionamento __index cuida da mágica do projétil.
             gunTool:Activate()
         end)
     end
 end)
 
--- ==================== GERENCIADORES E SUPORTE DE FECHAMENTO =--
+-- ==================== SISTEMA DE LIMPEZA E LOGICA DOS BOTOES DA WINDOW ====================
 local function LimparEDesligarAbsolutamente()
     if hbConnection then hbConnection:Disconnect() hbConnection = nil end
     if renderConnection then renderConnection:Disconnect() renderConnection = nil end
@@ -810,7 +808,6 @@ local function LimparEDesligarAbsolutamente()
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         if hum then hum.WalkSpeed = 16 hum.PlatformStand = false end
         
-        -- [REACH RESET SAFETIES]
         local knife = char and (char:FindFirstChild("Knife") or char:FindFirstChild("Faca"))
         if knife and knife:FindFirstChild("Handle") then
             local origSize = knife.Handle:GetAttribute("OrigSize")
@@ -959,7 +956,7 @@ local function ExecutarIntroAkat()
     AtualizarIdioma()
 end
 
--- ==================== GERENCIADORES DE INPUT E BARRA DE PESQUISA ====================
+-- ==================== SEÇÃO DOS BOTÕES SUPERIORES E INPUTS ====================
 local searchOpen = false
 SearchBtn.MouseButton1Click:Connect(function()
     searchOpen = not searchOpen
@@ -1004,7 +1001,7 @@ ConfigurarArrastarAkat(mainWrapper)
 ConfigurarArrastarAkat(FloatBtn)
 ConfigurarArrastarAkat(AutoShootMobileBtn)
 
--- ==================== VERIFICAÇÕES DE AMBIENTE RECORRENTES (LOOP DE CHECAGEM) ====================
+-- ==================== PERSISTENT BACKEND SCANNERS ====================
 task.spawn(function()
     while true do
         local gunFound, knifeFound = false, false
@@ -1047,7 +1044,7 @@ task.spawn(function()
     end
 end)
 
--- ==================== HEARTBEAT LOGIC (KNIFE REACH CORRIGIDO + MOVEMENT) ====================
+-- ==================== HEARTBEAT SYSTEMS (REACH, MOVEMENT, AUTOCOLLECT) ====================
 local function ObterArmaCaida(root)
     local gun = workspace:FindFirstChild("GunDrop", true)
     if gun then
@@ -1079,7 +1076,6 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
     local hum  = char and char:FindFirstChildOfClass("Humanoid")
     if not root or not hum then return end
 
-    -- [INTERMEIO] SISTEMA DE ALCANCE DA FACA (REACH) REESCRITO E REPARADO
     if Configs.Reach then
         pcall(function()
             local knife = char:FindFirstChild("Knife") or char:FindFirstChild("Faca")
@@ -1090,7 +1086,7 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
                 end
                 h.Massless = true
                 h.CanCollide = false
-                h.Size = Vector3.new(15, 15, 15) -- Hitbox massiva estável
+                h.Size = Vector3.new(15, 15, 15)
             end
         end)
     else
@@ -1175,5 +1171,4 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
     end
 end)
 
--- Instancia e executa a tela de introdução
 task.spawn(ExecutarIntroAkat)
