@@ -1,5 +1,5 @@
 -- [[
---     AKAT MM2 MAIN LOGIC - FULLY UPDATED & FIXED [v5.1 - ANTI-KICK CIRCULAR COLLECT]
+--     AKAT MM2 MAIN LOGIC - FULLY UPDATED & FIXED [v4.5 - MODERN AIMBOT EDITION]
 --     Compatível com Delta Mobile & PC | MM2 (2026)
 -- ]]
 
@@ -17,7 +17,7 @@ local mouse = player:GetMouse()
 local gunDroppedThisRound = false
 local lastPositionBeforeTpToGun = nil 
 local trackingTpToGun = false
-local rotationConnection = nil
+local aimbotConnection = nil
 
 -- Configurações expostas de forma Global
 local Configs = {
@@ -60,7 +60,7 @@ task.spawn(function()
                 end)
             end
             
-            -- SILENT AIM FOR COMPATIBILITY
+            -- SILENT AIM METAMETHOD
             if Configs.Aimbot and self == mouse then
                 if key == "Hit" or key == "hit" then
                     local murderer = _G.AS_GetMurderer()
@@ -96,7 +96,6 @@ local PlayerRoles = {}
 local ESPHighlights = {}
 local espEventConnections = {}
 local hbConnection = nil
-local renderConnection = nil
 local safePlatform = nil
 local lastPositionBeforeSafeSpot = nil
 local announcedThisRound = false
@@ -249,13 +248,43 @@ local function AS_GetMurderer()
 end
 _G.AS_GetMurderer = AS_GetMurderer
 
--- Verificação real de time/itens para o Murderer
-local function VerificarSeSouMurderer()
-    if PlayerRoles[player] == "Murderer" then return true end
-    if player.Backpack:FindFirstChild("Knife") or (player.Character and player.Character:FindFirstChild("Knife")) then 
-        return true 
+-- ==================== NOVO SISTEMA DE AIMBOT MODERNO ====================
+local function ToggleAimbot(enabled)
+    Configs.Aimbot = enabled
+    if aimbotConnection then aimbotConnection:Disconnect(); aimbotConnection = nil end
+    
+    if enabled then
+        aimbotConnection = RunService.RenderStepped:Connect(function()
+            if not Configs.Aimbot then return end
+            local murderer = AS_GetMurderer()
+            if murderer and murderer.Character then
+                local head = murderer.Character:FindFirstChild("Head")
+                local char = player.Character
+                local hum = char and char:FindFirstChildOfClass("Humanoid")
+                
+                if head and hum and hum.Health > 0 then
+                    -- Rastreamento de câmera direto, fluido e sem afetar a física ou travar o movimento do client
+                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, head.Position)
+                end
+            end
+        end)
     end
-    return false
+end
+
+-- ==================== LÓGICA DE PROCURA DE ITENS & SEGURANÇA ====================
+local function ObterArmaCaida(root)
+    local gun = workspace:FindFirstChild("GunDrop", true)
+    if gun then
+        local targetPart = nil
+        if gun:IsA("BasePart") then targetPart = gun
+        elseif gun:IsA("Model") then targetPart = gun:FindFirstChildOfClass("BasePart") or gun.PrimaryPart
+        elseif gun:IsA("Tool") then targetPart = gun:FindFirstChild("Handle") or gun:FindFirstChildOfClass("BasePart")
+        end
+        if targetPart and root then
+            if (root.Position - targetPart.Position).Magnitude < 1500 then return targetPart end
+        end
+    end
+    return nil
 end
 
 local function PlayerTemArma()
@@ -263,7 +292,6 @@ local function PlayerTemArma()
     return false
 end
 
--- ==================== SISTEMA DE DETECÇÃO DE MOEDAS PROXIMAS ====================
 local function ObterMoedaProxima(root)
     local closestCoin, closestDist = nil, math.huge
     for _, d in ipairs(workspace:GetDescendants()) do
@@ -284,21 +312,6 @@ local function ObterMoedaProxima(root)
         end
     end
     return closestCoin
-end
-
-local function ObterArmaCaida(root)
-    local gun = workspace:FindFirstChild("GunDrop", true)
-    if gun then
-        local targetPart = nil
-        if gun:IsA("BasePart") then targetPart = gun
-        elseif gun:IsA("Model") then targetPart = gun:FindFirstChildOfClass("BasePart") or gun.PrimaryPart
-        elseif gun:IsA("Tool") then targetPart = gun:FindFirstChild("Handle") or gun:FindFirstChildOfClass("BasePart")
-        end
-        if targetPart and root then
-            if (root.Position - targetPart.Position).Magnitude < 1500 then return targetPart end
-        end
-    end
-    return nil
 end
 
 local function IsBagFull()
@@ -335,7 +348,7 @@ end
 
 local function LimparEDesligarAbsolutamente()
     if hbConnection then hbConnection:Disconnect(); hbConnection = nil end
-    if renderConnection then renderConnection:Disconnect(); renderConnection = nil end
+    if aimbotConnection then aimbotConnection:Disconnect(); aimbotConnection = nil end
     for k in pairs(Configs) do Configs[k] = false end
     ESP_Disable()
     if safePlatform then pcall(function() safePlatform:Destroy() end); safePlatform = nil end
@@ -394,20 +407,20 @@ _G.AkatCallbacks = {
         end
     end,
     ["Shoot murder"] = function(enabled)
-        Configs.Aimbot = enabled
+        ToggleAimbot(enabled)
     end,
     AutoShoot = function(enabled) 
-        Configs.Aimbot = enabled
+        ToggleAimbot(enabled)
     end,
     ShutdownAll = function()
         LimparEDesligarAbsolutamente()
     end
 }
 
--- ==================== THREAD DO AUTO COLLECT (MOVIMENTO EM CÍRCULO / ANTI-KICK) ====================
+-- ==================== THREAD DO AUTO COLLECT (MENOS RÁPIDO / STEALTH) ====================
 task.spawn(function()
     while true do
-        task.wait(0.05) 
+        task.wait(0.15) 
         if Configs.AutoCollect then
             local char = player.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -424,55 +437,40 @@ task.spawn(function()
                     local target = ObterMoedaProxima(root)
                     if target and target.Parent then
                         currentCollectTarget = target
+                        local distance = (root.Position - target.Position).Magnitude
                         
-                        -- Configurações de velocidade segura e movimento circular bypass
-                        local moveSpeed = 50 -- Velocidade física ideal para evitar o "Invalid position"
-                        local circleRadius = 2.5 -- Raio da órbita circular
-                        local circleSpeed = 16 -- Velocidade da rotação em órbita
-                        
-                        local noclipConn
-                        noclipConn = RunService.Stepped:Connect(function()
-                            if char then
-                                for _, part in ipairs(char:GetChildren()) do
-                                    if part:IsA("BasePart") then part.CanCollide = false end
+                        if distance > 0 then
+                            -- Modificado: Velocidade reduzida de 70 para 35 para suavizar e parecer legítimo
+                            local speed = 35 
+                            local duration = distance / speed
+                            local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
+                            
+                            local safeTargetCFrame = target.CFrame * CFrame.new(0, 2, 0)
+                            local tween = TweenService:Create(root, tweenInfo, {CFrame = safeTargetCFrame})
+                            
+                            local noclipConn
+                            noclipConn = RunService.Stepped:Connect(function()
+                                if char then
+                                    for _, part in ipairs(char:GetChildren()) do
+                                        if part:IsA("BasePart") then part.CanCollide = false end
+                                    end
                                 end
-                            end
-                        end)
-                        
-                        -- Deslocamento em espiral contínuo em vez de teletransporte seco
-                        while Configs.AutoCollect and target and target.Parent and (root.Position - target.Position).Magnitude > 1.2 do
-                            local dt = RunService.Heartbeat:Wait()
-                            if not root or not target or not target.Parent then break end
-                            
-                            local targetPos = target.Position + Vector3.new(0, 1.2, 0)
-                            local currentPos = root.Position
-                            local distance = (targetPos - currentPos).Magnitude
-                            local direction = (targetPos - currentPos).Unit
-                            
-                            -- Cálculo matemático da trajetória em círculo (Bypass de vetor)
-                            local angle = tick() * circleSpeed
-                            -- Reduz dinamicamente o raio do círculo conforme se aproxima para tocar na moeda perfeitamente
-                            local dynamicRadius = circleRadius * math.min(1, distance / 6)
-                            local offset = Vector3.new(math.cos(angle) * dynamicRadius, 0, math.sin(angle) * dynamicRadius)
-                            
-                            local nextStep = direction * math.min(moveSpeed * dt, distance)
-                            root.Velocity = Vector3.new(0, 0, 0)
-                            
-                            -- Move aplicando a órbita circular e girando o personagem ao mesmo tempo
-                            local spinAngle = (tick() * 1000) % 360
-                            root.CFrame = CFrame.new(currentPos + nextStep + offset) * CFrame.Angles(0, math.rad(spinAngle), 0)
-                        end
-                        
-                        if noclipConn then noclipConn:Disconnect() end
-                        
-                        -- Garante o registro da coleta
-                        if target and target.Parent then
-                            pcall(function()
-                                firetouchinterest(root, target, 0)
-                                task.wait(0.01)
-                                firetouchinterest(root, target, 1)
                             end)
+                            
+                            root.Velocity = Vector3.new(0, 0, 0)
+                            root.Anchored = true 
+                            tween:Play()
+                            tween.Completed:Wait()
+                            if noclipConn then noclipConn:Disconnect() end
+                            root.Anchored = false
                         end
+                        
+                        pcall(function()
+                            firetouchinterest(root, target, 0)
+                            task.wait(0.04) -- Delay sutil extra de estabilização pós-toque
+                            firetouchinterest(root, target, 1)
+                        end)
+                        task.wait(0.15) -- Delay pós-coleta aumentado para evitar spam de pacotes
                     else
                         root.Anchored = false
                     end
@@ -486,20 +484,7 @@ task.spawn(function()
     end
 end)
 
--- ==================== RENDERSTEPPED LOOP (AIMBOT FLUIDO) ====================
-renderConnection = RunService.RenderStepped:Connect(function()
-    if Configs.Aimbot then
-        local murderer = AS_GetMurderer()
-        if murderer and murderer.Character then
-            local head = murderer.Character:FindFirstChild("Head")
-            if head then
-                Camera.CFrame = CFrame.new(Camera.CFrame.Position, head.Position)
-            end
-        end
-    end
-end)
-
--- ==================== LOOP PRINCIPAL (HEARTBEAT - TELEPORTS & ATRIBUTOS) ====================
+-- ==================== LOOP PRINCIPAL (HEARTBEAT) ====================
 hbConnection = RunService.Heartbeat:Connect(function(dt)
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -579,25 +564,32 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- TELEPORT TO GUN (CORRIGIDO: Bloqueia completamente se você for o Murderer)
-    if Configs.TpToGun and not VerificarSeSouMurderer() and not PlayerTemArma() then
-        local gunPart = ObterArmaCaida(root)
-        if gunPart then
-            if not trackingTpToGun then
-                lastPositionBeforeTpToGun = root.CFrame
-                trackingTpToGun = true
+    -- CORREÇÃO TELEPORT TO GUN (DOUBLE VERIFICATION: ROLE & KNIFE POSSESSION)
+    local isMurdererRole = (PlayerRoles[player] == "Murderer")
+    local hasKnife = player.Backpack:FindFirstChild("Knife") or (char and char:FindFirstChild("Knife")) or player.Backpack:FindFirstChild("Faca") or (char and char:FindFirstChild("Faca"))
+
+    if Configs.TpToGun then
+        if isMurdererRole or hasKnife then
+            -- Força a desativação imediata caso seja o assassino ou esteja armado de faca
+            Configs.TpToGun = false
+            trackingTpToGun = false
+        else
+            local gunPart = ObterArmaCaida(root)
+            if gunPart and not PlayerTemArma() then
+                if not trackingTpToGun then
+                    lastPositionBeforeTpToGun = root.CFrame
+                    trackingTpToGun = true
+                end
+                root.CFrame = gunPart.CFrame * CFrame.new(0, 3, 0)
             end
-            root.CFrame = gunPart.CFrame * CFrame.new(0, 3, 0)
         end
     else
         if trackingTpToGun then
             if lastPositionBeforeTpToGun then
                 root.CFrame = lastPositionBeforeTpToGun
+                lastPositionBeforeTpToGun = nil
             end
             trackingTpToGun = false
-        end
-        if VerificarSeSouMurderer() then
-            Configs.TpToGun = false
         end
     end
 end)
