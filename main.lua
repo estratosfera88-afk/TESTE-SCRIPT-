@@ -1,5 +1,5 @@
 -- [[
---     AKAT MM2 MAIN LOGIC - FULLY UPDATED & FIXED [v4.5 - MODERN AIMBOT EDITION]
+--     AKAT MM2 MAIN LOGIC - FULLY UPDATED & FIXED [v4.6 - STEALTH TELEPORT EDITION]
 --     Compatível com Delta Mobile & PC | MM2 (2026)
 -- ]]
 
@@ -33,6 +33,12 @@ local Configs = {
 }
 _G.Configs = Configs
 
+-- ==================== SISTEMA COMPLEMENTAR DE DETECÇÃO DE ARMA ====================
+local function PlayerTemArma()
+    if player.Backpack:FindFirstChild("Gun") or (player.Character and player.Character:FindFirstChild("Gun")) then return true end
+    return false
+end
+
 -- ==================== ANTI-BAN / ANTI-KICK & METAMETHOD HOOKS ====================
 local oldIndex = nil
 local oldNamecall = nil
@@ -60,8 +66,8 @@ task.spawn(function()
                 end)
             end
             
-            -- SILENT AIM METAMETHOD
-            if Configs.Aimbot and self == mouse then
+            -- SILENT AIM METAMETHOD (SÓ FUNCIONA SE TIVER A ARMA)
+            if Configs.Aimbot and PlayerTemArma() and self == mouse then
                 if key == "Hit" or key == "hit" then
                     local murderer = _G.AS_GetMurderer()
                     local pChar = murderer and murderer.Character
@@ -256,6 +262,9 @@ local function ToggleAimbot(enabled)
     if enabled then
         aimbotConnection = RunService.RenderStepped:Connect(function()
             if not Configs.Aimbot then return end
+            -- Correção: Só executa a trava mecânica da câmera se o jogador possuir a Arma
+            if not PlayerTemArma() then return end
+            
             local murderer = AS_GetMurderer()
             if murderer and murderer.Character then
                 local head = murderer.Character:FindFirstChild("Head")
@@ -263,7 +272,6 @@ local function ToggleAimbot(enabled)
                 local hum = char and char:FindFirstChildOfClass("Humanoid")
                 
                 if head and hum and hum.Health > 0 then
-                    -- Rastreamento de câmera direto, fluido e sem afetar a física ou travar o movimento do client
                     Camera.CFrame = CFrame.new(Camera.CFrame.Position, head.Position)
                 end
             end
@@ -285,11 +293,6 @@ local function ObterArmaCaida(root)
         end
     end
     return nil
-end
-
-local function PlayerTemArma()
-    if player.Backpack:FindFirstChild("Gun") or (player.Character and player.Character:FindFirstChild("Gun")) then return true end
-    return false
 end
 
 local function ObterMoedaProxima(root)
@@ -440,7 +443,6 @@ task.spawn(function()
                         local distance = (root.Position - target.Position).Magnitude
                         
                         if distance > 0 then
-                            -- Modificado: Velocidade reduzida de 70 para 35 para suavizar e parecer legítimo
                             local speed = 35 
                             local duration = distance / speed
                             local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
@@ -467,10 +469,10 @@ task.spawn(function()
                         
                         pcall(function()
                             firetouchinterest(root, target, 0)
-                            task.wait(0.04) -- Delay sutil extra de estabilização pós-toque
+                            task.wait(0.04) 
                             firetouchinterest(root, target, 1)
                         end)
-                        task.wait(0.15) -- Delay pós-coleta aumentado para evitar spam de pacotes
+                        task.wait(0.15) 
                     else
                         root.Anchored = false
                     end
@@ -564,26 +566,40 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- CORREÇÃO TELEPORT TO GUN (DOUBLE VERIFICATION: ROLE & KNIFE POSSESSION)
+    -- CORREÇÃO E OTIMIZAÇÃO COMPLETA: TELEPORT TO GUN
     local isMurdererRole = (PlayerRoles[player] == "Murderer")
     local hasKnife = player.Backpack:FindFirstChild("Knife") or (char and char:FindFirstChild("Knife")) or player.Backpack:FindFirstChild("Faca") or (char and char:FindFirstChild("Faca"))
 
     if Configs.TpToGun then
         if isMurdererRole or hasKnife then
-            -- Força a desativação imediata caso seja o assassino ou esteja armado de faca
+            -- Força o desligamento imediato por motivos de segurança do cargo
             Configs.TpToGun = false
-            trackingTpToGun = false
+            if trackingTpToGun then
+                if lastPositionBeforeTpToGun then root.CFrame = lastPositionBeforeTpToGun; lastPositionBeforeTpToGun = nil end
+                trackingTpToGun = false
+            end
         else
+            -- RESOLVIDO: O Script agora analisa a arma em tempo real, independente de quando a função foi ligada
             local gunPart = ObterArmaCaida(root)
+            
             if gunPart and not PlayerTemArma() then
                 if not trackingTpToGun then
-                    lastPositionBeforeTpToGun = root.CFrame
+                    lastPositionBeforeTpToGun = root.CFrame -- Salva a posição original perfeitamente
                     trackingTpToGun = true
                 end
                 root.CFrame = gunPart.CFrame * CFrame.new(0, 3, 0)
+            -- RESOLVIDO: Ao pegar a arma (PlayerTemArma vira true), ele retorna à posição de antes e encerra o TP
+            elseif PlayerTemArma() and trackingTpToGun then
+                if lastPositionBeforeTpToGun then
+                    root.CFrame = lastPositionBeforeTpToGun
+                    lastPositionBeforeTpToGun = nil
+                end
+                trackingTpToGun = false
+                Configs.TpToGun = false
             end
         end
     else
+        -- Se o botão for desligado manualmente no painel enquanto executa o TP, também retorna ao local original
         if trackingTpToGun then
             if lastPositionBeforeTpToGun then
                 root.CFrame = lastPositionBeforeTpToGun
