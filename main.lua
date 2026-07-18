@@ -1,5 +1,6 @@
 -- [[
---     AKAT MM2 MAIN LOGIC - FULLY UPDATED & FIXED [v4.0 - MOBILE & ANTI-KICK BYPASS]
+--     AKAT MM2 MAIN LOGIC - FULLY UPDATED & FIXED [v4.1 - SHOOT MURDER EDITION]
+--     Compatível com Delta Mobile & PC | MM2 (2026)
 -- ]]
 
 local Players = game:GetService("Players")
@@ -16,13 +17,13 @@ local mouse = player:GetMouse()
 local gunDroppedThisRound = false
 local lastPositionBeforeTpToGun = nil 
 local trackingTpToGun = false
-_G.ForceAutoShoot = false
 local rotationConnection = nil
+_G.IsShootingMurder = false -- Flag do novo Silent Aimbot
 
 -- Configurações expostas de forma Global
 local Configs = {
     ESP = false,
-    AutoShoot = false,
+    ShootMurder = false, -- Antigo AutoShoot
     Speed = false,
     Reach = false,
     AntiFling = false,
@@ -60,12 +61,13 @@ task.spawn(function()
                 end)
             end
             
-            if _G.Configs and (_G.Configs.AutoShoot or _G.ForceAutoShoot) and self == mouse then
+            -- SILENT AIMBOT INSTANTÂNEO (Ativado apenas no momento do tiro)
+            if _G.IsShootingMurder and self == mouse then
                 if key == "Hit" or key == "hit" then
                     local murderer = _G.AS_GetMurderer()
                     local pChar = murderer and murderer.Character
                     local head = pChar and (pChar:FindFirstChild("Head") or pChar:FindFirstChild("HumanoidRootPart"))
-                    if head then return CFrame.new(head.Position) end
+                    if head then return head.CFrame end
                 elseif key == "Target" or key == "target" then
                     local murderer = _G.AS_GetMurderer()
                     local pChar = murderer and murderer.Character
@@ -231,9 +233,7 @@ local function ESP_Disable()
     ESP_ClearAll()
 end
 
--- ==================== AUTO SHOOT SYSTEM ====================
-local AS = { lastShot = 0, cooldown = 0.35, maxRange = 250 }
-
+-- ==================== NEW: SHOOT MURDER LOGIC ====================
 local function AS_HasGun()
     local char = player.Character
     if not char then return false, nil end
@@ -245,27 +245,27 @@ local function AS_HasGun()
             end
         end
     end
+    for _, item in ipairs(player.Backpack:GetChildren()) do
+        if item:IsA("Tool") then
+            local n = item.Name:lower()
+            if n:find("gun") or n:find("pistol") or n:find("revolver") or n:find("sheriff") or n:find("arma") then
+                return true, item
+            end
+        end
+    end
     return false, nil
 end
 
 local function AS_GetMurderer()
-    local myChar = player.Character
-    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    if not myRoot then return nil end
-
-    local bestTarget, bestDist = nil, AS.maxRange
-
+    local bestTarget = nil
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= player and PlayerRoles[p] == "Murderer" then
             local pChar = p.Character
             local pRoot = pChar and pChar:FindFirstChild("HumanoidRootPart")
             local pHum  = pChar and pChar:FindFirstChildOfClass("Humanoid")
             if pRoot and pHum and pHum.Health > 0 then
-                local dist = (myRoot.Position - pRoot.Position).Magnitude
-                if dist < bestDist then
-                    bestDist   = dist
-                    bestTarget = p
-                end
+                bestTarget = p
+                break
             end
         end
     end
@@ -273,20 +273,36 @@ local function AS_GetMurderer()
 end
 _G.AS_GetMurderer = AS_GetMurderer
 
-local function AS_Tick()
-    if not Configs.AutoShoot then return end
-    
-    local hasGun, gunTool = AS_HasGun()
-    if not hasGun or not gunTool then return end
+local function ExecuteShootMurder()
+    if _G.IsShootingMurder then return end -- Evita spam de cliques
     
     local murderer = AS_GetMurderer()
-    if murderer and tick() - AS.lastShot >= AS.cooldown then
-        AS.lastShot = tick()
-        _G.ForceAutoShoot = true
-        pcall(function()
-            gunTool:Activate()
-        end)
+    if not murderer then return end
+
+    local hasGun, gunTool = AS_HasGun()
+    if not hasGun or not gunTool then return end
+
+    local char = player.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+
+    -- Equipa a arma automaticamente caso esteja na mochila
+    if gunTool.Parent == player.Backpack then
+        hum:EquipTool(gunTool)
+        task.wait(0.05) -- Tempo mínimo de segurança pro servidor registrar a arma
     end
+
+    -- Ativa o Silent Aimbot no Metamethod
+    _G.IsShootingMurder = true
+
+    pcall(function()
+        gunTool:Activate()
+    end)
+
+    -- Desativa o Aimbot quase instantaneamente para manter a câmera livre e natural
+    task.delay(0.15, function()
+        _G.IsShootingMurder = false
+    end)
 end
 
 -- ==================== LÓGICA DE PROCURA DE ITENS & SEGURANÇA ====================
@@ -409,79 +425,97 @@ local function CriarBotaoFlutuante()
     ScreenGui.ResetOnSpawn = false
 
     local Button = Instance.new("TextButton")
-    Button.Name = "AutoShootButton"
+    Button.Name = "ShootMurderButton"
     Button.Parent = ScreenGui
     Button.Size = UDim2.new(0, 150, 0, 46) 
     Button.Position = UDim2.new(0.85, -87, 0.5, -23)
-    Button.Text = "Auto Shoot: OFF"
+    Button.Text = "Shoot Murder"
     Button.TextColor3 = Color3.fromRGB(255, 255, 255)
     Button.Font = Enum.Font.GothamBold
     Button.TextSize = 14
-    Button.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-    Button.BackgroundTransparency = 0.2
+    Button.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    Button.AutoButtonColor = false -- Animação manual será mais bonita
     Button.ClipsDescendants = true
 
+    -- Cantos totalmente arredondados
     local UICorner = Instance.new("UICorner")
-    UICorner.CornerRadius = UDim.new(0, 8)
+    UICorner.CornerRadius = UDim.new(1, 0)
     UICorner.Parent = Button
 
-    -- MODIFICADO: Contorno em Vermelho Escuro
+    -- Contorno em Vermelho Escuro
     local UIStroke = Instance.new("UIStroke")
     UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     UIStroke.Thickness = 3
-    UIStroke.Color = Color3.fromRGB(139, 0, 0)
+    UIStroke.Color = Color3.fromRGB(255, 255, 255) -- Cor base para o gradiente agir
     UIStroke.Parent = Button
 
-    -- MODIFICADO: Fundo com Gradiente Preto Giratório Contínuo
-    local UIGradient = Instance.new("UIGradient")
-    UIGradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(40, 10, 10)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))
+    -- Gradiente animado para o FUNDO
+    local BgGradient = Instance.new("UIGradient")
+    BgGradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(15, 15, 15)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(45, 10, 10)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 15, 15))
     })
-    UIGradient.Parent = Button
+    BgGradient.Parent = Button
 
+    -- Gradiente animado para a BORDA
+    local StrokeGradient = Instance.new("UIGradient")
+    StrokeGradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(139, 0, 0)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 50, 50)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(139, 0, 0))
+    })
+    StrokeGradient.Parent = UIStroke
+
+    -- Rotação de 60 FPS otimizada (Usando tick() para não travar mesmo em lag)
     rotationConnection = RunService.RenderStepped:Connect(function()
-        if UIGradient and UIGradient.Parent then
-            UIGradient.Rotation = (UIGradient.Rotation + 3) % 360
+        if Button.Parent then
+            local spin = (tick() * 120) % 360
+            BgGradient.Rotation = spin
+            StrokeGradient.Rotation = -spin -- Gira no sentido oposto para visual dinâmico
         else
             if rotationConnection then rotationConnection:Disconnect(); rotationConnection = nil end
         end
     end)
 
+    -- Sistema de Dragging Moderno (Mobile/PC Friendly)
     local dragging, dragInput, dragStart, startPos
+    local isClick = false
+
     Button.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
+            isClick = true
             dragStart = input.Position
             startPos = Button.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then dragging = false end
-            end)
+            
+            -- Efeito visual de click (escurecer levemente)
+            TweenService:Create(Button, TweenInfo.new(0.1), {Size = UDim2.new(0, 140, 0, 42)}):Play()
         end
     end)
+
     Button.InputChanged:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
             dragInput = input
         end
     end)
+
     UserInputService.InputChanged:Connect(function(input)
         if input == dragInput and dragging then
             local delta = input.Position - dragStart
+            if delta.Magnitude > 5 then isClick = false end -- Se mover mais de 5 pixels, é drag, não click
             Button.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
     end)
 
-    Button.MouseButton1Click:Connect(function()
-        Configs.AutoShoot = not Configs.AutoShoot
-        if Configs.AutoShoot then
-            Button.Text = "Auto Shoot: ON"
-            if _G.AkatCallbacks and _G.AkatCallbacks.FireShoot then
-                _G.AkatCallbacks.FireShoot()
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+            TweenService:Create(Button, TweenInfo.new(0.1), {Size = UDim2.new(0, 150, 0, 46)}):Play()
+            
+            if isClick then
+                ExecuteShootMurder()
             end
-        else
-            Button.Text = "Auto Shoot: OFF"
-            _G.ForceAutoShoot = false
         end
     end)
 end
@@ -528,48 +562,32 @@ _G.AkatCallbacks = {
             if hum then hum.PlatformStand = false end
         end
     end,
-    AutoShoot = function(enabled)
-        Configs.AutoShoot = enabled
+    
+    -- Atualizado para refletir o novo sistema
+    ["Shoot murder"] = function(enabled)
+        Configs.ShootMurder = enabled
         if enabled then
             CriarBotaoFlutuante()
         else
             DestruirBotaoFlutuante()
         end
     end,
-    ["Shoot murder"] = function(enabled)
-        if _G.AkatCallbacks.AutoShoot then
-            _G.AkatCallbacks.AutoShoot(enabled)
+    
+    AutoShoot = function(enabled) -- Mantido para compatibilidade reversa com a UI antiga
+        if _G.AkatCallbacks["Shoot murder"] then
+            _G.AkatCallbacks["Shoot murder"](enabled)
         end
     end,
-    FireShoot = function()
-        local char = player.Character
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if not char or not hum then return end
-
-        local gunTool = char:FindFirstChild("Gun") or player.Backpack:FindFirstChild("Gun")
-        if not gunTool then
-            for _, item in ipairs(player.Backpack:GetChildren()) do
-                local n = item.Name:lower()
-                if n:find("gun") or n:find("pistol") or n:find("revolver") or n:find("arma") then
-                    gunTool = item
-                    break
-                end
-            end
-        end
-
-        if gunTool and gunTool.Parent == player.Backpack then
-            hum:EquipTool(gunTool)
-        end
-    end,
+    
     ShutdownAll = function()
         LimparEDesligarAbsolutamente()
     end
 }
 
--- ==================== THREAD DO AUTO COLLECT (ANTI-KICK MODIFICADO) ====================
+-- ==================== THREAD DO AUTO COLLECT ====================
 task.spawn(function()
     while true do
-        task.wait(0.2) -- Intervalo dinâmico de segurança contra detecções
+        task.wait(0.2) 
         if Configs.AutoCollect then
             local char = player.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -589,7 +607,6 @@ task.spawn(function()
                         
                         local distance = (root.Position - target.Position).Magnitude
                         if distance > 0 then
-                            -- CORREÇÃO ANTI-KICK: Velocidade suavizada que não quebra o limite de conferência de física do servidor Roblox
                             local speed = 65 
                             local duration = distance / speed
                             local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
@@ -614,7 +631,7 @@ task.spawn(function()
                             firetouchinterest(root, target, 0)
                             firetouchinterest(root, target, 1)
                         end)
-                        task.wait(0.1) -- Pausa adaptativa pós coleta
+                        task.wait(0.1) 
                     else
                         hum.PlatformStand = false
                     end
@@ -724,10 +741,6 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
             Configs.TpToGun = false
         end
     end
-end)
-
-renderConnection = RunService.RenderStepped:Connect(function()
-    AS_Tick()
 end)
 
 -- THREAD STATUS (SCANNER DE FUNÇÕES)
