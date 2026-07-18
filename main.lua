@@ -1,5 +1,5 @@
 -- [[
---     AKAT MM2 MAIN LOGIC - FULLY UPDATED & FIXED [v4.6 - STEALTH TELEPORT EDITION]
+--     AKAT MM2 MAIN LOGIC - FULLY UPDATED & OPTIMIZED [v4.7 - ANTI-CRASH EDITION]
 --     Compatível com Delta Mobile & PC | MM2 (2026)
 -- ]]
 
@@ -33,11 +33,21 @@ local Configs = {
 }
 _G.Configs = Configs
 
--- ==================== SISTEMA COMPLEMENTAR DE DETECÇÃO DE ARMA ====================
+-- ==================== CAMADA DE CACHE CENTRALIZADO (PREVINE CRASH) ====================
+local CachedState = {
+    HasGun = false,
+    Murderer = nil,
+    Coins = {}
+}
+
 local function PlayerTemArma()
-    if player.Backpack:FindFirstChild("Gun") or (player.Character and player.Character:FindFirstChild("Gun")) then return true end
-    return false
+    return CachedState.HasGun
 end
+
+local function AS_GetMurderer()
+    return CachedState.Murderer
+end
+_G.AS_GetMurderer = AS_GetMurderer
 
 -- ==================== ANTI-BAN / ANTI-KICK & METAMETHOD HOOKS ====================
 local oldIndex = nil
@@ -66,15 +76,15 @@ task.spawn(function()
                 end)
             end
             
-            -- SILENT AIM METAMETHOD (SÓ FUNCIONA SE TIVER A ARMA)
-            if Configs.Aimbot and PlayerTemArma() and self == mouse then
+            -- SILENT AIM METAMETHOD OTIMIZADO (Lê direto do cache)
+            if Configs.Aimbot and CachedState.HasGun and self == mouse then
                 if key == "Hit" or key == "hit" then
-                    local murderer = _G.AS_GetMurderer()
+                    local murderer = CachedState.Murderer
                     local pChar = murderer and murderer.Character
                     local head = pChar and (pChar:FindFirstChild("Head") or pChar:FindFirstChild("HumanoidRootPart"))
                     if head then return head.CFrame end
                 elseif key == "Target" or key == "target" then
-                    local murderer = _G.AS_GetMurderer()
+                    local murderer = CachedState.Murderer
                     local pChar = murderer and murderer.Character
                     local head = pChar and (pChar:FindFirstChild("Head") or pChar:FindFirstChild("HumanoidRootPart"))
                     if head then return head end
@@ -97,7 +107,7 @@ task.spawn(function()
     if player.Character then applyBypass(player.Character) end
 end)
 
--- ==================== VARIÁVEIS DE ESTADO INTERNAS ====================
+-- ==================== VARIÁVEI DE ESTADO INTERNAS ====================
 local PlayerRoles = {}
 local ESPHighlights = {}
 local espEventConnections = {}
@@ -237,35 +247,18 @@ local function ESP_Disable()
     ESP_ClearAll()
 end
 
-local function AS_GetMurderer()
-    local bestTarget = nil
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= player and PlayerRoles[p] == "Murderer" then
-            local pChar = p.Character
-            local pRoot = pChar and pChar:FindFirstChild("HumanoidRootPart")
-            local pHum  = pChar and pChar:FindFirstChildOfClass("Humanoid")
-            if pRoot and pHum and pHum.Health > 0 then
-                bestTarget = p
-                break
-            end
-        end
-    end
-    return bestTarget
-end
-_G.AS_GetMurderer = AS_GetMurderer
-
 -- ==================== NOVO SISTEMA DE AIMBOT MODERNO ====================
 local function ToggleAimbot(enabled)
+    if Configs.Aimbot == enabled and aimbotConnection then return end -- Proteção contra chamadas repetidas da UI
     Configs.Aimbot = enabled
     if aimbotConnection then aimbotConnection:Disconnect(); aimbotConnection = nil end
     
     if enabled then
         aimbotConnection = RunService.RenderStepped:Connect(function()
             if not Configs.Aimbot then return end
-            -- Correção: Só executa a trava mecânica da câmera se o jogador possuir a Arma
-            if not PlayerTemArma() then return end
+            if not CachedState.HasGun then return end -- Ultra leve: validação direta por boolean em cache
             
-            local murderer = AS_GetMurderer()
+            local murderer = CachedState.Murderer
             if murderer and murderer.Character then
                 local head = murderer.Character:FindFirstChild("Head")
                 local char = player.Character
@@ -295,22 +288,18 @@ local function ObterArmaCaida(root)
     return nil
 end
 
+-- RESOLVIDO CRASH: Puxa a lista de moedas pré-escaneada pelo Cache (Custo zero de processamento)
 local function ObterMoedaProxima(root)
     local closestCoin, closestDist = nil, math.huge
-    for _, d in ipairs(workspace:GetDescendants()) do
-        if d:IsA("BasePart") and d.Transparency < 1 then
-            local name = d.Name:lower()
-            if name:find("coin") or name:find("moeda") or name:find("gold") or name == "snowflake"
-                or name == "candycane" or name:find("token") or name:find("diamond")
-                or name:find("present") or name:find("candy") then
-                if not d:IsDescendantOf(Players) and not d:FindFirstAncestorOfClass("Tool")
-                    and not d:FindFirstAncestorOfClass("Accessory") then
-                    local dist = (root.Position - d.Position).Magnitude
-                    if dist < closestDist and dist < 1500 then
-                        closestDist = dist
-                        closestCoin = d
-                    end
-                end
+    local listaMoedas = CachedState.Coins
+    
+    for i = 1, #listaMoedas do
+        local d = listaMoedas[i]
+        if d and d.Parent then
+            local dist = (root.Position - d.Position).Magnitude
+            if dist < closestDist and dist < 1500 then
+                closestDist = dist
+                closestCoin = d
             end
         end
     end
@@ -420,7 +409,7 @@ _G.AkatCallbacks = {
     end
 }
 
--- ==================== THREAD DO AUTO COLLECT (MENOS RÁPIDO / STEALTH) ====================
+-- ==================== THREAD DO AUTO COLLECT (LEVE E OTIMIZADA) ====================
 task.spawn(function()
     while true do
         task.wait(0.15) 
@@ -566,30 +555,27 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- CORREÇÃO E OTIMIZAÇÃO COMPLETA: TELEPORT TO GUN
+    -- TELEPORT TO GUN
     local isMurdererRole = (PlayerRoles[player] == "Murderer")
     local hasKnife = player.Backpack:FindFirstChild("Knife") or (char and char:FindFirstChild("Knife")) or player.Backpack:FindFirstChild("Faca") or (char and char:FindFirstChild("Faca"))
 
     if Configs.TpToGun then
         if isMurdererRole or hasKnife then
-            -- Força o desligamento imediato por motivos de segurança do cargo
             Configs.TpToGun = false
             if trackingTpToGun then
                 if lastPositionBeforeTpToGun then root.CFrame = lastPositionBeforeTpToGun; lastPositionBeforeTpToGun = nil end
                 trackingTpToGun = false
             end
         else
-            -- RESOLVIDO: O Script agora analisa a arma em tempo real, independente de quando a função foi ligada
             local gunPart = ObterArmaCaida(root)
             
-            if gunPart and not PlayerTemArma() then
+            if gunPart and not CachedState.HasGun then
                 if not trackingTpToGun then
-                    lastPositionBeforeTpToGun = root.CFrame -- Salva a posição original perfeitamente
+                    lastPositionBeforeTpToGun = root.CFrame 
                     trackingTpToGun = true
                 end
                 root.CFrame = gunPart.CFrame * CFrame.new(0, 3, 0)
-            -- RESOLVIDO: Ao pegar a arma (PlayerTemArma vira true), ele retorna à posição de antes e encerra o TP
-            elseif PlayerTemArma() and trackingTpToGun then
+            elseif CachedState.HasGun and trackingTpToGun then
                 if lastPositionBeforeTpToGun then
                     root.CFrame = lastPositionBeforeTpToGun
                     lastPositionBeforeTpToGun = nil
@@ -599,7 +585,6 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
             end
         end
     else
-        -- Se o botão for desligado manualmente no painel enquanto executa o TP, também retorna ao local original
         if trackingTpToGun then
             if lastPositionBeforeTpToGun then
                 root.CFrame = lastPositionBeforeTpToGun
@@ -610,26 +595,59 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
     end
 end)
 
--- THREAD STATUS (SCANNER DE FUNÇÕES)
+-- ==================== THREAD CENTRAL DE SCANNER E CACHE COLETOR ====================
 task.spawn(function()
+    local tempoUltimoScanMoedas = 0
+    
     while true do
         local gunFoundInPlayers = false
         local knifeFoundInPlayers = false
+        local localPlayerHasGun = false
         local currentMurderer, currentSheriff = nil, nil
         
+        -- Loop de verificação de Inventários / Roles
         for _, p in ipairs(Players:GetPlayers()) do
             local role = PlayerRoles[p]
             if role == "Murderer" then currentMurderer = p end
             if role == "Sheriff"  then currentSheriff  = p end
             
             if p.Character then
-                if p.Character:FindFirstChild("Gun") or p.Backpack:FindFirstChild("Gun") then gunFoundInPlayers = true end
+                local temArma = p.Character:FindFirstChild("Gun") or p.Backpack:FindFirstChild("Gun")
+                if temArma then 
+                    gunFoundInPlayers = true 
+                    if p == player then localPlayerHasGun = true end
+                end
                 if p.Character:FindFirstChild("Knife") or p.Backpack:FindFirstChild("Knife") then knifeFoundInPlayers = true end
             end
             
             if Configs.ESP and p ~= player then
                 ESP_UpdatePlayer(p)
             end
+        end
+        
+        -- Atualiza o estado da Arma Local e do Murderer para o Aimbot (Custo zero no render)
+        CachedState.HasGun = localPlayerHasGun
+        CachedState.Murderer = currentMurderer
+
+        -- RESOLVIDO CRASH: Sincroniza a busca de moedas para rodar apenas 1 vez por segundo
+        if Configs.AutoCollect and (tick() - tempoUltimoScanMoedas > 1.0) then
+            tempoUltimoScanMoedas = tick()
+            local moedasEncontradas = {}
+            
+            for _, d in ipairs(workspace:GetDescendants()) do
+                if d:IsA("BasePart") and d.Transparency < 1 then
+                    local name = d.Name:lower()
+                    if name:find("coin") or name:find("moeda") or name:find("gold") or name == "snowflake"
+                        or name == "candycane" or name:find("token") or name:find("diamond")
+                        or name:find("present") or name:find("candy") then
+                        if not d:IsDescendantOf(Players) and not d:FindFirstAncestorOfClass("Tool")
+                            and not d:FindFirstAncestorOfClass("Accessory") then
+                            table.insert(moedasEncontradas, d)
+                        end
+                    end
+                end
+            end
+            CachedState.Coins = moedasEncontradas
         end
         
         local gunDropExists = workspace:FindFirstChild("GunDrop", true) ~= nil
@@ -649,7 +667,7 @@ task.spawn(function()
             end
             EnviarMensagemChat(msg)
         end
-        task.wait(0.4)
+        task.wait(0.3)
     end
 end)
 
