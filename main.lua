@@ -1,5 +1,5 @@
 -- [[
---     AKAT MM2 MAIN LOGIC - FULLY UPDATED & FIXED [v5.0 - AIMBOT & RE-DESIGN EDITION]
+--     AKAT MM2 MAIN LOGIC - FULLY UPDATED & FIXED [v5.1 - ANTI-KICK CIRCULAR COLLECT]
 --     Compatível com Delta Mobile & PC | MM2 (2026)
 -- ]]
 
@@ -404,10 +404,10 @@ _G.AkatCallbacks = {
     end
 }
 
--- ==================== THREAD DO AUTO COLLECT (GIRO RÁPIDO & MAIS PERTO) ====================
+-- ==================== THREAD DO AUTO COLLECT (MOVIMENTO EM CÍRCULO / ANTI-KICK) ====================
 task.spawn(function()
     while true do
-        task.wait(0.02) -- Frequência de busca aumentada para máxima prioridade
+        task.wait(0.05) 
         if Configs.AutoCollect then
             local char = player.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -424,33 +424,54 @@ task.spawn(function()
                     local target = ObterMoedaProxima(root)
                     if target and target.Parent then
                         currentCollectTarget = target
-                        local distance = (root.Position - target.Position).Magnitude
                         
-                        if distance > 0 then
-                            -- Gira o personagem em altíssima velocidade continuamente enquanto farma
-                            local spinAngle = (tick() * 2500) % 360
-                            local targetCFrame = CFrame.new(target.Position + Vector3.new(0, 1.5, 0)) * CFrame.Angles(0, math.rad(spinAngle), 0)
-                            
-                            local noclipConn
-                            noclipConn = RunService.Stepped:Connect(function()
-                                if char then
-                                    for _, part in ipairs(char:GetChildren()) do
-                                        if part:IsA("BasePart") then part.CanCollide = false end
-                                    end
+                        -- Configurações de velocidade segura e movimento circular bypass
+                        local moveSpeed = 50 -- Velocidade física ideal para evitar o "Invalid position"
+                        local circleRadius = 2.5 -- Raio da órbita circular
+                        local circleSpeed = 16 -- Velocidade da rotação em órbita
+                        
+                        local noclipConn
+                        noclipConn = RunService.Stepped:Connect(function()
+                            if char then
+                                for _, part in ipairs(char:GetChildren()) do
+                                    if part:IsA("BasePart") then part.CanCollide = false end
                                 end
-                            end)
+                            end
+                        end)
+                        
+                        -- Deslocamento em espiral contínuo em vez de teletransporte seco
+                        while Configs.AutoCollect and target and target.Parent and (root.Position - target.Position).Magnitude > 1.2 do
+                            local dt = RunService.Heartbeat:Wait()
+                            if not root or not target or not target.Parent then break end
                             
+                            local targetPos = target.Position + Vector3.new(0, 1.2, 0)
+                            local currentPos = root.Position
+                            local distance = (targetPos - currentPos).Magnitude
+                            local direction = (targetPos - currentPos).Unit
+                            
+                            -- Cálculo matemático da trajetória em círculo (Bypass de vetor)
+                            local angle = tick() * circleSpeed
+                            -- Reduz dinamicamente o raio do círculo conforme se aproxima para tocar na moeda perfeitamente
+                            local dynamicRadius = circleRadius * math.min(1, distance / 6)
+                            local offset = Vector3.new(math.cos(angle) * dynamicRadius, 0, math.sin(angle) * dynamicRadius)
+                            
+                            local nextStep = direction * math.min(moveSpeed * dt, distance)
                             root.Velocity = Vector3.new(0, 0, 0)
-                            root.Anchored = true 
-                            root.CFrame = targetCFrame
                             
+                            -- Move aplicando a órbita circular e girando o personagem ao mesmo tempo
+                            local spinAngle = (tick() * 1000) % 360
+                            root.CFrame = CFrame.new(currentPos + nextStep + offset) * CFrame.Angles(0, math.rad(spinAngle), 0)
+                        end
+                        
+                        if noclipConn then noclipConn:Disconnect() end
+                        
+                        -- Garante o registro da coleta
+                        if target and target.Parent then
                             pcall(function()
                                 firetouchinterest(root, target, 0)
+                                task.wait(0.01)
                                 firetouchinterest(root, target, 1)
                             end)
-                            
-                            if noclipConn then noclipConn:Disconnect() end
-                            root.Anchored = false
                         end
                     else
                         root.Anchored = false
@@ -472,7 +493,6 @@ renderConnection = RunService.RenderStepped:Connect(function()
         if murderer and murderer.Character then
             local head = murderer.Character:FindFirstChild("Head")
             if head then
-                -- Rastreia a cabeça sem alterar o posicionamento físico ou travar o personagem
                 Camera.CFrame = CFrame.new(Camera.CFrame.Position, head.Position)
             end
         end
@@ -576,7 +596,6 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
             end
             trackingTpToGun = false
         end
-        -- Força desligar a config caso seja detectado como Murderer
         if VerificarSeSouMurderer() then
             Configs.TpToGun = false
         end
