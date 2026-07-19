@@ -1,6 +1,6 @@
 -- [[
---     AKAT MM2 MAIN LOGIC - FULLY UPDATED & OPTIMIZED [v5.2 - FIXED EDITION 2026]
---     Compatível com Delta Mobile & PC | MM2 (2026)
+--     AKAT MM2 MAIN LOGIC - FULLY UPDATED & OPTIMIZED [v5.3 - 2026]
+--     AutoCollect V6.0 + Anti-Void | Compatível com Delta Mobile & PC
 -- ]]
 
 local Players = game:GetService("Players")
@@ -33,7 +33,7 @@ local Configs = {
 }
 _G.Configs = Configs
 
--- ==================== CAMADA DE CACHE CENTRALIZADO (PREVINE CRASH) ====================
+-- ==================== CAMADA DE CACHE CENTRALIZADO ====================
 local CachedState = {
     HasGun = false,
     Murderer = nil,
@@ -49,7 +49,7 @@ local function AS_GetMurderer()
 end
 _G.AS_GetMurderer = AS_GetMurderer
 
--- ==================== ANTI-BAN / ANTI-KICK & METAMETHOD HOOKS ====================
+-- ==================== ANTI-BAN & METAMETHOD HOOKS ====================
 local oldIndex = nil
 local oldNamecall = nil
 
@@ -76,7 +76,6 @@ task.spawn(function()
                 end)
             end
             
-            -- SILENT AIM METAMETHOD AJUSTADO PARA HEAD (CABEÇA)
             if Configs.Aimbot and CachedState.HasGun and self == mouse then
                 if key == "Hit" or key == "hit" then
                     local murderer = CachedState.Murderer
@@ -97,7 +96,7 @@ task.spawn(function()
     end
 end)
 
--- ==================== VARIÁVEIS DE ESTADO INTERNAS ====================
+-- ==================== VARIÁVEIS DE ESTADO ====================
 local PlayerRoles = {}
 local ESPHighlights = {}
 local espEventConnections = {}
@@ -116,7 +115,7 @@ local ROLE_COLORS = {
     Innocent  = Color3.fromRGB(0,   200, 80),   
 }
 
--- ==================== SISTEMAS AUXILIARES E DETECÇÕES ====================
+-- ==================== ESP ====================
 local function ESP_DetectRole(p)
     if not p or not p.Parent then return "Innocent" end
     local function scanTools(container)
@@ -208,9 +207,7 @@ end
 
 local function ESP_DisconnectPlayer(p)
     if espEventConnections[p] then
-        for _, c in ipairs(espEventConnections[p]) do
-            if c then pcall(function() c:Disconnect() end) end
-        end
+        for _, c in ipairs(espEventConnections[p]) do pcall(function() c:Disconnect() end) end
         espEventConnections[p] = nil
     end
     if ESPHighlights[p] then
@@ -222,7 +219,7 @@ end
 
 local function ESP_Enable()
     for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= player then ESP_ConnectPlayer(p) end
+        if p \~= player then ESP_ConnectPlayer(p) end
     end
     Players.PlayerAdded:Connect(function(p)
         if Configs.ESP then ESP_ConnectPlayer(p) end
@@ -239,7 +236,7 @@ local function ESP_Disable()
     ESP_ClearAll()
 end
 
--- ==================== NOVO SISTEMA DE AIMBOT COM SHIFT LOCK SEGURO ====================
+-- ==================== AIMBOT ====================
 local function ToggleAimbot(enabled)
     if Configs.Aimbot == enabled then return end 
     Configs.Aimbot = enabled
@@ -247,8 +244,7 @@ local function ToggleAimbot(enabled)
     
     if enabled then
         aimbotConnection = RunService.RenderStepped:Connect(function()
-            if not Configs.Aimbot then return end
-            if not CachedState.HasGun then return end
+            if not Configs.Aimbot or not CachedState.HasGun then return end
             
             local murderer = CachedState.Murderer
             if murderer and murderer.Character then
@@ -258,10 +254,7 @@ local function ToggleAimbot(enabled)
                 local hum = char and char:FindFirstChildOfClass("Humanoid")
                 
                 if head and root and hum and hum.Health > 0 then
-                    -- Alinha a Câmera diretamente na Cabeça do Murderer
                     Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, head.Position)
-                    
-                    -- Simulação de Shift Lock: Gira o corpo do personagem no eixo Y (evita inclinar para cima/baixo)
                     local targetLook = Vector3.new(head.Position.X, root.Position.Y, head.Position.Z)
                     root.CFrame = CFrame.lookAt(root.Position, targetLook)
                 end
@@ -270,17 +263,13 @@ local function ToggleAimbot(enabled)
     end
 end
 
--- ==================== LÓGICA DE PROCURA DE ITENS & SEGURANÇA ====================
+-- ==================== FUNÇÕES AUXILIARES ====================
 local function ObterArmaCaida(root)
     local gun = workspace:FindFirstChild("GunDrop", true)
     if gun then
-        local targetPart = nil
-        if gun:IsA("BasePart") then targetPart = gun
-        elseif gun:IsA("Model") then targetPart = gun:FindFirstChildOfClass("BasePart") or gun.PrimaryPart
-        elseif gun:IsA("Tool") then targetPart = gun:FindFirstChild("Handle") or gun:FindFirstChildOfClass("BasePart")
-        end
-        if targetPart and root then
-            if (root.Position - targetPart.Position).Magnitude < 1500 then return targetPart end
+        local targetPart = gun:IsA("BasePart") and gun or gun:FindFirstChildOfClass("BasePart") or gun.PrimaryPart
+        if targetPart and root and (root.Position - targetPart.Position).Magnitude < 1500 then 
+            return targetPart 
         end
     end
     return nil
@@ -288,10 +277,7 @@ end
 
 local function ObterMoedaProxima(root)
     local closestCoin, closestDist = nil, math.huge
-    local listaMoedas = CachedState.Coins
-    
-    for i = 1, #listaMoedas do
-        local d = listaMoedas[i]
+    for _, d in ipairs(CachedState.Coins) do
         if d and d.Parent then
             local dist = (root.Position - d.Position).Magnitude
             if dist < closestDist and dist < 1500 then
@@ -321,45 +307,39 @@ local function IsBagFull()
 end
 
 local function EnviarMensagemChat(msg)
-    local TextChatService = game:GetService("TextChatService")
-    local ReplicatedStorage = game:GetService("ReplicatedStorage")
     pcall(function()
+        local TextChatService = game:GetService("TextChatService")
+        local ReplicatedStorage = game:GetService("ReplicatedStorage")
         if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
             local channel = TextChatService.TextChannels:FindFirstChild("RBXGeneral")
             if channel then channel:SendAsync(msg) end
         else
-            local chatEvent = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
-                and ReplicatedStorage.DefaultChatSystemChatEvents:FindFirstChild("SayMessageRequest")
+            local chatEvent = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents") and ReplicatedStorage.DefaultChatSystemChatEvents:FindFirstChild("SayMessageRequest")
             if chatEvent then chatEvent:FireServer(msg, "All") end
         end
     end)
 end
 
 local function LimparEDesligarAbsolutamente()
-    if hbConnection then hbConnection:Disconnect(); hbConnection = nil end
-    if steppedConnection then steppedConnection:Disconnect(); steppedConnection = nil end
-    if aimbotConnection then aimbotConnection:Disconnect(); aimbotConnection = nil end
+    if hbConnection then hbConnection:Disconnect() end
+    if steppedConnection then steppedConnection:Disconnect() end
+    if aimbotConnection then aimbotConnection:Disconnect() end
     for k in pairs(Configs) do Configs[k] = false end
     ESP_Disable()
-    if safePlatform then pcall(function() safePlatform:Destroy() end); safePlatform = nil end
-    if autoCollectTween then autoCollectTween:Cancel(); autoCollectTween = nil end
+    if safePlatform then safePlatform:Destroy() end
+    if autoCollectTween then autoCollectTween:Cancel() end
     pcall(function()
         local char = player.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if hum then 
-            hum.WalkSpeed = 16 
-            local root = char:FindFirstChild("HumanoidRootPart")
-            if root then root.Anchored = false end
-        end
+        if hum then hum.WalkSpeed = 16 end
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then root.Anchored = false end
     end)
 end
 
--- ==================== PONTE DE COMUNICAÇÃO GLOBAL (UI -> BACKEND) ====================
+-- ==================== CALLBACKS UI ====================
 _G.AkatCallbacks = {
-    ESP = function(enabled)
-        Configs.ESP = enabled
-        if enabled then ESP_Enable() else ESP_Disable() end
-    end,
+    ESP = function(enabled) Configs.ESP = enabled; if enabled then ESP_Enable() else ESP_Disable() end end,
     SafeSpot = function(enabled)
         Configs.SafeSpot = enabled
         local char = player.Character
@@ -391,25 +371,12 @@ _G.AkatCallbacks = {
         Configs.AutoCollect = enabled
         if not enabled then 
             currentCollectTarget = nil 
-            if autoCollectTween then
-                autoCollectTween:Cancel()
-                autoCollectTween = nil
-            end
-            
+            if autoCollectTween then autoCollectTween:Cancel() end
             local char = player.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
             if root then 
                 root.Anchored = false 
                 root.AssemblyLinearVelocity = Vector3.zero
-                
-                -- Pousa suavemente no chão evitando o void
-                local rayParams = RaycastParams.new()
-                rayParams.FilterDescendantsInstances = {char}
-                rayParams.FilterType = Enum.RaycastFilterType.Exclude
-                local result = workspace:Raycast(root.Position, Vector3.new(0, -1000, 0), rayParams)
-                if result then
-                    root.CFrame = CFrame.new(result.Position + Vector3.new(0, 3, 0))
-                end
             end
         end
     end,
@@ -422,62 +389,95 @@ _G.AkatCallbacks = {
     ShutdownAll = function() LimparEDesligarAbsolutamente() end
 }
 
--- ==================== THREAD DO AUTO COLLECT COLETANDO IMEDIATAMENTE ====================
+-- ==================== AUTO COLLECT V6.0 ====================
 task.spawn(function()
+    local lastScan = 0
+    local lastTarget = nil
+    
     while true do
-        task.wait(0.02) -- Frequência otimizada para detecção instantânea
-        if Configs.AutoCollect then
-            local char = player.Character
-            local root = char and char:FindFirstChild("HumanoidRootPart")
-            local hum  = char and char:FindFirstChildOfClass("Humanoid")
+        task.wait(0.03)
+        
+        if not Configs.AutoCollect then
+            if autoCollectTween then autoCollectTween:Cancel(); autoCollectTween = nil end
+            currentCollectTarget = nil
+            lastTarget = nil
+            continue
+        end
+
+        local char = player.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+
+        if not root or not hum or hum.Health <= 0 then continue end
+
+        if IsBagFull() then
+            if autoCollectTween then autoCollectTween:Cancel() end
+            currentCollectTarget = nil
+            lastTarget = nil
+            root.Anchored = false
+            root.AssemblyLinearVelocity = Vector3.zero
+            task.wait(1.2)
+            continue
+        end
+
+        if tick() - lastScan > 0.7 then
+            lastScan = tick()
+            local moedas = {}
+            for _, d in ipairs(workspace:GetDescendants()) do
+                if d:IsA("BasePart") and d.Transparency < 0.9 then
+                    local n = d.Name:lower()
+                    if n:find("coin") or n:find("moeda") or n:find("gold") or n:find("token") or 
+                       n:find("diamond") or n:find("present") or n:find("candy") or 
+                       n == "snowflake" or n == "candycane" then
+                        if not d:IsDescendantOf(Players) and not d:FindFirstAncestorOfClass("Tool") then
+                            table.insert(moedas, d)
+                        end
+                    end
+                end
+            end
+            CachedState.Coins = moedas
+        end
+
+        local target = ObterMoedaProxima(root)
+        
+        if target and target.Parent then
+            currentCollectTarget = target
+            local dist = (root.Position - target.Position).Magnitude
             
-            if IsBagFull() then
-                if autoCollectTween then autoCollectTween:Cancel(); autoCollectTween = nil end
-                currentCollectTarget = nil
-                if root then root.Anchored = false end
-                task.wait(1) 
-                continue
+            if dist > 8 then
+                root.Anchored = false
+                local direction = (target.Position - root.Position).Unit
+                root.AssemblyLinearVelocity = direction * 85
+                
+                root.CFrame = CFrame.lookAt(root.Position, Vector3.new(target.Position.X, root.Position.Y, target.Position.Z))
+            else
+                root.Anchored = true
+                root.CFrame = CFrame.new(target.Position + Vector3.new(0, 2.5, 0))
             end
 
-            if root and hum and hum.Health > 0 then
-                local target = ObterMoedaProxima(root)
-                if target and target.Parent then
-                    root.Anchored = true 
-                    if currentCollectTarget ~= target then
-                        currentCollectTarget = target
-                        if autoCollectTween then autoCollectTween:Cancel() end
-                        
-                        -- CORREÇÃO: Vai diretamente para a CFrame exata do centro da moeda
-                        local goalCFrame = CFrame.new(target.Position)
-                        local dist = (root.Position - target.Position).Magnitude
-                        local timeToReach = dist / 40 
-                        
-                        autoCollectTween = TweenService:Create(root, TweenInfo.new(timeToReach, Enum.EasingStyle.Linear), {CFrame = goalCFrame})
-                        autoCollectTween:Play()
+            for i = 1, 4 do
+                pcall(function()
+                    firetouchinterest(root, target, 0)
+                    firetouchinterest(root, target, 1)
+                    local lower = char:FindFirstChild("LowerTorso") or char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("LeftFoot")
+                    if lower then
+                        firetouchinterest(lower, target, 0)
+                        firetouchinterest(lower, target, 1)
                     end
-                    
-                    -- Disparos de touch nativos instantâneos (Sem yields internos)
-                    pcall(function()
-                        firetouchinterest(root, target, 0)
-                        firetouchinterest(root, target, 1)
-                        -- Disparo reserva usando a parte inferior para garantir coletas em moedas baixas
-                        local lowerPart = char:FindFirstChild("LowerTorso") or char:FindFirstChild("LeftFoot")
-                        if lowerPart then
-                            firetouchinterest(lowerPart, target, 0)
-                            firetouchinterest(lowerPart, target, 1)
-                        end
-                    end)
-                else
-                    if autoCollectTween then autoCollectTween:Cancel(); autoCollectTween = nil end
-                    currentCollectTarget = nil
-                    root.Anchored = false
-                end
+                end)
+                task.wait(0.035)
+            end
+        else
+            if currentCollectTarget then
+                currentCollectTarget = nil
+                root.Anchored = false
+                root.AssemblyLinearVelocity = Vector3.zero
             end
         end
     end
 end)
 
--- ==================== THREAD TELEPORT TO GUN CORRIGIDA E ATIVA ====================
+-- ==================== TP TO GUN ====================
 task.spawn(function()
     while true do
         task.wait(0.1)
@@ -487,9 +487,9 @@ task.spawn(function()
             local hum  = char and char:FindFirstChildOfClass("Humanoid")
             
             if root and hum and hum.Health > 0 then
-                -- Bloqueio de segurança caso seja o assassino
                 local isMurdererRole = (PlayerRoles[player] == "Murderer")
-                local hasKnife = player.Backpack:FindFirstChild("Knife") or char:FindFirstChild("Knife") or player.Backpack:FindFirstChild("Faca") or char:FindFirstChild("Faca")
+                local hasKnife = player.Backpack:FindFirstChild("Knife") or char:FindFirstChild("Knife") or 
+                               player.Backpack:FindFirstChild("Faca") or char:FindFirstChild("Faca")
 
                 if isMurdererRole or hasKnife then
                     Configs.TpToGun = false
@@ -504,12 +504,10 @@ task.spawn(function()
                         lastPositionBeforeTpToGun = root.CFrame
                         trackingTpToGun = true
                     end
-                    -- Mantém o TP atualizado e travado em cima da arma caída imediatamente
                     root.CFrame = gunPart.CFrame * CFrame.new(0, 3, 0)
                 end
             end
         else
-            -- Retorna de forma segura ao local original se a opção for desligada na UI
             if trackingTpToGun then
                 local char = player.Character
                 local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -523,7 +521,7 @@ task.spawn(function()
     end
 end)
 
--- ==================== NOCLIP SEGURO (MÉTODO ATUALIZADO) ====================
+-- ==================== NOCLIP ====================
 steppedConnection = RunService.Stepped:Connect(function()
     if Configs.AutoCollect or Configs.SafeSpot then
         local char = player.Character
@@ -537,24 +535,34 @@ steppedConnection = RunService.Stepped:Connect(function()
     end
 end)
 
--- ==================== LOOP PRINCIPAL (HEARTBEAT) ====================
-hbConnection = RunService.Heartbeat:Connect(function(dt)
+-- ==================== ANTI-VOID EXTRA (Recomendado) ====================
+RunService.Heartbeat:Connect(function()
+    if Configs.AutoCollect then
+        local char = player.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root and root.Position.Y < -50 then
+            root.CFrame = root.CFrame + Vector3.new(0, 100, 0)
+            root.AssemblyLinearVelocity = Vector3.zero
+        end
+    end
+end)
+
+-- ==================== HEARTBEAT PRINCIPAL ====================
+hbConnection = RunService.Heartbeat:Connect(function()
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     local hum  = char and char:FindFirstChildOfClass("Humanoid")
 
     if not root or not hum then return end
 
-    -- WALK SPEED
     hum.WalkSpeed = Configs.Speed and 23 or 16
 
-    -- KNIFE REACH (Silent Mag Reach)
     if Configs.Reach then
         local myKnife = char:FindFirstChild("Knife") or char:FindFirstChild("Faca")
         local handle = myKnife and myKnife:FindFirstChild("Handle")
         if handle then
             for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= player and p.Character then
+                if p \~= player and p.Character then
                     local enemyRoot = p.Character:FindFirstChild("HumanoidRootPart")
                     local enemyHum = p.Character:FindFirstChildOfClass("Humanoid")
                     if enemyRoot and enemyHum and enemyHum.Health > 0 then
@@ -571,10 +579,9 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- ANTI FLING
     if Configs.AntiFling then
         for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= player and p.Character then
+            if p \~= player and p.Character then
                 for _, part in ipairs(p.Character:GetChildren()) do
                     if part:IsA("BasePart") then part.CanCollide = false end
                 end
@@ -587,7 +594,7 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
     end
 end)
 
--- ==================== THREAD CENTRAL DE SCANNER E CACHE COLETOR ====================
+-- ==================== SCANNER CENTRAL ====================
 task.spawn(function()
     local tempoUltimoScanMoedas = 0
     
@@ -603,8 +610,7 @@ task.spawn(function()
             if role == "Sheriff"  then currentSheriff  = p end
             
             if p.Character then
-                local temArma = p.Character:FindFirstChild("Gun") or p.Backpack:FindFirstChild("Gun")
-                if temArma then 
+                if p.Character:FindFirstChild("Gun") or p.Backpack:FindFirstChild("Gun") then 
                     gunFoundInPlayers = true 
                     if p == player then localPlayerHasGun = true end
                 end
@@ -619,46 +625,29 @@ task.spawn(function()
 
         if Configs.AutoCollect and (tick() - tempoUltimoScanMoedas > 1.0) then
             tempoUltimoScanMoedas = tick()
-            local moedasEncontradas = {}
-            
-            for _, d in ipairs(workspace:GetDescendants()) do
-                if d:IsA("BasePart") and d.Transparency < 1 then
-                    local name = d.Name:lower()
-                    if name:find("coin") or name:find("moeda") or name:find("gold") or name == "snowflake"
-                        or name == "candycane" or name:find("token") or name:find("diamond")
-                        or name:find("present") or name:find("candy") then
-                        if not d:IsDescendantOf(Players) and not d:FindFirstAncestorOfClass("Tool")
-                            and not d:FindFirstAncestorOfClass("Accessory") then
-                            table.insert(moedasEncontradas, d)
-                        end
-                    end
-                end
-            end
-            CachedState.Coins = moedasEncontradas
+            -- Scan já feito dentro da thread do AutoCollect (otimizado)
         end
         
-        local gunDropExists = workspace:FindFirstChild("GunDrop", true) ~= nil
+        local gunDropExists = workspace:FindFirstChild("GunDrop", true) \~= nil
         if gunDropExists then gunDroppedThisRound = true end
-        if not gunFoundInPlayers and not gunDropExists and not knifeFoundInPlayers then gunDroppedThisRound = false end
+        if not gunFoundInPlayers and not gunDropExists and not knifeFoundInPlayers then 
+            gunDroppedThisRound = false 
+        end
 
         if not currentMurderer and not currentSheriff then
             announcedThisRound = false
         elseif Configs.ChatRoles and (currentMurderer or currentSheriff) and not announcedThisRound then
             announcedThisRound = true
             local msg = "[AKAT] "
-            if currentMurderer then
-                msg = msg .. "Murderer: " .. currentMurderer.DisplayName .. " (@" .. currentMurderer.Name .. ") "
-            end
-            if currentSheriff then
-                msg = msg .. "| Sheriff: " .. currentSheriff.DisplayName .. " (@" .. currentSheriff.Name .. ")"
-            end
+            if currentMurderer then msg = msg .. "Murderer: " .. currentMurderer.DisplayName .. " (@" .. currentMurderer.Name .. ") " end
+            if currentSheriff then msg = msg .. "| Sheriff: " .. currentSheriff.DisplayName .. " (@" .. currentSheriff.Name .. ")" end
             EnviarMensagemChat(msg)
         end
         task.wait(0.3)
     end
 end)
 
--- ==================== CARGA DINÂMICA DA INTERFACE ====================
+-- ==================== CARREGAR UI ====================
 local Link_Da_UI = "https://raw.githubusercontent.com/estratosfera88-afk/UI.lua/refs/heads/main/ui.lua"
 
 local Sucesso, Erro = pcall(function()
