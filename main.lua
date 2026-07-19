@@ -100,6 +100,9 @@ end)
 -- ==================== VARIÁVEIS DE ESTADO INTERNAS ====================
 local PlayerRoles = {}
 local ESPHighlights = {}
+local espEventConnections = {}
+local espPlayerAddedConn = nil
+local espPlayerRemovingConn = nil
 local hbConnection = nil
 local steppedConnection = nil
 local safePlatform = nil
@@ -150,42 +153,107 @@ local function ESP_DetectRole(p)
     return checkAttr(p) or (p.Character and checkAttr(p.Character)) or "Innocent"
 end
 
--- Novo Atualizador de ESP Otimizado e Sem Loops de Conexão Gulosos
-local function ESP_UpdateAll()
+local function ESP_UpdatePlayer(p)
     if not Configs.ESP then return end
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= player and p.Character then
-            local char = p.Character
-            local role = ESP_DetectRole(p)
-            PlayerRoles[p] = role
-
-            local color = ROLE_COLORS[role] or ROLE_COLORS.Innocent
-            local hl = char:FindFirstChild("AkatESP")
-            if not hl then
-                hl = Instance.new("Highlight")
-                hl.Name = "AkatESP"
-                hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-                hl.FillTransparency = 0.3
-                hl.OutlineTransparency = 0
-                hl.Parent = char
-                ESPHighlights[p] = hl
-            end
-
-            hl.FillColor    = color
-            hl.OutlineColor = color
+    if not p or not p.Character then
+        if ESPHighlights[p] then
+            pcall(function() ESPHighlights[p]:Destroy() end)
+            ESPHighlights[p] = nil
         end
+        return
+    end
+
+    local char = p.Character
+    local role = ESP_DetectRole(p)
+    PlayerRoles[p] = role
+
+    local color = ROLE_COLORS[role] or ROLE_COLORS.Innocent
+    local hl = char:FindFirstChild("AkatESP")
+    if not hl then
+        hl = Instance.new("Highlight")
+        hl.Name = "AkatESP"
+        hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        hl.FillTransparency = 0.3
+        hl.OutlineTransparency = 0
+        hl.Parent = char
+        ESPHighlights[p] = hl
+    end
+
+    hl.FillColor    = color
+    hl.OutlineColor = color
+end
+
+local function ESP_ClearAll()
+    for p, hl in pairs(ESPHighlights) do
+        pcall(function() if hl and hl.Parent then hl:Destroy() end end)
+        ESPHighlights[p] = nil
+        PlayerRoles[p] = nil
     end
 end
 
-local function ESP_Disable()
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p.Character then
-            local hl = p.Character:FindFirstChild("AkatESP")
-            if hl then pcall(function() hl:Destroy() end) end
+local function ESP_ConnectPlayer(p)
+    if p == player then return end
+    if espEventConnections[p] then return end -- Evita duplicar escutas no mesmo player
+
+    local c1 = p.CharacterAdded:Connect(function(char)
+        task.wait(0.5)
+        if Configs.ESP then
+            ESP_UpdatePlayer(p)
+            char.ChildAdded:Connect(function() task.wait(0.1); if Configs.ESP then ESP_UpdatePlayer(p) end end)
+            char.ChildRemoved:Connect(function() task.wait(0.1); if Configs.ESP then ESP_UpdatePlayer(p) end end)
         end
+    end)
+
+    local bp = p:WaitForChild("Backpack", 5)
+    local c2 = bp and bp.ChildAdded:Connect(function() task.wait(0.1); if Configs.ESP then ESP_UpdatePlayer(p) end end)
+    local c3 = bp and bp.ChildRemoved:Connect(function() task.wait(0.1); if Configs.ESP then ESP_UpdatePlayer(p) end end)
+
+    espEventConnections[p] = { c1, c2, c3 }
+    ESP_UpdatePlayer(p)
+end
+
+local function ESP_DisconnectPlayer(p)
+    if espEventConnections[p] then
+        for _, c in ipairs(espEventConnections[p]) do
+            if c then pcall(function() c:Disconnect() end) end
+        end
+        espEventConnections[p] = nil
     end
-    table.clear(ESPHighlights)
-    table.clear(PlayerRoles)
+    if ESPHighlights[p] then
+        pcall(function() ESPHighlights[p]:Destroy() end)
+        ESPHighlights[p] = nil
+    end
+    PlayerRoles[p] = nil
+end
+
+local function ESP_Enable()
+    Configs.ESP = true
+    
+    if espPlayerAddedConn then espPlayerAddedConn:Disconnect() end
+    if espPlayerRemovingConn then espPlayerRemovingConn:Disconnect() end
+
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= player then ESP_ConnectPlayer(p) end
+    end
+    
+    espPlayerAddedConn = Players.PlayerAdded:Connect(function(p)
+        if Configs.ESP then ESP_ConnectPlayer(p) end
+    end)
+    
+    espPlayerRemovingConn = Players.PlayerRemoving:Connect(function(p)
+        ESP_DisconnectPlayer(p)
+    end)
+end
+
+local function ESP_Disable()
+    Configs.ESP = false
+    if espPlayerAddedConn then espPlayerAddedConn:Disconnect(); espPlayerAddedConn = nil end
+    if espPlayerRemovingConn then espPlayerRemovingConn:Disconnect(); espPlayerRemovingConn = nil end
+    
+    for _, p in ipairs(Players:GetPlayers()) do
+        ESP_DisconnectPlayer(p)
+    end
+    ESP_ClearAll()
 end
 
 -- ==================== NOVO SISTEMA DE AIMBOT COM SHIFT LOCK SEGURO ====================
@@ -204,7 +272,7 @@ local function ToggleAimbot(enabled)
                 local head = murderer.Character:FindFirstChild("Head")
                 local char = player.Character
                 local root = char and char:FindFirstChild("HumanoidRootPart")
-                local hum  = char and char:FindFirstChildOfClass("Humanoid")
+                local hum = char and char:FindFirstChildOfClass("Humanoid")
                 
                 if head and root and hum and hum.Health > 0 then
                     Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, head.Position)
@@ -230,24 +298,6 @@ local function ObterArmaCaida(root)
         end
     end
     return nil
-end
-
-local function AtualizarCacheMoedas()
-    local moedasEncontradas = {}
-    for _, d in ipairs(workspace:GetDescendants()) do
-        if d:IsA("BasePart") and d.Transparency < 1 and d.Parent then
-            local name = d.Name:lower()
-            if name:find("coin") or name:find("moeda") or name:find("gold") or name == "snowflake"
-                or name == "candycane" or name:find("token") or name:find("diamond")
-                or name:find("present") or name:find("candy") then
-                if not d:IsDescendantOf(Players) and not d:FindFirstAncestorOfClass("Tool")
-                    and not d:FindFirstAncestorOfClass("Accessory") then
-                    table.insert(moedasEncontradas, d)
-                end
-            end
-        end
-    end
-    CachedState.Coins = moedasEncontradas
 end
 
 local function ObterMoedaProxima(root)
@@ -321,8 +371,7 @@ end
 -- ==================== PONTE DE COMUNICAÇÃO GLOBAL (UI -> BACKEND) ====================
 _G.AkatCallbacks = {
     ESP = function(enabled)
-        Configs.ESP = enabled
-        if not enabled then ESP_Disable() end
+        if enabled then ESP_Enable() else ESP_Disable() end
     end,
     SafeSpot = function(enabled)
         Configs.SafeSpot = enabled
@@ -385,10 +434,10 @@ _G.AkatCallbacks = {
     ShutdownAll = function() LimparEDesligarAbsolutamente() end
 }
 
--- ==================== THREAD DO AUTO COLLECT COLETANDO FLUIDAMENTE (CORRIGIDO) ====================
+-- ==================== THREAD DO AUTO COLLECT COLETANDO IMEDIATAMENTE (DELAY DIMINUÍDO) ====================
 task.spawn(function()
     while true do
-        task.wait(0.01)
+        task.wait(0.005) -- Ciclo ainda mais rápido para checagem imediata física
         if Configs.AutoCollect then
             local char = player.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -410,36 +459,23 @@ task.spawn(function()
                         
                         local goalCFrame = CFrame.new(target.Position)
                         local dist = (root.Position - target.Position).Magnitude
-                        local timeToReach = dist / 60 
+                        local timeToReach = dist / 70 -- Aumentado de 55 para 70 (Velocidade de aproximação mais rápida)
                         
                         autoCollectTween = TweenService:Create(root, TweenInfo.new(timeToReach, Enum.EasingStyle.Linear), {CFrame = goalCFrame})
                         autoCollectTween:Play()
                     end
                     
-                    -- Coleta via Firetouchinterest
                     pcall(function()
                         firetouchinterest(root, target, 0)
                         firetouchinterest(root, target, 1)
+                        
                         for _, part in ipairs(char:GetChildren()) do
-                            if part:IsA("BasePart") and (part.Name:find("Foot") or part.Name:find("Leg")) then
+                            if part:IsA("BasePart") and (part.Name:find("Foot") or part.Name:find("Leg") or part.Name:find("Torso")) then
                                 firetouchinterest(part, target, 0)
                                 firetouchinterest(part, target, 1)
                             end
                         end
                     end)
-
-                    -- MODIFICAÇÃO: Detecção de proximidade com um mini delay fluido (0.12s) para transição suave de moeda em moeda
-                    if (root.Position - target.Position).Magnitude < 3.8 then
-                        for i, v in ipairs(CachedState.Coins) do
-                            if v == target then
-                                table.remove(CachedState.Coins, i)
-                                break
-                            end
-                        end
-                        currentCollectTarget = nil
-                        if autoCollectTween then autoCollectTween:Cancel(); autoCollectTween = nil end
-                        task.wait(0.12) -- Delay ajustado sob medida para manter o movimento fluido e limpo
-                    end
                 else
                     if autoCollectTween then autoCollectTween:Cancel(); autoCollectTween = nil end
                     currentCollectTarget = nil
@@ -449,7 +485,7 @@ task.spawn(function()
     end
 end)
 
--- ==================== THREAD TELEPORT TO GUN (CORRIGIDO SEM DESINCRONIZAR A UI) ====================
+-- ==================== THREAD TELEPORT TO GUN (RETORNO AUTOMÁTICO CORRIGIDO PARA A UI) ====================
 task.spawn(function()
     while true do
         task.wait(0.05)
@@ -463,11 +499,8 @@ task.spawn(function()
                 local hasKnife = player.Backpack:FindFirstChild("Knife") or char:FindFirstChild("Knife") or player.Backpack:FindFirstChild("Faca") or char:FindFirstChild("Faca")
 
                 if isMurdererRole or hasKnife then
-                    if trackingTpToGun then
-                        if lastPositionBeforeTpToGun then root.CFrame = lastPositionBeforeTpToGun end
-                        lastPositionBeforeTpToGun = nil
-                        trackingTpToGun = false
-                    end
+                    trackingTpToGun = false
+                    lastPositionBeforeTpToGun = nil
                     continue
                 end
                 
@@ -480,9 +513,12 @@ task.spawn(function()
                     root.CFrame = gunPart.CFrame * CFrame.new(0, 3, 0)
                 else
                     if trackingTpToGun then
-                        if lastPositionBeforeTpToGun then root.CFrame = lastPositionBeforeTpToGun end
+                        if lastPositionBeforeTpToGun then
+                            root.CFrame = lastPositionBeforeTpToGun
+                        end
                         lastPositionBeforeTpToGun = nil
                         trackingTpToGun = false
+                        -- CORREÇÃO: Não força mais Configs.TpToGun = false para manter sincronia perfeita com a UI!
                     end
                 end
             end
@@ -491,7 +527,7 @@ task.spawn(function()
                 local char = player.Character
                 local root = char and char:FindFirstChild("HumanoidRootPart")
                 if root and lastPositionBeforeTpToGun then
-                    root.CFrame = lastPositionBeforeSafeSpot or lastPositionBeforeTpToGun
+                    root.CFrame = lastPositionBeforeTpToGun
                 end
                 lastPositionBeforeTpToGun = nil
                 trackingTpToGun = false
@@ -564,7 +600,7 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
     end
 end)
 
--- ==================== THREAD CENTRAL DE SCANNER E CACHE COLETOR ====================
+-- ==================== THREAD CENTRAL DE SCANNER E CACHE COLETOR (OTIMIZADO) ====================
 task.spawn(function()
     local tempoUltimoScanMoedas = 0
     
@@ -574,11 +610,8 @@ task.spawn(function()
         local localPlayerHasGun = false
         local currentMurderer, currentSheriff = nil, nil
         
-        -- Atualiza Roles de forma nativa e segura
         for _, p in ipairs(Players:GetPlayers()) do
-            local role = ESP_DetectRole(p)
-            PlayerRoles[p] = role
-            
+            local role = PlayerRoles[p]
             if role == "Murderer" then currentMurderer = p end
             if role == "Sheriff"  then currentSheriff  = p end
             
@@ -597,20 +630,25 @@ task.spawn(function()
         CachedState.HasGun = localPlayerHasGun
         CachedState.Murderer = currentMurderer
 
-        -- Executa o update visual do ESP reativamente sem bugar a UI
-        if Configs.ESP then
-            ESP_UpdateAll()
-        else
-            ESP_Disable()
-        end
-
-        -- Scanner de Moedas sincronizado
-        if Configs.AutoCollect then
-            local freqScan = (currentCollectTarget == nil) and 0.15 or 0.4
-            if (tick() - tempoUltimoScanMoedas > freqScan) then
-                tempoUltimoScanMoedas = tick()
-                AtualizarCacheMoedas()
+        -- CORREÇÃO DELAY: Alterado tempo de escaneamento de 1.0s para 0.3s (Detecta moedas muito mais rápido)
+        if Configs.AutoCollect and (tick() - tempoUltimoScanMoedas > 0.3) then
+            tempoUltimoScanMoedas = tick()
+            local moedasEncontradas = {}
+            
+            for _, d in ipairs(workspace:GetDescendants()) do
+                if d:IsA("BasePart") and d.Transparency < 1 then
+                    local name = d.Name:lower()
+                    if name:find("coin") or name:find("moeda") or name:find("gold") or name == "snowflake"
+                        or name == "candycane" or name:find("token") or name:find("diamond")
+                        or name:find("present") or name:find("candy") then
+                        if not d:IsDescendantOf(Players) and not d:FindFirstAncestorOfClass("Tool")
+                            and not d:FindFirstAncestorOfClass("Accessory") then
+                            table.insert(moedasEncontradas, d)
+                        end
+                    end
+                end
             end
+            CachedState.Coins = moedasEncontradas
         end
         
         local gunDropExists = workspace:FindFirstChild("GunDrop", true) ~= nil
@@ -630,7 +668,7 @@ task.spawn(function()
             end
             EnviarMensagemChat(msg)
         end
-        task.wait(0.3)
+        task.wait(0.2)
     end
 end)
 
