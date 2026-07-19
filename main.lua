@@ -1,5 +1,5 @@
 -- [[
---     AKAT MM2 MAIN LOGIC - FULLY UPDATED & OPTIMIZED [v4.8 - PERFORMANCE & MOBILE FIX]
+--     AKAT MM2 MAIN LOGIC - FULLY UPDATED & OPTIMIZED [v4.9 - PHYSICS & RETURN FIX]
 --     Compatível com Delta Mobile & PC | MM2 (2026)
 -- ]]
 
@@ -247,7 +247,7 @@ local function ESP_Disable()
     ESP_ClearAll()
 end
 
--- ==================== NOVO SISTEMA DE AIMBOT MODERNO (MOBILE OPTIMIZED) ====================
+-- ==================== NOVO SISTEMA DE AIMBOT MODERNO (ANTI-TRAVAMENTO) ====================
 local function ToggleAimbot(enabled)
     if Configs.Aimbot == enabled and aimbotConnection then return end 
     Configs.Aimbot = enabled
@@ -255,43 +255,45 @@ local function ToggleAimbot(enabled)
     
     if enabled then
         aimbotConnection = RunService.RenderStepped:Connect(function()
-            if not Configs.Aimbot then return end
-            if not CachedState.HasGun then return end 
+            local char = player.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            
+            -- CORREÇÃO CRÍTICA: Se não tiver a arma ativa ou configurada, libera o travamento imediatamente
+            if not Configs.Aimbot or not CachedState.HasGun then 
+                if hum then hum.AutoRotate = true end
+                return 
+            end
             
             local murderer = CachedState.Murderer
             if murderer and murderer.Character then
                 local head = murderer.Character:FindFirstChild("Head")
                 local mHum = murderer.Character:FindFirstChildOfClass("Humanoid")
-                local char = player.Character
-                local hum = char and char:FindFirstChildOfClass("Humanoid")
                 
                 if head and hum and hum.Health > 0 and mHum and mHum.Health > 0 then
-                    -- CORREÇÃO DA CÂMERA FUGIR NO MOBILE: Desativa temporariamente o AutoRotate ao mirar
+                    -- Desativa o AutoRotate no Mobile apenas durante o rastreamento ativo
                     if UserInputService.TouchEnabled then
                         hum.AutoRotate = false
                     end
 
-                    -- TIRO PREMIUM PREDITIVO: Calcula posição futura se o alvo pular ou se mover muito
+                    -- TIRO PREMIUM PREDITIVO COM AJUSTE DINÂMICO DE MOVIMENTO
                     local targetVelocity = murderer.Character:FindFirstChild("HumanoidRootPart") and murderer.Character.HumanoidRootPart.Velocity or Vector3.new(0,0,0)
-                    local predictionOffset = targetVelocity * 0.135
+                    local predictionOffset = targetVelocity * 0.14
                     
                     if mHum.FloorMaterial == Enum.Material.Air then
-                        -- Se o Murderer estiver pulando, ajustamos o foco vertical perfeitamente na cabeça
-                        predictionOffset = Vector3.new(targetVelocity.X * 0.14, targetVelocity.Y * 0.09, targetVelocity.Z * 0.14)
+                        -- Foco preditivo aprimorado para alvos saltando freneticamente
+                        predictionOffset = Vector3.new(targetVelocity.X * 0.14, targetVelocity.Y * 0.1, targetVelocity.Z * 0.14)
                     end
                     
                     local finalAimPosition = head.Position + predictionOffset
                     Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, finalAimPosition)
+                else
+                    if hum then hum.AutoRotate = true end
                 end
             else
-                -- Se o Murderer morrer ou sumir, restaura o controle do mobile imediatamente
-                local char = player.Character
-                local hum = char and char:FindFirstChildOfClass("Humanoid")
-                if hum and UserInputService.TouchEnabled then hum.AutoRotate = true end
+                if hum then hum.AutoRotate = true end
             end
         end)
     else
-        -- Restaura o comportamento padrão ao desligar o aimbot
         local char = player.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         if hum then hum.AutoRotate = true end
@@ -428,21 +430,24 @@ _G.AkatCallbacks = {
     end
 }
 
--- ==================== THREAD DO AUTO COLLECT (EFICIENTE & SEM PULOS & IMUNE) ====================
+-- ==================== THREAD DO AUTO COLLECT (GIRO EM ESPIRAL HÉLICE E GOD MODE ABSOLUTO) ====================
 task.spawn(function()
+    local angleRotation = 0
     while true do
-        task.wait(0.01) -- Reduzido o delay para transição ultra rápida de moeda em moeda
+        task.wait(0.01)
         if Configs.AutoCollect then
             local char = player.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
             local hum  = char and char:FindFirstChildOfClass("Humanoid")
             
             if root and hum and hum.Health > 0 then
-                -- IMUNIDADE ABSOLUTA ATIVADA: Desativa o registro de toque de todas as partes (Faca/Tiros ignoram você)
+                -- GOD MODE SEGURO POR BYPASS DE HITBOX REPLICADA
+                hum.PlatformStand = true
                 for _, part in ipairs(char:GetChildren()) do
                     if part:IsA("BasePart") then
                         part.CanCollide = false
-                        if part.Name ~= "HumanoidRootPart" then
+                        -- Bypassa completamente os scripts locais e remotos de checagem do Murderer/Xerife
+                        if part.Name ~= "HumanoidRootPart" then 
                             part.CanTouch = false 
                         end
                     end
@@ -457,31 +462,31 @@ task.spawn(function()
                     local target = ObterMoedaProxima(root)
                     if target and target.Parent then
                         currentCollectTarget = target
-                        local distance = (root.Position - target.Position).Magnitude
+                        local startPos = root.Position
+                        local targetPos = target.Position
+                        local distance = (startPos - targetPos).Magnitude
                         
+                        -- SISTEMA DE HELICE: Deslocamento fluido girando e subindo dinamicamente
                         if distance > 0 then
-                            local speed = 55 -- Velocidade otimizada
-                            local duration = distance / speed
-                            local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
-                            
-                            -- REMOVIDO O OFFSET VERTICAL (Sem pulos, liso de moeda em moeda)
-                            local targetCFrame = target.CFrame 
-                            local tween = TweenService:Create(root, tweenInfo, {CFrame = targetCFrame})
-                            
-                            local noclipConn = RunService.Stepped:Connect(function()
-                                if char then
-                                    for _, part in ipairs(char:GetChildren()) do
-                                        if part:IsA("BasePart") then part.CanCollide = false end
-                                    end
-                                end
-                            end)
-                            
-                            root.Velocity = Vector3.new(0, 0, 0)
-                            tween:Play()
-                            tween.Completed:Wait()
-                            if noclipConn then noclipConn:Disconnect() end
+                            local steps = math.clamp(math.floor(distance / 3.5), 3, 15)
+                            for i = 1, steps do
+                                if not Configs.AutoCollect or not target.Parent or IsBagFull() then break end
+                                angleRotation = angleRotation + 45 -- Efeito de rotação em alta velocidade
+                                
+                                local alpha = i / steps
+                                local currentLerpPos = startPos:Lerp(targetPos, alpha)
+                                
+                                -- Cria o efeito "subindo verticalmente enquanto gira" solicitado
+                                local heightBonus = math.sin(alpha * math.pi) * 4.5
+                                local finalFrame = CFrame.new(currentLerpPos + Vector3.new(0, heightBonus, 0)) * CFrame.Angles(0, math.rad(angleRotation), 0)
+                                
+                                root.CFrame = finalFrame
+                                root.Velocity = Vector3.new(0,0,0)
+                                RunService.Heartbeat:Wait()
+                            end
                         end
                         
+                        -- Coleta via injeção física direta
                         pcall(function()
                             firetouchinterest(root, target, 0)
                             task.wait(0.01) 
@@ -490,11 +495,21 @@ task.spawn(function()
                     end
                 end
             end
+        else
+            -- Restaura o estado físico padrão quando desligado
+            local char = player.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if hum and hum.PlatformStand then 
+                hum.PlatformStand = false 
+                for _, part in ipairs(char:GetChildren()) do
+                    if part:IsA("BasePart") then part.CanTouch = true end
+                end
+            end
         end
     end
 end)
 
--- ==================== LOOP PRINCIPAL (HEARTBEAT) ====================
+-- ==================== LOOP PRINCIPAL (HEARTBEAT - CORREÇÃO DO TP TO GUN) ====================
 hbConnection = RunService.Heartbeat:Connect(function(dt)
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -574,7 +589,7 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- TELEPORT TO GUN (RESOLVIDO BUG DE SEGUNDO PLANO)
+    -- TELEPORT TO GUN (CORREÇÃO DE RETORNO COMPLETA)
     local isMurdererRole = (PlayerRoles[player] == "Murderer")
     local hasKnife = player.Backpack:FindFirstChild("Knife") or (char and char:FindFirstChild("Knife")) or player.Backpack:FindFirstChild("Faca") or (char and char:FindFirstChild("Faca"))
 
@@ -583,7 +598,6 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
             Configs.TpToGun = false
             trackingTpToGun = false
         else
-            -- Procura a arma em tempo real direto na workspace (instantâneo)
             local gunDrop = workspace:FindFirstChild("GunDrop", true)
             if gunDrop then
                 local gunPart = gunDrop:IsA("BasePart") and gunDrop or gunDrop:FindFirstChildOfClass("BasePart") or gunDrop.PrimaryPart
@@ -592,12 +606,17 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
                         lastPositionBeforeTpToGun = root.CFrame 
                         trackingTpToGun = true
                     end
-                    -- Teleporta instantaneamente para a arma caída
+                    
                     root.CFrame = gunPart.CFrame * CFrame.new(0, 2, 0)
                     
-                    -- Se coletou a arma com sucesso, finaliza a função sozinho sem travar
+                    -- Verifica em tempo de execução imediato se a arma foi recolhida
                     local localHasGun = player.Backpack:FindFirstChild("Gun") or char:FindFirstChild("Gun") or player.Backpack:FindFirstChild("Revolver") or char:FindFirstChild("Revolver")
                     if localHasGun then
+                        -- RETORNO INSTANTÂNEO GARANTIDO
+                        if lastPositionBeforeTpToGun then
+                            root.CFrame = lastPositionBeforeTpToGun
+                            lastPositionBeforeTpToGun = nil
+                        end
                         trackingTpToGun = false
                         Configs.TpToGun = false
                     end
