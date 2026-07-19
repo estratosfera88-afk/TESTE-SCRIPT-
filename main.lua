@@ -76,7 +76,7 @@ task.spawn(function()
                 end)
             end
             
-            -- SILENT AIM METAMETHOD OTIMIZADO (Lê direto do cache)
+            -- SILENT AIM METAMETHOD OTIMIZADO
             if Configs.Aimbot and CachedState.HasGun and self == mouse then
                 if key == "Hit" or key == "hit" then
                     local murderer = CachedState.Murderer
@@ -97,7 +97,7 @@ task.spawn(function()
     end
 end)
 
--- ==================== VARIÁVEI DE ESTADO INTERNAS ====================
+-- ==================== VARIÁVEIS DE ESTADO INTERNAS ====================
 local PlayerRoles = {}
 local ESPHighlights = {}
 local espEventConnections = {}
@@ -107,6 +107,7 @@ local safePlatform = nil
 local lastPositionBeforeSafeSpot = nil
 local announcedThisRound = false
 local currentCollectTarget = nil
+local autoCollectTween = nil
 
 local ROLE_COLORS = {
     Murderer  = Color3.fromRGB(220, 0,   0),    
@@ -335,6 +336,7 @@ local function LimparEDesligarAbsolutamente()
     for k in pairs(Configs) do Configs[k] = false end
     ESP_Disable()
     if safePlatform then pcall(function() safePlatform:Destroy() end); safePlatform = nil end
+    if autoCollectTween then autoCollectTween:Cancel(); autoCollectTween = nil end
     pcall(function()
         local char = player.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -383,9 +385,27 @@ _G.AkatCallbacks = {
         Configs.AutoCollect = enabled
         if not enabled then 
             currentCollectTarget = nil 
+            if autoCollectTween then
+                autoCollectTween:Cancel()
+                autoCollectTween = nil
+            end
+            
             local char = player.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
-            if root then root.Anchored = false end
+            if root then 
+                root.Anchored = false 
+                root.AssemblyLinearVelocity = Vector3.zero
+                
+                -- Pousa suavemente no chão evitando o void
+                local rayParams = RaycastParams.new()
+                rayParams.FilterDescendantsInstances = {char}
+                rayParams.FilterType = Enum.RaycastFilterType.Exclude
+                local result = workspace:Raycast(root.Position, Vector3.new(0, -1000, 0), rayParams)
+                if result then
+                    -- Teleporta ele perfeitamente acima do solo
+                    root.CFrame = CFrame.new(result.Position + Vector3.new(0, 3, 0))
+                end
+            end
         end
     end,
     ["Shoot murder"] = function(enabled) ToggleAimbot(enabled) end,
@@ -394,32 +414,53 @@ _G.AkatCallbacks = {
     ShutdownAll = function() LimparEDesligarAbsolutamente() end
 }
 
--- ==================== THREAD DO AUTO COLLECT ====================
+-- ==================== THREAD DO AUTO COLLECT (VOO SUAVE) ====================
 task.spawn(function()
     while true do
         task.wait(0.05) 
         if Configs.AutoCollect then
-            if IsBagFull() then
-                task.wait(1) -- Pausa inteligentemente o scan caso a bolsa esteja cheia
-                continue
-            end
-
             local char = player.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
             local hum  = char and char:FindFirstChildOfClass("Humanoid")
             
+            if IsBagFull() then
+                if autoCollectTween then autoCollectTween:Cancel(); autoCollectTween = nil end
+                currentCollectTarget = nil
+                task.wait(1) 
+                continue
+            end
+
             if root and hum and hum.Health > 0 then
+                -- Ancorar previne que o jogo toque animação de queda ou lute contra a gravidade
+                root.Anchored = true 
+                
                 local target = ObterMoedaProxima(root)
                 if target and target.Parent then
-                    currentCollectTarget = target
-                    root.AssemblyLinearVelocity = Vector3.zero
-                    root.CFrame = target.CFrame
+                    if currentCollectTarget ~= target then
+                        currentCollectTarget = target
+                        if autoCollectTween then autoCollectTween:Cancel() end
+                        
+                        local dist = (root.Position - target.Position).Magnitude
+                        local timeToReach = dist / 35 -- Velocidade do Tween de movimentação (suave)
+                        
+                        -- Extrai o ângulo atual para o personagem não girar
+                        local yRot = select(2, root.CFrame:ToEulerAnglesYXZ())
+                        
+                        -- Vai para a posição da moeda (sempre um pouco acima para não bater no chão)
+                        local goalCFrame = CFrame.new(target.Position + Vector3.new(0, 2.5, 0)) * CFrame.Angles(0, yRot, 0)
+                        
+                        autoCollectTween = TweenService:Create(root, TweenInfo.new(timeToReach, Enum.EasingStyle.Linear), {CFrame = goalCFrame})
+                        autoCollectTween:Play()
+                    end
                     
                     pcall(function()
                         firetouchinterest(root, target, 0)
                         task.wait(0.02) 
                         firetouchinterest(root, target, 1)
                     end)
+                else
+                    if autoCollectTween then autoCollectTween:Cancel(); autoCollectTween = nil end
+                    currentCollectTarget = nil
                 end
             end
         end
@@ -474,7 +515,7 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- ANTI FLING (Propriedades Corrigidas)
+    -- ANTI FLING
     if Configs.AntiFling then
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= player and p.Character then
@@ -489,27 +530,44 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- TELEPORT TO GUN
+    -- TELEPORT TO GUN INTELIGENTE (Retorna quando a arma for pega ou desativada)
     if Configs.TpToGun then
         local isMurdererRole = (PlayerRoles[player] == "Murderer")
         local hasKnife = player.Backpack:FindFirstChild("Knife") or (char and char:FindFirstChild("Knife")) or player.Backpack:FindFirstChild("Faca") or (char and char:FindFirstChild("Faca"))
 
         if isMurdererRole or hasKnife then
             Configs.TpToGun = false
+            if trackingTpToGun and lastPositionBeforeTpToGun then
+                root.CFrame = lastPositionBeforeTpToGun
+            end
             trackingTpToGun = false
             lastPositionBeforeTpToGun = nil
         else
             local gunPart = ObterArmaCaida(root)
             if gunPart then
+                if not trackingTpToGun then
+                    -- Salva a posição anterior apenas na primeira vez
+                    lastPositionBeforeTpToGun = root.CFrame
+                    trackingTpToGun = true
+                end
                 root.CFrame = gunPart.CFrame * CFrame.new(0, 3, 0)
-                trackingTpToGun = true
             else
-                trackingTpToGun = false
+                -- A arma não está mais lá (você pegou ou outra pessoa pegou)
+                if trackingTpToGun and lastPositionBeforeTpToGun then
+                    root.CFrame = lastPositionBeforeTpToGun
+                    lastPositionBeforeTpToGun = nil
+                    trackingTpToGun = false
+                    Configs.TpToGun = false -- Desliga automaticamente após concluir
+                end
             end
         end
     else
-        trackingTpToGun = false
-        lastPositionBeforeTpToGun = nil
+        -- Caso o botão seja desativado manualmente no meio da operação
+        if trackingTpToGun and lastPositionBeforeTpToGun then
+            root.CFrame = lastPositionBeforeTpToGun
+            lastPositionBeforeTpToGun = nil
+            trackingTpToGun = false
+        end
     end
 end)
 
