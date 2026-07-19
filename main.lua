@@ -100,7 +100,6 @@ end)
 -- ==================== VARIÁVEIS DE ESTADO INTERNAS ====================
 local PlayerRoles = {}
 local ESPHighlights = {}
-local espEventConnections = {}
 local hbConnection = nil
 local steppedConnection = nil
 local safePlatform = nil
@@ -151,92 +150,42 @@ local function ESP_DetectRole(p)
     return checkAttr(p) or (p.Character and checkAttr(p.Character)) or "Innocent"
 end
 
-local function ESP_UpdatePlayer(p)
-    if not p or not p.Character then
-        if ESPHighlights[p] then
-            pcall(function() ESPHighlights[p]:Destroy() end)
-            ESPHighlights[p] = nil
-        end
-        return
-    end
-
-    local char = p.Character
-    local role = ESP_DetectRole(p)
-    PlayerRoles[p] = role
-
-    local color = ROLE_COLORS[role] or ROLE_COLORS.Innocent
-    local hl = char:FindFirstChild("AkatESP")
-    if not hl then
-        hl = Instance.new("Highlight")
-        hl.Name = "AkatESP"
-        hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        hl.FillTransparency = 0.3
-        hl.OutlineTransparency = 0
-        hl.Parent = char
-        ESPHighlights[p] = hl
-    end
-
-    hl.FillColor    = color
-    hl.OutlineColor = color
-end
-
-local function ESP_ClearAll()
-    for p, hl in pairs(ESPHighlights) do
-        pcall(function() if hl and hl.Parent then hl:Destroy() end end)
-        ESPHighlights[p] = nil
-        PlayerRoles[p] = nil
-    end
-end
-
-local function ESP_ConnectPlayer(p)
-    if p == player then return end
-
-    local c1 = p.CharacterAdded:Connect(function(char)
-        task.wait(0.5)
-        ESP_UpdatePlayer(p)
-        char.ChildAdded:Connect(function() task.wait(0.1); ESP_UpdatePlayer(p) end)
-        char.ChildRemoved:Connect(function() task.wait(0.1); ESP_UpdatePlayer(p) end)
-    end)
-
-    local bp = p:WaitForChild("Backpack", 5)
-    local c2 = bp and bp.ChildAdded:Connect(function() task.wait(0.1); ESP_UpdatePlayer(p) end)
-    local c3 = bp and bp.ChildRemoved:Connect(function() task.wait(0.1); ESP_UpdatePlayer(p) end)
-
-    espEventConnections[p] = { c1, c2, c3 }
-    ESP_UpdatePlayer(p)
-end
-
-local function ESP_DisconnectPlayer(p)
-    if espEventConnections[p] then
-        for _, c in ipairs(espEventConnections[p]) do
-            if c then pcall(function() c:Disconnect() end) end
-        end
-        espEventConnections[p] = nil
-    end
-    if ESPHighlights[p] then
-        pcall(function() ESPHighlights[p]:Destroy() end)
-        ESPHighlights[p] = nil
-    end
-    PlayerRoles[p] = nil
-end
-
-local function ESP_Enable()
+-- Novo Atualizador de ESP Otimizado e Sem Loops de Conexão Gulosos
+local function ESP_UpdateAll()
+    if not Configs.ESP then return end
     for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= player then ESP_ConnectPlayer(p) end
+        if p ~= player and p.Character then
+            local char = p.Character
+            local role = ESP_DetectRole(p)
+            PlayerRoles[p] = role
+
+            local color = ROLE_COLORS[role] or ROLE_COLORS.Innocent
+            local hl = char:FindFirstChild("AkatESP")
+            if not hl then
+                hl = Instance.new("Highlight")
+                hl.Name = "AkatESP"
+                hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                hl.FillTransparency = 0.3
+                hl.OutlineTransparency = 0
+                hl.Parent = char
+                ESPHighlights[p] = hl
+            end
+
+            hl.FillColor    = color
+            hl.OutlineColor = color
+        end
     end
-    Players.PlayerAdded:Connect(function(p)
-        if Configs.ESP then ESP_ConnectPlayer(p) end
-    end)
-    Players.PlayerRemoving:Connect(function(p)
-        ESP_DisconnectPlayer(p)
-    end)
 end
 
 local function ESP_Disable()
     for _, p in ipairs(Players:GetPlayers()) do
-        ESP_DisconnectPlayer(p)
+        if p.Character then
+            local hl = p.Character:FindFirstChild("AkatESP")
+            if hl then pcall(function() hl:Destroy() end) end
+        end
     end
-    ESP_ClearAll()
+    table.clear(ESPHighlights)
+    table.clear(PlayerRoles)
 end
 
 -- ==================== NOVO SISTEMA DE AIMBOT COM SHIFT LOCK SEGURO ====================
@@ -255,7 +204,7 @@ local function ToggleAimbot(enabled)
                 local head = murderer.Character:FindFirstChild("Head")
                 local char = player.Character
                 local root = char and char:FindFirstChild("HumanoidRootPart")
-                local hum = char and char:FindFirstChildOfClass("Humanoid")
+                local hum  = char and char:FindFirstChildOfClass("Humanoid")
                 
                 if head and root and hum and hum.Health > 0 then
                     Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, head.Position)
@@ -281,6 +230,24 @@ local function ObterArmaCaida(root)
         end
     end
     return nil
+end
+
+local function AtualizarCacheMoedas()
+    local moedasEncontradas = {}
+    for _, d in ipairs(workspace:GetDescendants()) do
+        if d:IsA("BasePart") and d.Transparency < 1 and d.Parent then
+            local name = d.Name:lower()
+            if name:find("coin") or name:find("moeda") or name:find("gold") or name == "snowflake"
+                or name == "candycane" or name:find("token") or name:find("diamond")
+                or name:find("present") or name:find("candy") then
+                if not d:IsDescendantOf(Players) and not d:FindFirstAncestorOfClass("Tool")
+                    and not d:FindFirstAncestorOfClass("Accessory") then
+                    table.insert(moedasEncontradas, d)
+                end
+            end
+        end
+    end
+    CachedState.Coins = moedasEncontradas
 end
 
 local function ObterMoedaProxima(root)
@@ -355,7 +322,7 @@ end
 _G.AkatCallbacks = {
     ESP = function(enabled)
         Configs.ESP = enabled
-        if enabled then ESP_Enable() else ESP_Disable() end
+        if not enabled then ESP_Disable() end
     end,
     SafeSpot = function(enabled)
         Configs.SafeSpot = enabled
@@ -421,7 +388,7 @@ _G.AkatCallbacks = {
 -- ==================== THREAD DO AUTO COLLECT COLETANDO IMEDIATAMENTE (CORRIGIDO) ====================
 task.spawn(function()
     while true do
-        task.wait(0.01) -- Loop ultrarrápido para resposta imediata
+        task.wait(0.01)
         if Configs.AutoCollect then
             local char = player.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -430,39 +397,47 @@ task.spawn(function()
             if IsBagFull() then
                 if autoCollectTween then autoCollectTween:Cancel(); autoCollectTween = nil end
                 currentCollectTarget = nil
-                task.wait(1) 
+                task.wait(0.5) 
                 continue
             end
 
             if root and hum and hum.Health > 0 then
                 local target = ObterMoedaProxima(root)
                 if target and target.Parent then
-                    -- ANCORAGEM REMOVIDA: Mantém a física ativa para o firetouchinterest registrar instantaneamente
                     if currentCollectTarget ~= target then
                         currentCollectTarget = target
                         if autoCollectTween then autoCollectTween:Cancel() end
                         
                         local goalCFrame = CFrame.new(target.Position)
                         local dist = (root.Position - target.Position).Magnitude
-                        local timeToReach = dist / 55 
+                        local timeToReach = dist / 60 
                         
                         autoCollectTween = TweenService:Create(root, TweenInfo.new(timeToReach, Enum.EasingStyle.Linear), {CFrame = goalCFrame})
                         autoCollectTween:Play()
                     end
                     
-                    -- Simulação aprimorada de toque multiparte (Garante a coleta mesmo em moedas com delay)
+                    -- Coleta instantânea via Firetouchinterest
                     pcall(function()
                         firetouchinterest(root, target, 0)
                         firetouchinterest(root, target, 1)
-                        
-                        -- Força o toque usando as extremidades inferiores do boneco
                         for _, part in ipairs(char:GetChildren()) do
-                            if part:IsA("BasePart") and (part.Name:find("Foot") or part.Name:find("Leg") or part.Name:find("Torso")) then
+                            if part:IsA("BasePart") and (part.Name:find("Foot") or part.Name:find("Leg")) then
                                 firetouchinterest(part, target, 0)
                                 firetouchinterest(part, target, 1)
                             end
                         end
                     end)
+
+                    -- CORREÇÃO: Limpa a moeda do cache imediatamente ao chegar nela para não travar parado esperando
+                    if (root.Position - target.Position).Magnitude < 3.5 then
+                        for i, v in ipairs(CachedState.Coins) do
+                            if v == target then
+                                table.remove(CachedState.Coins, i)
+                                break
+                            end
+                        end
+                        currentCollectTarget = nil
+                    end
                 else
                     if autoCollectTween then autoCollectTween:Cancel(); autoCollectTween = nil end
                     currentCollectTarget = nil
@@ -472,7 +447,7 @@ task.spawn(function()
     end
 end)
 
--- ==================== THREAD TELEPORT TO GUN (RETORNO AUTOMÁTICO CORRIGIDO) ====================
+-- ==================== THREAD TELEPORT TO GUN (CORRIGIDO SEM DESINCRONIZAR A UI) ====================
 task.spawn(function()
     while true do
         task.wait(0.05)
@@ -486,9 +461,11 @@ task.spawn(function()
                 local hasKnife = player.Backpack:FindFirstChild("Knife") or char:FindFirstChild("Knife") or player.Backpack:FindFirstChild("Faca") or char:FindFirstChild("Faca")
 
                 if isMurdererRole or hasKnife then
-                    Configs.TpToGun = false
-                    trackingTpToGun = false
-                    lastPositionBeforeTpToGun = nil
+                    if trackingTpToGun then
+                        if lastPositionBeforeTpToGun then root.CFrame = lastPositionBeforeTpToGun end
+                        lastPositionBeforeTpToGun = nil
+                        trackingTpToGun = false
+                    end
                     continue
                 end
                 
@@ -500,19 +477,14 @@ task.spawn(function()
                     end
                     root.CFrame = gunPart.CFrame * CFrame.new(0, 3, 0)
                 else
-                    -- CORREÇÃO: Se você pegou a arma (ou ela sumiu), volta para a posição inicial de forma automática
                     if trackingTpToGun then
-                        if lastPositionBeforeTpToGun then
-                            root.CFrame = lastPositionBeforeTpToGun
-                        end
+                        if lastPositionBeforeTpToGun then root.CFrame = lastPositionBeforeTpToGun end
                         lastPositionBeforeTpToGun = nil
                         trackingTpToGun = false
-                        Configs.TpToGun = false -- Desliga automaticamente na UI ao terminar
                     end
                 end
             end
         else
-            -- Retorno manual de segurança caso desmarque o botão no menu antes de pegar
             if trackingTpToGun then
                 local char = player.Character
                 local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -600,8 +572,11 @@ task.spawn(function()
         local localPlayerHasGun = false
         local currentMurderer, currentSheriff = nil, nil
         
+        -- Atualiza Roles de forma nativa e segura
         for _, p in ipairs(Players:GetPlayers()) do
-            local role = PlayerRoles[p]
+            local role = ESP_DetectRole(p)
+            PlayerRoles[p] = role
+            
             if role == "Murderer" then currentMurderer = p end
             if role == "Sheriff"  then currentSheriff  = p end
             
@@ -620,24 +595,20 @@ task.spawn(function()
         CachedState.HasGun = localPlayerHasGun
         CachedState.Murderer = currentMurderer
 
-        if Configs.AutoCollect and (tick() - tempoUltimoScanMoedas > 1.0) then
-            tempoUltimoScanMoedas = tick()
-            local moedasEncontradas = {}
-            
-            for _, d in ipairs(workspace:GetDescendants()) do
-                if d:IsA("BasePart") and d.Transparency < 1 then
-                    local name = d.Name:lower()
-                    if name:find("coin") or name:find("moeda") or name:find("gold") or name == "snowflake"
-                        or name == "candycane" or name:find("token") or name:find("diamond")
-                        or name:find("present") or name:find("candy") then
-                        if not d:IsDescendantOf(Players) and not d:FindFirstAncestorOfClass("Tool")
-                            and not d:FindFirstAncestorOfClass("Accessory") then
-                            table.insert(moedasEncontradas, d)
-                        end
-                    end
-                end
+        -- Executa o update visual do ESP reativamente sem bugar a UI
+        if Configs.ESP then
+            ESP_UpdateAll()
+        else
+            ESP_Disable()
+        end
+
+        -- Scanner Inteligente de Moedas com frequência dinâmica para evitar delay
+        if Configs.AutoCollect then
+            local freqScan = (currentCollectTarget == nil) and 0.15 or 0.4
+            if (tick() - tempoUltimoScanMoedas > freqScan) then
+                tempoUltimoScanMoedas = tick()
+                AtualizarCacheMoedas()
             end
-            CachedState.Coins = moedasEncontradas
         end
         
         local gunDropExists = workspace:FindFirstChild("GunDrop", true) ~= nil
