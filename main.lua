@@ -1,5 +1,5 @@
 -- [[
---     AKAT MM2 MAIN LOGIC - FULLY UPDATED & OPTIMIZED [v5.3 - FIXED EDITION 2026]
+--     AKAT MM2 MAIN LOGIC - FULLY UPDATED & OPTIMIZED [v5.4 - FIXED EDITION 2026]
 --     Compatível com Delta Mobile & PC | MM2 (2026)
 -- ]]
 
@@ -17,6 +17,7 @@ local mouse = player:GetMouse()
 local gunDroppedThisRound = false
 local lastPositionBeforeTpToGun = nil 
 local trackingTpToGun = false
+local autoCollectTemporarilyDisabled = false -- Controle de pausa do Auto Collect
 local aimbotConnection = nil
 
 -- Configurações expostas de forma Global
@@ -103,6 +104,8 @@ local ESPHighlights = {}
 local espEventConnections = {}
 local espPlayerAddedConn = nil
 local espPlayerRemovingConn = nil
+-- Declarado como global no escopo local para evitar redundância
+local ESP_UpdatePlayer 
 local hbConnection = nil
 local steppedConnection = nil
 local safePlatform = nil
@@ -153,7 +156,7 @@ local function ESP_DetectRole(p)
     return checkAttr(p) or (p.Character and checkAttr(p.Character)) or "Innocent"
 end
 
-local function ESP_UpdatePlayer(p)
+ESP_UpdatePlayer = function(p)
     if not Configs.ESP then return end
     if not p or not p.Character then
         if ESPHighlights[p] then
@@ -272,7 +275,7 @@ local function ToggleAimbot(enabled)
                 local head = murderer.Character:FindFirstChild("Head")
                 local char = player.Character
                 local root = char and char:FindFirstChild("HumanoidRootPart")
-                local hum = char and char:FindFirstChildOfClass("Humanoid")
+                local hum  = char and char:FindFirstChildOfClass("Humanoid")
                 
                 if head and root and hum and hum.Health > 0 then
                     Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, head.Position)
@@ -354,6 +357,7 @@ local function LimparEDesligarAbsolutamente()
     if steppedConnection then steppedConnection:Disconnect(); steppedConnection = nil end
     if aimbotConnection then aimbotConnection:Disconnect(); aimbotConnection = nil end
     for k in pairs(Configs) do Configs[k] = false end
+    autoCollectTemporarilyDisabled = false
     ESP_Disable()
     if safePlatform then pcall(function() safePlatform:Destroy() end); safePlatform = nil end
     if autoCollectTween then autoCollectTween:Cancel(); autoCollectTween = nil end
@@ -485,7 +489,7 @@ task.spawn(function()
     end
 end)
 
--- ==================== THREAD TELEPORT TO GUN (RETORNO AUTOMÁTICO CORRIGIDO PARA A UI) ====================
+-- ==================== THREAD TELEPORT TO GUN (INTERAÇÃO COM AUTO-COLLECT CORRIGIDA) ====================
 task.spawn(function()
     while true do
         task.wait(0.05)
@@ -501,6 +505,10 @@ task.spawn(function()
                 if isMurdererRole or hasKnife then
                     trackingTpToGun = false
                     lastPositionBeforeTpToGun = nil
+                    if autoCollectTemporarilyDisabled then
+                        autoCollectTemporarilyDisabled = false
+                        Configs.AutoCollect = true
+                    end
                     continue
                 end
                 
@@ -509,6 +517,14 @@ task.spawn(function()
                     if not trackingTpToGun then
                         lastPositionBeforeTpToGun = root.CFrame
                         trackingTpToGun = true
+                        
+                        -- CORREÇÃO: Pausa o Auto Collect temporariamente para não travar o boneco ou gerar conflitos de movimentação
+                        if Configs.AutoCollect then
+                            autoCollectTemporarilyDisabled = true
+                            Configs.AutoCollect = false
+                            if autoCollectTween then autoCollectTween:Cancel(); autoCollectTween = nil end
+                            currentCollectTarget = nil
+                        end
                     end
                     root.CFrame = gunPart.CFrame * CFrame.new(0, 3, 0)
                 else
@@ -518,7 +534,12 @@ task.spawn(function()
                         end
                         lastPositionBeforeTpToGun = nil
                         trackingTpToGun = false
-                        -- CORREÇÃO: Não força mais Configs.TpToGun = false para manter sincronia perfeita com a UI!
+                        
+                        -- CORREÇÃO: Reativa o Auto Collect automaticamente ao retornar ao local de origem
+                        if autoCollectTemporarilyDisabled then
+                            autoCollectTemporarilyDisabled = false
+                            Configs.AutoCollect = true
+                        end
                     end
                 end
             end
@@ -531,6 +552,12 @@ task.spawn(function()
                 end
                 lastPositionBeforeTpToGun = nil
                 trackingTpToGun = false
+                
+                -- Se a função TpToGun foi desativada manualmente, força a reativação do Auto Collect pendente
+                if autoCollectTemporarilyDisabled then
+                    autoCollectTemporarilyDisabled = false
+                    Configs.AutoCollect = true
+                end
             end
         end
     end
@@ -538,7 +565,7 @@ end)
 
 -- ==================== NOCLIP SEGURO (MÉTODO ATUALIZADO) ====================
 steppedConnection = RunService.Stepped:Connect(function()
-    if Configs.AutoCollect or Configs.SafeSpot then
+    if Configs.AutoCollect or Configs.SafeSpot or trackingTpToGun then
         local char = player.Character
         if char then
             for _, part in ipairs(char:GetChildren()) do
@@ -611,6 +638,11 @@ task.spawn(function()
         local currentMurderer, currentSheriff = nil, nil
         
         for _, p in ipairs(Players:GetPlayers()) do
+            -- CORREÇÃO ESP: Atualização constante e forçada no loop central para evitar cores dessincronizadas
+            if Configs.ESP then
+                ESP_UpdatePlayer(p)
+            end
+
             local role = PlayerRoles[p]
             if role == "Murderer" then currentMurderer = p end
             if role == "Sheriff"  then currentSheriff  = p end
