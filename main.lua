@@ -1,5 +1,5 @@
 -- [[
---     AKAT MM2 MAIN LOGIC - FULLY UPDATED & OPTIMIZED [v5.4 - FIXED EDITION 2026]
+--     AKAT MM2 MAIN LOGIC - FULLY UPDATED & OPTIMIZED [v5.5 - FIXED EDITION 2026]
 --     Compatível com Delta Mobile & PC | MM2 (2026)
 -- ]]
 
@@ -104,7 +104,6 @@ local ESPHighlights = {}
 local espEventConnections = {}
 local espPlayerAddedConn = nil
 local espPlayerRemovingConn = nil
--- Declarado como global no escopo local para evitar redundância
 local ESP_UpdatePlayer 
 local hbConnection = nil
 local steppedConnection = nil
@@ -157,7 +156,7 @@ local function ESP_DetectRole(p)
 end
 
 ESP_UpdatePlayer = function(p)
-    if not Configs.ESP then return end
+    if not Configs.ESP or p == player then return end -- CORREÇÃO: Ignora o próprio personagem completamente
     if not p or not p.Character then
         if ESPHighlights[p] then
             pcall(function() ESPHighlights[p]:Destroy() end)
@@ -196,7 +195,9 @@ end
 
 local function ESP_ConnectPlayer(p)
     if p == player then return end
-    if espEventConnections[p] then return end -- Evita duplicar escutas no mesmo player
+    if espEventConnections[p] then return end
+
+    local connections = {}
 
     local c1 = p.CharacterAdded:Connect(function(char)
         task.wait(0.5)
@@ -206,12 +207,20 @@ local function ESP_ConnectPlayer(p)
             char.ChildRemoved:Connect(function() task.wait(0.1); if Configs.ESP then ESP_UpdatePlayer(p) end end)
         end
     end)
+    table.insert(connections, c1)
 
-    local bp = p:WaitForChild("Backpack", 5)
-    local c2 = bp and bp.ChildAdded:Connect(function() task.wait(0.1); if Configs.ESP then ESP_UpdatePlayer(p) end end)
-    local c3 = bp and bp.ChildRemoved:Connect(function() task.wait(0.1); if Configs.ESP then ESP_UpdatePlayer(p) end end)
+    -- CORREÇÃO: Carregamento assíncrono para evitar travamento de yield de scripts externos
+    task.spawn(function()
+        local bp = p:WaitForChild("Backpack", 5)
+        if bp and espEventConnections[p] then
+            local c2 = bp.ChildAdded:Connect(function() task.wait(0.1); if Configs.ESP then ESP_UpdatePlayer(p) end end)
+            local c3 = bp.ChildRemoved:Connect(function() task.wait(0.1); if Configs.ESP then ESP_UpdatePlayer(p) end end)
+            table.insert(espEventConnections[p], c2)
+            table.insert(espEventConnections[p], c3)
+        end
+    end)
 
-    espEventConnections[p] = { c1, c2, c3 }
+    espEventConnections[p] = connections
     ESP_UpdatePlayer(p)
 end
 
@@ -231,7 +240,6 @@ end
 
 local function ESP_Enable()
     Configs.ESP = true
-    
     if espPlayerAddedConn then espPlayerAddedConn:Disconnect() end
     if espPlayerRemovingConn then espPlayerRemovingConn:Disconnect() end
 
@@ -438,10 +446,10 @@ _G.AkatCallbacks = {
     ShutdownAll = function() LimparEDesligarAbsolutamente() end
 }
 
--- ==================== THREAD DO AUTO COLLECT COLETANDO IMEDIATAMENTE (DELAY DIMINUÍDO) ====================
+-- ==================== THREAD DO AUTO COLLECT COLETANDO IMEDIATAMENTE ====================
 task.spawn(function()
     while true do
-        task.wait(0.005) -- Ciclo ainda mais rápido para checagem imediata física
+        task.wait(0.005)
         if Configs.AutoCollect then
             local char = player.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -463,7 +471,7 @@ task.spawn(function()
                         
                         local goalCFrame = CFrame.new(target.Position)
                         local dist = (root.Position - target.Position).Magnitude
-                        local timeToReach = dist / 70 -- Aumentado de 55 para 70 (Velocidade de aproximação mais rápida)
+                        local timeToReach = dist / 70
                         
                         autoCollectTween = TweenService:Create(root, TweenInfo.new(timeToReach, Enum.EasingStyle.Linear), {CFrame = goalCFrame})
                         autoCollectTween:Play()
@@ -489,7 +497,7 @@ task.spawn(function()
     end
 end)
 
--- ==================== THREAD TELEPORT TO GUN (INTERAÇÃO COM AUTO-COLLECT CORRIGIDA) ====================
+-- ==================== THREAD TELEPORT TO GUN ====================
 task.spawn(function()
     while true do
         task.wait(0.05)
@@ -518,7 +526,6 @@ task.spawn(function()
                         lastPositionBeforeTpToGun = root.CFrame
                         trackingTpToGun = true
                         
-                        -- CORREÇÃO: Pausa o Auto Collect temporariamente para não travar o boneco ou gerar conflitos de movimentação
                         if Configs.AutoCollect then
                             autoCollectTemporarilyDisabled = true
                             Configs.AutoCollect = false
@@ -535,7 +542,6 @@ task.spawn(function()
                         lastPositionBeforeTpToGun = nil
                         trackingTpToGun = false
                         
-                        -- CORREÇÃO: Reativa o Auto Collect automaticamente ao retornar ao local de origem
                         if autoCollectTemporarilyDisabled then
                             autoCollectTemporarilyDisabled = false
                             Configs.AutoCollect = true
@@ -553,7 +559,6 @@ task.spawn(function()
                 lastPositionBeforeTpToGun = nil
                 trackingTpToGun = false
                 
-                -- Se a função TpToGun foi desativada manualmente, força a reativação do Auto Collect pendente
                 if autoCollectTemporarilyDisabled then
                     autoCollectTemporarilyDisabled = false
                     Configs.AutoCollect = true
@@ -563,7 +568,7 @@ task.spawn(function()
     end
 end)
 
--- ==================== NOCLIP SEGURO (MÉTODO ATUALIZADO) ====================
+-- ==================== NOCLIP SEGURO ====================
 steppedConnection = RunService.Stepped:Connect(function()
     if Configs.AutoCollect or Configs.SafeSpot or trackingTpToGun then
         local char = player.Character
@@ -588,7 +593,7 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
     -- WALK SPEED
     hum.WalkSpeed = Configs.Speed and 23 or 16
 
-    -- KNIFE REACH (Silent Mag Reach)
+    -- KNIFE REACH
     if Configs.Reach then
         local myKnife = char:FindFirstChild("Knife") or char:FindFirstChild("Faca")
         local handle = myKnife and myKnife:FindFirstChild("Handle")
@@ -638,11 +643,7 @@ task.spawn(function()
         local currentMurderer, currentSheriff = nil, nil
         
         for _, p in ipairs(Players:GetPlayers()) do
-            -- CORREÇÃO ESP: Atualização constante e forçada no loop central para evitar cores dessincronizadas
-            if Configs.ESP then
-                ESP_UpdatePlayer(p)
-            end
-
+            -- CORREÇÃO: O ESP agora roda puramente baseado em eventos dinâmicos para prevenir travamentos e lags visuais.
             local role = PlayerRoles[p]
             if role == "Murderer" then currentMurderer = p end
             if role == "Sheriff"  then currentSheriff  = p end
@@ -662,7 +663,6 @@ task.spawn(function()
         CachedState.HasGun = localPlayerHasGun
         CachedState.Murderer = currentMurderer
 
-        -- CORREÇÃO DELAY: Alterado tempo de escaneamento de 1.0s para 0.3s (Detecta moedas muito mais rápido)
         if Configs.AutoCollect and (tick() - tempoUltimoScanMoedas > 0.3) then
             tempoUltimoScanMoedas = tick()
             local moedasEncontradas = {}
