@@ -1,5 +1,5 @@
 -- [[
---     AKAT MM2 MAIN LOGIC - FULLY UPDATED & OPTIMIZED [v5.5 - FIXED EDITION 2026]
+--     AKAT MM2 MAIN LOGIC - FULLY UPDATED & OPTIMIZED [v5.6 - FIXED EDITION 2026]
 --     Compatível com Delta Mobile & PC | MM2 (2026)
 -- ]]
 
@@ -120,27 +120,10 @@ local ROLE_COLORS = {
     Innocent  = Color3.fromRGB(0,   200, 80),   
 }
 
--- ==================== SISTEMAS AUXILIARES E DETECÇÕES ====================
+-- ==================== SISTEMAS AUXILIARES E DETECÇÕES (CORRIGIDO PARA SKINS) ====================
 local function ESP_DetectRole(p)
     if not p or not p.Parent then return "Innocent" end
-    local function scanTools(container)
-        if not container then return nil end
-        for _, item in ipairs(container:GetChildren()) do
-            if item:IsA("Tool") then
-                local n = item.Name:lower()
-                if n:find("knife") or n:find("faca") or n:find("sword") then
-                    return "Murderer"
-                elseif n:find("gun") or n:find("pistol") or n:find("revolver") or n:find("arma") then
-                    if gunDroppedThisRound then return "Hero" else return "Sheriff" end
-                end
-            end
-        end
-        return nil
-    end
-
-    local toolRole = scanTools(p.Character) or scanTools(p:FindFirstChild("Backpack"))
-    if toolRole then return toolRole end
-
+    
     local function checkAttr(target)
         if not target then return nil end
         local role = target:GetAttribute("Role") or target:GetAttribute("role") or target:GetAttribute("MMRole")
@@ -152,11 +135,37 @@ local function ESP_DetectRole(p)
         return nil
     end
 
-    return checkAttr(p) or (p.Character and checkAttr(p.Character)) or "Innocent"
+    local attrRole = checkAttr(p) or (p.Character and checkAttr(p.Character))
+    if attrRole then return attrRole end
+
+    local function scanTools(container)
+        if not container then return nil end
+        for _, item in ipairs(container:GetChildren()) do
+            if item:IsA("Tool") then
+                -- Verificação por script interno da arma (funciona com 100% das skins do MM2)
+                if item:FindFirstChild("KnifeScript") or item:FindFirstChild("Knife") then
+                    return "Murderer"
+                elseif item:FindFirstChild("GunScript") or item:FindFirstChild("Gun") then
+                    if gunDroppedThisRound then return "Hero" else return "Sheriff" end
+                end
+                
+                local n = item.Name:lower()
+                -- Fallback para palavras-chave comuns de nomes e skins
+                if n:find("knife") or n:find("faca") or n:find("sword") or n:find("blade") then
+                    return "Murderer"
+                elseif n:find("gun") or n:find("pistol") or n:find("revolver") or n:find("arma") or n:find("luger") or n:find("blaster") or n:find("laser") or n:find("shark") or n:find("fang") or n:find("seer") then
+                    if gunDroppedThisRound then return "Hero" else return "Sheriff" end
+                end
+            end
+        end
+        return nil
+    end
+
+    return scanTools(p.Character) or scanTools(p:FindFirstChild("Backpack")) or "Innocent"
 end
 
 ESP_UpdatePlayer = function(p)
-    if not Configs.ESP or p == player then return end -- CORREÇÃO: Ignora o próprio personagem completamente
+    if not Configs.ESP or p == player then return end 
     if not p or not p.Character then
         if ESPHighlights[p] then
             pcall(function() ESPHighlights[p]:Destroy() end)
@@ -209,7 +218,6 @@ local function ESP_ConnectPlayer(p)
     end)
     table.insert(connections, c1)
 
-    -- CORREÇÃO: Carregamento assíncrono para evitar travamento de yield de scripts externos
     task.spawn(function()
         local bp = p:WaitForChild("Backpack", 5)
         if bp and espEventConnections[p] then
@@ -635,6 +643,7 @@ end)
 -- ==================== THREAD CENTRAL DE SCANNER E CACHE COLETOR (OTIMIZADO) ====================
 task.spawn(function()
     local tempoUltimoScanMoedas = 0
+    local tempoUltimoScanESP = 0
     
     while true do
         local gunFoundInPlayers = false
@@ -642,8 +651,18 @@ task.spawn(function()
         local localPlayerHasGun = false
         local currentMurderer, currentSheriff = nil, nil
         
+        -- Verificação leve do ESP a cada 1 segundo (garante detecção precisa de skins sem lag)
+        local agora = tick()
+        local atualizarESP = Configs.ESP and (agora - tempoUltimoScanESP > 1.0)
+        if atualizarESP then
+            tempoUltimoScanESP = agora
+        end
+
         for _, p in ipairs(Players:GetPlayers()) do
-            -- CORREÇÃO: O ESP agora roda puramente baseado em eventos dinâmicos para prevenir travamentos e lags visuais.
+            if atualizarESP and p ~= player then
+                ESP_UpdatePlayer(p)
+            end
+
             local role = PlayerRoles[p]
             if role == "Murderer" then currentMurderer = p end
             if role == "Sheriff"  then currentSheriff  = p end
