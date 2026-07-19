@@ -385,7 +385,7 @@ _G.AkatCallbacks = {
     ShutdownAll = function() LimparEDesligarAbsolutamente() end
 }
 
--- ==================== THREAD DO AUTO COLLECT COLETANDO IMEDIATAMENTE (CORRIGIDO) ====================
+-- ==================== THREAD DO AUTO COLLECT COLETANDO FLUIDAMENTE (CORRIGIDO) ====================
 task.spawn(function()
     while true do
         task.wait(0.01)
@@ -416,7 +416,7 @@ task.spawn(function()
                         autoCollectTween:Play()
                     end
                     
-                    -- Coleta instantânea via Firetouchinterest
+                    -- Coleta via Firetouchinterest
                     pcall(function()
                         firetouchinterest(root, target, 0)
                         firetouchinterest(root, target, 1)
@@ -428,8 +428,8 @@ task.spawn(function()
                         end
                     end)
 
-                    -- CORREÇÃO: Limpa a moeda do cache imediatamente ao chegar nela para não travar parado esperando
-                    if (root.Position - target.Position).Magnitude < 3.5 then
+                    -- MODIFICAÇÃO: Detecção de proximidade com um mini delay fluido (0.12s) para transição suave de moeda em moeda
+                    if (root.Position - target.Position).Magnitude < 3.8 then
                         for i, v in ipairs(CachedState.Coins) do
                             if v == target then
                                 table.remove(CachedState.Coins, i)
@@ -437,6 +437,8 @@ task.spawn(function()
                             end
                         end
                         currentCollectTarget = nil
+                        if autoCollectTween then autoCollectTween:Cancel(); autoCollectTween = nil end
+                        task.wait(0.12) -- Delay ajustado sob medida para manter o movimento fluido e limpo
                     end
                 else
                     if autoCollectTween then autoCollectTween:Cancel(); autoCollectTween = nil end
@@ -489,7 +491,7 @@ task.spawn(function()
                 local char = player.Character
                 local root = char and char:FindFirstChild("HumanoidRootPart")
                 if root and lastPositionBeforeTpToGun then
-                    root.CFrame = lastPositionBeforeTpToGun
+                    root.CFrame = lastPositionBeforeSafeSpot or lastPositionBeforeTpToGun
                 end
                 lastPositionBeforeTpToGun = nil
                 trackingTpToGun = false
@@ -602,7 +604,7 @@ task.spawn(function()
             ESP_Disable()
         end
 
-        -- Scanner Inteligente de Moedas com frequência dinâmica para evitar delay
+        -- Scanner de Moedas sincronizado
         if Configs.AutoCollect then
             local freqScan = (currentCollectTarget == nil) and 0.15 or 0.4
             if (tick() - tempoUltimoScanMoedas > freqScan) then
