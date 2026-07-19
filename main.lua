@@ -1,5 +1,5 @@
 -- [[
---     AKAT MM2 MAIN LOGIC - FULLY UPDATED & OPTIMIZED [v5.2 - FIXED EDITION 2026]
+--     AKAT MM2 MAIN LOGIC - FULLY UPDATED & OPTIMIZED [v5.3 - FIXED EDITION 2026]
 --     Compatível com Delta Mobile & PC | MM2 (2026)
 -- ]]
 
@@ -258,10 +258,7 @@ local function ToggleAimbot(enabled)
                 local hum = char and char:FindFirstChildOfClass("Humanoid")
                 
                 if head and root and hum and hum.Health > 0 then
-                    -- Alinha a Câmera diretamente na Cabeça do Murderer
                     Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, head.Position)
-                    
-                    -- Simulação de Shift Lock: Gira o corpo do personagem no eixo Y (evita inclinar para cima/baixo)
                     local targetLook = Vector3.new(head.Position.X, root.Position.Y, head.Position.Z)
                     root.CFrame = CFrame.lookAt(root.Position, targetLook)
                 end
@@ -402,7 +399,6 @@ _G.AkatCallbacks = {
                 root.Anchored = false 
                 root.AssemblyLinearVelocity = Vector3.zero
                 
-                -- Pousa suavemente no chão evitando o void
                 local rayParams = RaycastParams.new()
                 rayParams.FilterDescendantsInstances = {char}
                 rayParams.FilterType = Enum.RaycastFilterType.Exclude
@@ -422,125 +418,70 @@ _G.AkatCallbacks = {
     ShutdownAll = function() LimparEDesligarAbsolutamente() end
 }
 
--- ==================== AUTO COLLECT - V6.0 (MELHOR VERSÃO) ====================
-local AUTO_COLLECT_SPEED = 85          -- Aumentado para Delta Mobile
-local TOUCH_RETRIES = 4
-local COIN_SCAN_INTERVAL = 0.7
-
+-- ==================== THREAD DO AUTO COLLECT COLETANDO IMEDIATAMENTE (CORRIGIDO) ====================
 task.spawn(function()
-    local lastScan = 0
-    local lastTarget = nil
-    
     while true do
-        task.wait(0.03)
-        
-        if not Configs.AutoCollect then
-            if autoCollectTween then autoCollectTween:Cancel(); autoCollectTween = nil end
-            currentCollectTarget = nil
-            lastTarget = nil
-            continue
-        end
-
-        local char = player.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-
-        if not root or not hum or hum.Health <= 0 then continue end
-
-        -- Bag cheia
-        if IsBagFull() then
-            if autoCollectTween then autoCollectTween:Cancel() end
-            currentCollectTarget = nil
-            lastTarget = nil
-            root.Anchored = false
-            root.AssemblyLinearVelocity = Vector3.zero
-            task.wait(1.2)
-            continue
-        end
-
-        -- Scan de moedas otimizado
-        if tick() - lastScan > COIN_SCAN_INTERVAL then
-            lastScan = tick()
-            local moedas = {}
-            for _, d in ipairs(workspace:GetDescendants()) do
-                if d:IsA("BasePart") and d.Transparency < 0.9 and d.CanCollide ~= nil then
-                    local n = d.Name:lower()
-                    if n:find("coin") or n:find("moeda") or n:find("gold") or n:find("token") or 
-                       n:find("diamond") or n:find("present") or n:find("candy") or 
-                       n == "snowflake" or n == "candycane" then
-                        
-                        if not d:IsDescendantOf(Players) and not d:FindFirstAncestorOfClass("Tool") then
-                            table.insert(moedas, d)
-                        end
-                    end
-                end
-            end
-            CachedState.Coins = moedas
-        end
-
-        local target = ObterMoedaProxima(root)
-        
-        if target and target.Parent then
-            currentCollectTarget = target
+        task.wait(0.01) -- Loop ultrarrápido para resposta imediata
+        if Configs.AutoCollect then
+            local char = player.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            local hum  = char and char:FindFirstChildOfClass("Humanoid")
             
-            local dist = (root.Position - target.Position).Magnitude
-            
-            -- === MOVIMENTO MELHORADO (Velocity + CFrame) ===
-            if dist > 8 then
-                root.Anchored = false
-                
-                local direction = (target.Position - root.Position).Unit
-                local velocity = direction * AUTO_COLLECT_SPEED
-                
-                root.AssemblyLinearVelocity = velocity
-                
-                -- Ajuste fino de rotação (melhor visual e estabilidade)
-                root.CFrame = CFrame.lookAt(root.Position, Vector3.new(target.Position.X, root.Position.Y, target.Position.Z))
-            else
-                -- Quando muito perto: ancora + toque forte
-                root.Anchored = true
-                root.CFrame = CFrame.new(target.Position + Vector3.new(0, 2.5, 0))
-            end
-
-            -- === TOQUES INTENSIVOS (Mais confiável) ===
-            for i = 1, TOUCH_RETRIES do
-                pcall(function()
-                    firetouchinterest(root, target, 0)
-                    firetouchinterest(root, target, 1)
-                    
-                    local lower = char:FindFirstChild("LowerTorso") or 
-                                 char:FindFirstChild("HumanoidRootPart") or 
-                                 char:FindFirstChild("LeftFoot")
-                    if lower then
-                        firetouchinterest(lower, target, 0)
-                        firetouchinterest(lower, target, 1)
-                    end
-                end)
-                task.wait(0.035)
-            end
-
-        else
-            -- Sem moedas próximas
-            if currentCollectTarget then
+            if IsBagFull() then
+                if autoCollectTween then autoCollectTween:Cancel(); autoCollectTween = nil end
                 currentCollectTarget = nil
-                root.Anchored = false
-                root.AssemblyLinearVelocity = Vector3.zero
+                task.wait(1) 
+                continue
+            end
+
+            if root and hum and hum.Health > 0 then
+                local target = ObterMoedaProxima(root)
+                if target and target.Parent then
+                    -- ANCORAGEM REMOVIDA: Mantém a física ativa para o firetouchinterest registrar instantaneamente
+                    if currentCollectTarget ~= target then
+                        currentCollectTarget = target
+                        if autoCollectTween then autoCollectTween:Cancel() end
+                        
+                        local goalCFrame = CFrame.new(target.Position)
+                        local dist = (root.Position - target.Position).Magnitude
+                        local timeToReach = dist / 55 
+                        
+                        autoCollectTween = TweenService:Create(root, TweenInfo.new(timeToReach, Enum.EasingStyle.Linear), {CFrame = goalCFrame})
+                        autoCollectTween:Play()
+                    end
+                    
+                    -- Simulação aprimorada de toque multiparte (Garante a coleta mesmo em moedas com delay)
+                    pcall(function()
+                        firetouchinterest(root, target, 0)
+                        firetouchinterest(root, target, 1)
+                        
+                        -- Força o toque usando as extremidades inferiores do boneco
+                        for _, part in ipairs(char:GetChildren()) do
+                            if part:IsA("BasePart") and (part.Name:find("Foot") or part.Name:find("Leg") or part.Name:find("Torso")) then
+                                firetouchinterest(part, target, 0)
+                                firetouchinterest(part, target, 1)
+                            end
+                        end
+                    end)
+                else
+                    if autoCollectTween then autoCollectTween:Cancel(); autoCollectTween = nil end
+                    currentCollectTarget = nil
+                end
             end
         end
     end
 end)
 
--- ==================== THREAD TELEPORT TO GUN CORRIGIDA E ATIVA ====================
+-- ==================== THREAD TELEPORT TO GUN (RETORNO AUTOMÁTICO CORRIGIDO) ====================
 task.spawn(function()
     while true do
-        task.wait(0.1)
+        task.wait(0.05)
         if Configs.TpToGun then
             local char = player.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
             local hum  = char and char:FindFirstChildOfClass("Humanoid")
             
             if root and hum and hum.Health > 0 then
-                -- Bloqueio de segurança caso seja o assassino
                 local isMurdererRole = (PlayerRoles[player] == "Murderer")
                 local hasKnife = player.Backpack:FindFirstChild("Knife") or char:FindFirstChild("Knife") or player.Backpack:FindFirstChild("Faca") or char:FindFirstChild("Faca")
 
@@ -557,12 +498,21 @@ task.spawn(function()
                         lastPositionBeforeTpToGun = root.CFrame
                         trackingTpToGun = true
                     end
-                    -- Mantém o TP atualizado e travado em cima da arma caída imediatamente
                     root.CFrame = gunPart.CFrame * CFrame.new(0, 3, 0)
+                else
+                    -- CORREÇÃO: Se você pegou a arma (ou ela sumiu), volta para a posição inicial de forma automática
+                    if trackingTpToGun then
+                        if lastPositionBeforeTpToGun then
+                            root.CFrame = lastPositionBeforeTpToGun
+                        end
+                        lastPositionBeforeTpToGun = nil
+                        trackingTpToGun = false
+                        Configs.TpToGun = false -- Desliga automaticamente na UI ao terminar
+                    end
                 end
             end
         else
-            -- Retorna de forma segura ao local original se a opção for desligada na UI
+            -- Retorno manual de segurança caso desmarque o botão no menu antes de pegar
             if trackingTpToGun then
                 local char = player.Character
                 local root = char and char:FindFirstChild("HumanoidRootPart")
