@@ -1,5 +1,5 @@
 -- [[
---     AKAT MM2 MAIN LOGIC - FULLY UPDATED & OPTIMIZED [v5.2 - FIX EDITION]
+--     AKAT MM2 MAIN LOGIC - FULLY UPDATED & OPTIMIZED [v5.2 - FIXED EDITION 2026]
 --     Compatível com Delta Mobile & PC | MM2 (2026)
 -- ]]
 
@@ -76,7 +76,7 @@ task.spawn(function()
                 end)
             end
             
-            -- SILENT AIM AJUSTADO EXCLUSIVAMENTE PARA A CABEÇA
+            -- SILENT AIM METAMETHOD AJUSTADO PARA HEAD (CABEÇA)
             if Configs.Aimbot and CachedState.HasGun and self == mouse then
                 if key == "Hit" or key == "hit" then
                     local murderer = CachedState.Murderer
@@ -239,7 +239,7 @@ local function ESP_Disable()
     ESP_ClearAll()
 end
 
--- ==================== NOVO AIMBOT COM OPERAÇÃO EM SHIFT-LOCK ====================
+-- ==================== NOVO SISTEMA DE AIMBOT COM SHIFT LOCK SEGURO ====================
 local function ToggleAimbot(enabled)
     if Configs.Aimbot == enabled then return end 
     Configs.Aimbot = enabled
@@ -255,15 +255,15 @@ local function ToggleAimbot(enabled)
                 local head = murderer.Character:FindFirstChild("Head")
                 local char = player.Character
                 local root = char and char:FindFirstChild("HumanoidRootPart")
-                local hum  = char and char:FindFirstChildOfClass("Humanoid")
+                local hum = char and char:FindFirstChildOfClass("Humanoid")
                 
                 if head and root and hum and hum.Health > 0 then
-                    -- Foca a câmera diretamente na cabeça
-                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, head.Position)
+                    -- Alinha a Câmera diretamente na Cabeça do Murderer
+                    Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, head.Position)
                     
-                    -- LÓGICA DO SHIFT-LOCK: Força o corpo a virar para a direção horizontal do Murderer
-                    local targetPositionHorizontal = Vector3.new(head.Position.X, root.Position.Y, head.Position.Z)
-                    root.CFrame = CFrame.lookAt(root.Position, targetPositionHorizontal)
+                    -- Simulação de Shift Lock: Gira o corpo do personagem no eixo Y (evita inclinar para cima/baixo)
+                    local targetLook = Vector3.new(head.Position.X, root.Position.Y, head.Position.Z)
+                    root.CFrame = CFrame.lookAt(root.Position, targetLook)
                 end
             end
         end)
@@ -402,6 +402,7 @@ _G.AkatCallbacks = {
                 root.Anchored = false 
                 root.AssemblyLinearVelocity = Vector3.zero
                 
+                -- Pousa suavemente no chão evitando o void
                 local rayParams = RaycastParams.new()
                 rayParams.FilterDescendantsInstances = {char}
                 rayParams.FilterType = Enum.RaycastFilterType.Exclude
@@ -421,10 +422,10 @@ _G.AkatCallbacks = {
     ShutdownAll = function() LimparEDesligarAbsolutamente() end
 }
 
--- ==================== THREAD DO AUTO COLLECT CORRIGIDA (COLETA FIRME) ====================
+-- ==================== THREAD DO AUTO COLLECT COLETANDO IMEDIATAMENTE ====================
 task.spawn(function()
     while true do
-        task.wait(0.01) 
+        task.wait(0.02) -- Frequência otimizada para detecção instantânea
         if Configs.AutoCollect then
             local char = player.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -446,29 +447,24 @@ task.spawn(function()
                         currentCollectTarget = target
                         if autoCollectTween then autoCollectTween:Cancel() end
                         
-                        -- Modificado para ir exatamente na CFrame da moeda, sem flutuações
-                        local goalCFrame = target.CFrame
-                        local dist = (root.Position - goalCFrame.Position).Magnitude
+                        -- CORREÇÃO: Vai diretamente para a CFrame exata do centro da moeda
+                        local goalCFrame = CFrame.new(target.Position)
+                        local dist = (root.Position - target.Position).Magnitude
                         local timeToReach = dist / 40 
                         
                         autoCollectTween = TweenService:Create(root, TweenInfo.new(timeToReach, Enum.EasingStyle.Linear), {CFrame = goalCFrame})
                         autoCollectTween:Play()
                     end
                     
-                    -- Simula o toque de forma agressiva nos pés e no torso para forçar o registro da moeda
+                    -- Disparos de touch nativos instantâneos (Sem yields internos)
                     pcall(function()
                         firetouchinterest(root, target, 0)
                         firetouchinterest(root, target, 1)
-                        
-                        local lFoot = char:FindFirstChild("LeftFoot") or char:FindFirstChild("Left Leg")
-                        local rFoot = char:FindFirstChild("RightFoot") or char:FindFirstChild("Right Leg")
-                        if lFoot then
-                            firetouchinterest(lFoot, target, 0)
-                            firetouchinterest(lFoot, target, 1)
-                        end
-                        if rFoot then
-                            firetouchinterest(rFoot, target, 0)
-                            firetouchinterest(rFoot, target, 1)
+                        -- Disparo reserva usando a parte inferior para garantir coletas em moedas baixas
+                        local lowerPart = char:FindFirstChild("LowerTorso") or char:FindFirstChild("LeftFoot")
+                        if lowerPart then
+                            firetouchinterest(lowerPart, target, 0)
+                            firetouchinterest(lowerPart, target, 1)
                         end
                     end)
                 else
@@ -481,16 +477,17 @@ task.spawn(function()
     end
 end)
 
--- ==================== THREAD TELEPORT TO GUN INTELIGENTE CORRIGIDA (SEM ERROS) ====================
+-- ==================== THREAD TELEPORT TO GUN CORRIGIDA E ATIVA ====================
 task.spawn(function()
     while true do
-        task.wait(0.05)
+        task.wait(0.1)
         if Configs.TpToGun then
             local char = player.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
             local hum  = char and char:FindFirstChildOfClass("Humanoid")
             
             if root and hum and hum.Health > 0 then
+                -- Bloqueio de segurança caso seja o assassino
                 local isMurdererRole = (PlayerRoles[player] == "Murderer")
                 local hasKnife = player.Backpack:FindFirstChild("Knife") or char:FindFirstChild("Knife") or player.Backpack:FindFirstChild("Faca") or char:FindFirstChild("Faca")
 
@@ -507,26 +504,18 @@ task.spawn(function()
                         lastPositionBeforeTpToGun = root.CFrame
                         trackingTpToGun = true
                     end
-                    -- Zera a velocidade física para quebrar o puxão do anticheat (Bypass de Posição)
-                    root.AssemblyLinearVelocity = Vector3.zero
-                    root.AssemblyAngularVelocity = Vector3.zero
-                    root.CFrame = gunPart.CFrame * CFrame.new(0, 2.5, 0)
-                else
-                    if trackingTpToGun and lastPositionBeforeTpToGun then
-                        root.AssemblyLinearVelocity = Vector3.zero
-                        root.CFrame = lastPositionBeforeTpToGun
-                        lastPositionBeforeTpToGun = nil
-                        trackingTpToGun = false
-                        Configs.TpToGun = false 
-                    end
+                    -- Mantém o TP atualizado e travado em cima da arma caída imediatamente
+                    root.CFrame = gunPart.CFrame * CFrame.new(0, 3, 0)
                 end
             end
         else
-            local char = player.Character
-            local root = char and char:FindFirstChild("HumanoidRootPart")
-            if root and trackingTpToGun and lastPositionBeforeTpToGun then
-                root.AssemblyLinearVelocity = Vector3.zero
-                root.CFrame = lastPositionBeforeTpToGun
+            -- Retorna de forma segura ao local original se a opção for desligada na UI
+            if trackingTpToGun then
+                local char = player.Character
+                local root = char and char:FindFirstChild("HumanoidRootPart")
+                if root and lastPositionBeforeTpToGun then
+                    root.CFrame = lastPositionBeforeTpToGun
+                end
                 lastPositionBeforeTpToGun = nil
                 trackingTpToGun = false
             end
@@ -536,7 +525,7 @@ end)
 
 -- ==================== NOCLIP SEGURO (MÉTODO ATUALIZADO) ====================
 steppedConnection = RunService.Stepped:Connect(function()
-    if Configs.AutoCollect or Configs.SafeSpot or Configs.TpToGun then
+    if Configs.AutoCollect or Configs.SafeSpot then
         local char = player.Character
         if char then
             for _, part in ipairs(char:GetChildren()) do
@@ -628,7 +617,7 @@ task.spawn(function()
         CachedState.HasGun = localPlayerHasGun
         CachedState.Murderer = currentMurderer
 
-        if Configs.AutoCollect and (tick() - tempoUltimoScanMoedas > 0.8) then
+        if Configs.AutoCollect and (tick() - tempoUltimoScanMoedas > 1.0) then
             tempoUltimoScanMoedas = tick()
             local moedasEncontradas = {}
             
@@ -665,7 +654,7 @@ task.spawn(function()
             end
             EnviarMensagemChat(msg)
         end
-        task.wait(0.2)
+        task.wait(0.3)
     end
 end)
 
