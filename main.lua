@@ -263,7 +263,7 @@ local function ESP_Enable()
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= player then ESP_ConnectPlayer(p) end
     end
-    
+
     espPlayerAddedConn = Players.PlayerAdded:Connect(function(p)
         if Configs.ESP then ESP_ConnectPlayer(p) end
     end)
@@ -491,10 +491,11 @@ task.spawn(function()
                         
                         local goalCFrame = CFrame.new(target.Position)
                         local dist = (root.Position - target.Position).Magnitude
-                        local timeToReach = dist / 50 
+                        local timeToReach = dist / 37
                         
                         autoCollectTween = TweenService:Create(root, TweenInfo.new(timeToReach, Enum.EasingStyle.Linear), {CFrame = goalCFrame})
                         autoCollectTween:Play()
+                        autoCollectTween.Completed:Wait() 
                     end
                     
                     pcall(function()
