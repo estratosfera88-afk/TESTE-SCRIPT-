@@ -1,5 +1,5 @@
 -- [[
---     AKAT MM2 MAIN LOGIC - FULLY UPDATED & OPTIMIZED [v5.6 - FIXED EDITION 2026]
+--     AKAT MM2 MAIN LOGIC - FULLY UPDATED & OPTIMIZED [v5.7 - PERFECT AIM 2026]
 --     Compatível com Delta Mobile & PC | MM2 (2026)
 -- ]]
 
@@ -17,7 +17,7 @@ local mouse = player:GetMouse()
 local gunDroppedThisRound = false
 local lastPositionBeforeTpToGun = nil 
 local trackingTpToGun = false
-local autoCollectTemporarilyDisabled = false -- Controle de pausa do Auto Collect
+local autoCollectTemporarilyDisabled = false 
 local aimbotConnection = nil
 
 -- Configurações expostas de forma Global
@@ -50,33 +50,6 @@ local function AS_GetMurderer()
 end
 _G.AS_GetMurderer = AS_GetMurderer
 
--- ==================== SISTEMA DE PREDIÇÃO DE MOVIMENTO AVANÇADO ====================
-local function GetPredictedPosition(targetPlayer)
-    if not targetPlayer or not targetPlayer.Character then return nil end
-    local char = targetPlayer.Character
-    local head = char:FindFirstChild("Head")
-    local root = char:FindFirstChild("HumanoidRootPart")
-    if not head or not root then return nil end
-    
-    local velocity = root.AssemblyLinearVelocity or root.Velocity or Vector3.zero
-    local myChar = player.Character
-    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    
-    local dist = myRoot and (myRoot.Position - head.Position).Magnitude or 0
-    -- Constante otimizada para a velocidade de projétil/hitscan do MM2 em 2026
-    local bulletSpeed = 230 
-    local time = (dist / bulletSpeed) + 0.04 -- Compensação de ping/latência de rede (Delta/PC)
-    
-    local predictedPos = head.Position + (velocity * time)
-    
-    -- Compensação balística para alvos pulando ou em queda livre
-    if velocity.Y ~= 0 then
-        predictedPos = predictedPos + Vector3.new(0, (workspace.Gravity * time * time) * 0.5, 0)
-    end
-    
-    return predictedPos
-end
-
 -- ==================== ANTI-BAN / ANTI-KICK & METAMETHOD HOOKS ====================
 local oldIndex = nil
 local oldNamecall = nil
@@ -104,13 +77,23 @@ task.spawn(function()
                 end)
             end
             
-            -- SILENT AIM AJUSTADO COM PREDIÇÃO PARA MÁXIMA CONSISTÊNCIA NO DISPARO
+            -- SILENT AIM PRECISÃO ABSOLUTA (APENAS NO DISPARO)
             if Configs.Aimbot and CachedState.HasGun and self == mouse then
                 if key == "Hit" or key == "hit" then
                     local murderer = CachedState.Murderer
                     if murderer and murderer.Character then
-                        local predPos = GetPredictedPosition(murderer)
-                        if predPos then return CFrame.new(predPos) end
+                        local head = murderer.Character:FindFirstChild("Head")
+                        local root = murderer.Character:FindFirstChild("HumanoidRootPart")
+                        if head and root then
+                            -- Predição linear pura ajustada para o ping da rede (sem gravidade/curva)
+                            local velocity = root.AssemblyLinearVelocity or root.Velocity or Vector3.zero
+                            if velocity.Magnitude > 80 then velocity = Vector3.zero end -- Filtro anti-bug
+                            
+                            local pingCompensation = 0.045
+                            local targetPosition = head.Position + (velocity * pingCompensation)
+                            
+                            return CFrame.new(targetPosition)
+                        end
                     end
                 elseif key == "Target" or key == "target" then
                     local murderer = CachedState.Murderer
@@ -301,7 +284,7 @@ local function ESP_Disable()
     ESP_ClearAll()
 end
 
--- ==================== NOVO SISTEMA DE AIMBOT COM PREDIÇÃO SINCRONIZADA ====================
+-- ==================== LOCK DE CÂMERA INTEGRAL E FLUIDO ====================
 local function ToggleAimbot(enabled)
     if Configs.Aimbot == enabled then return end 
     Configs.Aimbot = enabled
@@ -314,15 +297,17 @@ local function ToggleAimbot(enabled)
             
             local murderer = CachedState.Murderer
             if murderer and murderer.Character then
+                local head = murderer.Character:FindFirstChild("Head")
                 local char = player.Character
                 local root = char and char:FindFirstChild("HumanoidRootPart")
                 local hum  = char and char:FindFirstChildOfClass("Humanoid")
                 
-                -- Obtém a posição futura calculada com base na movimentação atual do Murderer
-                local predPos = GetPredictedPosition(murderer)
-                if predPos and root and hum and hum.Health > 0 then
-                    Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, predPos)
-                    local targetLook = Vector3.new(predPos.X, root.Position.Y, predPos.Z)
+                if head and root and hum and hum.Health > 0 then
+                    -- Rastreia a cabeça real visualmente (acaba com a mira torta)
+                    Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, head.Position)
+                    
+                    -- Alinha a orientação do corpo do personagem de forma estável
+                    local targetLook = Vector3.new(head.Position.X, root.Position.Y, head.Position.Z)
                     root.CFrame = CFrame.lookAt(root.Position, targetLook)
                 end
             end
@@ -481,7 +466,7 @@ _G.AkatCallbacks = {
     ShutdownAll = function() LimparEDesligarAbsolutamente() end
 }
 
--- ==================== THREAD DO AUTO COLLECT AJUSTADA (MAIOR PRECISÃO) ====================
+-- ==================== THREAD DO AUTO COLLECT COLETANDO IMEDIATAMENTE ====================
 task.spawn(function()
     while true do
         task.wait(0.005)
@@ -506,8 +491,6 @@ task.spawn(function()
                         
                         local goalCFrame = CFrame.new(target.Position)
                         local dist = (root.Position - target.Position).Magnitude
-                        
-                        -- Velocidade reajustada levemente de 70 para 50 para evitar falhas de coleta por alta velocidade
                         local timeToReach = dist / 50 
                         
                         autoCollectTween = TweenService:Create(root, TweenInfo.new(timeToReach, Enum.EasingStyle.Linear), {CFrame = goalCFrame})
