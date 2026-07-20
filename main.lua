@@ -50,6 +50,33 @@ local function AS_GetMurderer()
 end
 _G.AS_GetMurderer = AS_GetMurderer
 
+-- ==================== SISTEMA DE PREDIÇÃO DE MOVIMENTO AVANÇADO ====================
+local function GetPredictedPosition(targetPlayer)
+    if not targetPlayer or not targetPlayer.Character then return nil end
+    local char = targetPlayer.Character
+    local head = char:FindFirstChild("Head")
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not head or not root then return nil end
+    
+    local velocity = root.AssemblyLinearVelocity or root.Velocity or Vector3.zero
+    local myChar = player.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    
+    local dist = myRoot and (myRoot.Position - head.Position).Magnitude or 0
+    -- Constante otimizada para a velocidade de projétil/hitscan do MM2 em 2026
+    local bulletSpeed = 230 
+    local time = (dist / bulletSpeed) + 0.04 -- Compensação de ping/latência de rede (Delta/PC)
+    
+    local predictedPos = head.Position + (velocity * time)
+    
+    -- Compensação balística para alvos pulando ou em queda livre
+    if velocity.Y ~= 0 then
+        predictedPos = predictedPos + Vector3.new(0, (workspace.Gravity * time * time) * 0.5, 0)
+    end
+    
+    return predictedPos
+end
+
 -- ==================== ANTI-BAN / ANTI-KICK & METAMETHOD HOOKS ====================
 local oldIndex = nil
 local oldNamecall = nil
@@ -77,13 +104,14 @@ task.spawn(function()
                 end)
             end
             
-            -- SILENT AIM METAMETHOD AJUSTADO PARA HEAD (CABEÇA)
+            -- SILENT AIM AJUSTADO COM PREDIÇÃO PARA MÁXIMA CONSISTÊNCIA NO DISPARO
             if Configs.Aimbot and CachedState.HasGun and self == mouse then
                 if key == "Hit" or key == "hit" then
                     local murderer = CachedState.Murderer
-                    local pChar = murderer and murderer.Character
-                    local head = pChar and pChar:FindFirstChild("Head")
-                    if head then return head.CFrame end
+                    if murderer and murderer.Character then
+                        local predPos = GetPredictedPosition(murderer)
+                        if predPos then return CFrame.new(predPos) end
+                    end
                 elseif key == "Target" or key == "target" then
                     local murderer = CachedState.Murderer
                     local pChar = murderer and murderer.Character
@@ -120,7 +148,7 @@ local ROLE_COLORS = {
     Innocent  = Color3.fromRGB(0,   200, 80),   
 }
 
--- ==================== SISTEMAS AUXILIARES E DETECÇÕES (CORRIGIDO PARA SKINS) ====================
+-- ==================== SISTEMAS AUXILIARES E DETECÇÕES ====================
 local function ESP_DetectRole(p)
     if not p or not p.Parent then return "Innocent" end
     
@@ -142,7 +170,6 @@ local function ESP_DetectRole(p)
         if not container then return nil end
         for _, item in ipairs(container:GetChildren()) do
             if item:IsA("Tool") then
-                -- Verificação por script interno da arma (funciona com 100% das skins do MM2)
                 if item:FindFirstChild("KnifeScript") or item:FindFirstChild("Knife") then
                     return "Murderer"
                 elseif item:FindFirstChild("GunScript") or item:FindFirstChild("Gun") then
@@ -150,7 +177,6 @@ local function ESP_DetectRole(p)
                 end
                 
                 local n = item.Name:lower()
-                -- Fallback para palavras-chave comuns de nomes e skins
                 if n:find("knife") or n:find("faca") or n:find("sword") or n:find("blade") then
                     return "Murderer"
                 elseif n:find("gun") or n:find("pistol") or n:find("revolver") or n:find("arma") or n:find("luger") or n:find("blaster") or n:find("laser") or n:find("shark") or n:find("fang") or n:find("seer") then
@@ -275,7 +301,7 @@ local function ESP_Disable()
     ESP_ClearAll()
 end
 
--- ==================== NOVO SISTEMA DE AIMBOT COM SHIFT LOCK SEGURO ====================
+-- ==================== NOVO SISTEMA DE AIMBOT COM PREDIÇÃO SINCRONIZADA ====================
 local function ToggleAimbot(enabled)
     if Configs.Aimbot == enabled then return end 
     Configs.Aimbot = enabled
@@ -288,14 +314,15 @@ local function ToggleAimbot(enabled)
             
             local murderer = CachedState.Murderer
             if murderer and murderer.Character then
-                local head = murderer.Character:FindFirstChild("Head")
                 local char = player.Character
                 local root = char and char:FindFirstChild("HumanoidRootPart")
                 local hum  = char and char:FindFirstChildOfClass("Humanoid")
                 
-                if head and root and hum and hum.Health > 0 then
-                    Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, head.Position)
-                    local targetLook = Vector3.new(head.Position.X, root.Position.Y, head.Position.Z)
+                -- Obtém a posição futura calculada com base na movimentação atual do Murderer
+                local predPos = GetPredictedPosition(murderer)
+                if predPos and root and hum and hum.Health > 0 then
+                    Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, predPos)
+                    local targetLook = Vector3.new(predPos.X, root.Position.Y, predPos.Z)
                     root.CFrame = CFrame.lookAt(root.Position, targetLook)
                 end
             end
@@ -454,7 +481,7 @@ _G.AkatCallbacks = {
     ShutdownAll = function() LimparEDesligarAbsolutamente() end
 }
 
--- ==================== THREAD DO AUTO COLLECT COLETANDO IMEDIATAMENTE ====================
+-- ==================== THREAD DO AUTO COLLECT AJUSTADA (MAIOR PRECISÃO) ====================
 task.spawn(function()
     while true do
         task.wait(0.005)
@@ -479,7 +506,9 @@ task.spawn(function()
                         
                         local goalCFrame = CFrame.new(target.Position)
                         local dist = (root.Position - target.Position).Magnitude
-                        local timeToReach = dist / 70
+                        
+                        -- Velocidade reajustada levemente de 70 para 50 para evitar falhas de coleta por alta velocidade
+                        local timeToReach = dist / 50 
                         
                         autoCollectTween = TweenService:Create(root, TweenInfo.new(timeToReach, Enum.EasingStyle.Linear), {CFrame = goalCFrame})
                         autoCollectTween:Play()
@@ -640,7 +669,7 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
     end
 end)
 
--- ==================== THREAD CENTRAL DE SCANNER E CACHE COLETOR (OTIMIZADO) ====================
+-- ==================== THREAD CENTRAL DE SCANNER E CACHE COLETOR ====================
 task.spawn(function()
     local tempoUltimoScanMoedas = 0
     local tempoUltimoScanESP = 0
@@ -651,7 +680,6 @@ task.spawn(function()
         local localPlayerHasGun = false
         local currentMurderer, currentSheriff = nil, nil
         
-        -- Verificação leve do ESP a cada 1 segundo (garante detecção precisa de skins sem lag)
         local agora = tick()
         local atualizarESP = Configs.ESP and (agora - tempoUltimoScanESP > 1.0)
         if atualizarESP then
