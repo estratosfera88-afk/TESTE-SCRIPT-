@@ -1,742 +1,541 @@
--- [[
---     AKAT MM2 MAIN LOGIC - FULLY UPDATED & OPTIMIZED [v5.7 - PERFECT AIM 2026]
---     Compatível com Delta Mobile & PC | MM2 (2026)
--- ]]
+--// =====================================================================
+--//  PARTE 2: LÓGICA E SISTEMAS - AKAT EDITION
+--// =====================================================================
+
+--// ANTI-BAN / ANTI-KICK SYSTEM
+local AntiBanEnabled = true
 
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
-local Lighting = game:GetService("Lighting")
+local LocalPlayer = Players.LocalPlayer
 
-local player = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
-local mouse = player:GetMouse()
+if AntiBanEnabled then
+    pcall(function()
+        local oldKick = LocalPlayer.Kick
+        LocalPlayer.Kick = function(self, reason)
+            warn("[ANTI-KICK] Tentativa bloqueada: " .. tostring(reason or "Sem motivo"))
+            return nil
+        end
 
--- Estado dinâmico da rodada
-local gunDroppedThisRound = false
-local lastPositionBeforeTpToGun = nil 
-local trackingTpToGun = false
-local autoCollectTemporarilyDisabled = false 
-local aimbotConnection = nil
+        local mt = getrawmetatable(game)
+        local oldNamecall = mt.__namecall
+        setreadonly(mt, false)
 
--- Configurações expostas de forma Global
-local Configs = {
-    ESP = false,
-    Aimbot = false, 
-    Speed = false,
-    Reach = false,
-    AntiFling = false,
-    TpToGun = false,
-    SafeSpot = false,
-    AutoCollect = false,
-    ChatRoles = false
-}
-_G.Configs = Configs
-
--- ==================== CAMADA DE CACHE CENTRALIZADO (PREVINE CRASH) ====================
-local CachedState = {
-    HasGun = false,
-    Murderer = nil,
-    Coins = {}
-}
-
-local function PlayerTemArma()
-    return CachedState.HasGun
-end
-
-local function AS_GetMurderer()
-    return CachedState.Murderer
-end
-_G.AS_GetMurderer = AS_GetMurderer
-
--- ==================== ANTI-BAN / ANTI-KICK & METAMETHOD HOOKS ====================
-local oldIndex = nil
-local oldNamecall = nil
-
-task.spawn(function()
-    local gmt = getrawmetatable and getrawmetatable(game)
-    if gmt and setreadonly and hookfunction then
-        setreadonly(gmt, false)
-        oldNamecall = gmt.__namecall
-        oldIndex = gmt.__index
-        
-        gmt.__namecall = newcclosure(function(self, ...)
+        mt.__namecall = newcclosure(function(self, ...)
             local method = getnamecallmethod()
-            if tostring(method):lower() == "kick" and self == player then
-                warn("[AKAT ANTI-BAN] Tentativa de Kick bloqueada!")
+            if self == LocalPlayer and (method == "Kick" or method == "kick") then
+                warn("[ANTI-KICK] Namecall bloqueado!")
                 return nil
             end
             return oldNamecall(self, ...)
         end)
-        
-        gmt.__index = newcclosure(function(self, key)
-            if tostring(key):lower() == "kick" and self == player then
-                return newcclosure(function()
-                    warn("[AKAT ANTI-BAN] Kick indireto bloqueado!")
-                end)
-            end
-            
-            -- SILENT AIM PRECISÃO ABSOLUTA (APENAS NO DISPARO)
-            if Configs.Aimbot and CachedState.HasGun and self == mouse then
-                if key == "Hit" or key == "hit" then
-                    local murderer = CachedState.Murderer
-                    if murderer and murderer.Character then
-                        local head = murderer.Character:FindFirstChild("Head")
-                        local root = murderer.Character:FindFirstChild("HumanoidRootPart")
-                        if head and root then
-                            -- Predição linear pura ajustada para o ping da rede (sem gravidade/curva)
-                            local velocity = root.AssemblyLinearVelocity or root.Velocity or Vector3.zero
-                            if velocity.Magnitude > 80 then velocity = Vector3.zero end -- Filtro anti-bug
-                            
-                            local pingCompensation = 0.045
-                            local targetPosition = head.Position + (velocity * pingCompensation)
-                            
-                            return CFrame.new(targetPosition)
-                        end
-                    end
-                elseif key == "Target" or key == "target" then
-                    local murderer = CachedState.Murderer
-                    local pChar = murderer and murderer.Character
-                    local head = pChar and pChar:FindFirstChild("Head")
-                    if head then return head end
+
+        setreadonly(mt, true)
+    end)
+    print("✅ Anti-Ban / Anti-Kick carregado com sucesso")
+end
+
+task.wait(0.1)
+
+--// SERVICES & ESTADO GLOBAL
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local Lighting = game:GetService("Lighting")
+local Camera = workspace.CurrentCamera
+
+_G.AkatHub = _G.AkatHub or {}
+local Akat = _G.AkatHub
+
+-- Configurações padrão da Lógica
+Akat.Aimbot = Akat.Aimbot or false
+Akat.AimbotFix = Akat.AimbotFix or false
+Akat.AimbotFixEnabled = Akat.AimbotFixEnabled or false
+Akat.LockedTarget = Akat.LockedTarget or nil
+Akat.AimPart = Akat.AimPart or "Head"
+
+Akat.ESP = Akat.ESP or false
+Akat.Names = Akat.Names or false
+Akat.DistanceESP = Akat.DistanceESP or false
+Akat.TracerESP = Akat.TracerESP or false
+Akat.HealthESP = Akat.HealthESP or false
+Akat.TeamCheck = Akat.TeamCheck or false
+Akat.WallCheck = Akat.WallCheck or true
+Akat.AimSmoothness = Akat.AimSmoothness or 4
+
+Akat.FOVCircle = Akat.FOVCircle or false
+Akat.FOVRadius = Akat.FOVRadius or 150
+Akat.FOVThickness = Akat.FOVThickness or 4
+Akat.FOVTransparency = Akat.FOVTransparency or 0
+Akat.FOVColor = Akat.FOVColor or Color3.fromRGB(255,0,0)
+Akat.FOVRainbow = Akat.FOVRainbow or false
+
+Akat.AntiLag = Akat.AntiLag or false
+Akat.ShowFPS = Akat.ShowFPS or false
+Akat.RedMode = Akat.RedMode or false
+Akat.TargetFPS = Akat.TargetFPS or 60
+
+local OriginalAutoRotate = true
+local MAX_LOCK_DISTANCE = 300
+local ESP_MAX_DISTANCE = 500
+
+--// COPIAR DISCORD
+local function CopiarLinkDiscord()
+    local link = "https://discord.gg/rZuYzZ7zvt"
+    if setclipboard then
+        pcall(setclipboard, link)
+    elseif toclipboard then
+        pcall(toclipboard, link)
+    elseif syn and syn.write_clipboard then
+        pcall(syn.write_clipboard, link)
+    end
+end
+
+--// LÓGICA DO AIMBOT
+local function GetTargetPart(Character)
+    if Akat.AimPart == "Head" then
+        return Character:FindFirstChild("Head")
+    elseif Akat.AimPart == "Body" then
+        return Character:FindFirstChild("HumanoidRootPart") or Character:FindFirstChild("UpperTorso") or Character:FindFirstChild("Torso")
+    end
+    return Character:FindFirstChild("Head")
+end
+
+local function GetClosestPlayer()
+    local ClosestPlayer = nil
+    local shortestDistance = MAX_LOCK_DISTANCE
+    local myChar = LocalPlayer.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return nil end
+
+    for _, v in ipairs(Players:GetPlayers()) do
+        if v == LocalPlayer or (Akat.TeamCheck and v.Team == LocalPlayer.Team) then continue end
+        local Char = v.Character
+        if not Char then continue end
+        local Hum = Char:FindFirstChildOfClass("Humanoid")
+        if not Hum or Hum.Health <= 0 then continue end
+        local Root = Char:FindFirstChild("HumanoidRootPart")
+        if not Root then continue end
+
+        local distance = (Root.Position - myRoot.Position).Magnitude
+        if distance < shortestDistance then
+            shortestDistance = distance
+            ClosestPlayer = v
+        end
+    end
+    return ClosestPlayer
+end
+
+local function ShouldReleaseTarget()
+    if not Akat.LockedTarget or not Akat.LockedTarget.Character then return true end
+    local Hum = Akat.LockedTarget.Character:FindFirstChildOfClass("Humanoid")
+    if not Hum or Hum.Health <= 0 then return true end
+
+    local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    local targetRoot = Akat.LockedTarget.Character:FindFirstChild("HumanoidRootPart")
+    if myRoot and targetRoot and (targetRoot.Position - myRoot.Position).Magnitude > 150 then
+        return true
+    end
+    return false
+end
+
+function Akat.ApplyCameraFix()
+    if not LocalPlayer.Character then return end
+    local Humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if Humanoid then
+        OriginalAutoRotate = Humanoid.AutoRotate
+        Humanoid.AutoRotate = false
+    end
+end
+
+function Akat.RemoveCameraFix()
+    if not LocalPlayer.Character then return end
+    local Humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if Humanoid then
+        Humanoid.AutoRotate = OriginalAutoRotate
+    end
+end
+
+local function ToggleAimbotFix(active)
+    Akat.AimbotFix = active
+    if active then
+        Akat.ApplyCameraFix()
+        if Akat.ToggleButton then
+            Akat.ToggleButton.Text = "ON"
+            TweenService:Create(Akat.ToggleButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(180,0,0)}):Play()
+        end
+    else
+        Akat.RemoveCameraFix()
+        Akat.LockedTarget = nil
+        if Akat.ToggleButton then
+            Akat.ToggleButton.Text = "OFF"
+            TweenService:Create(Akat.ToggleButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(20,20,20)}):Play()
+        end
+    end
+end
+
+if Akat.ToggleButton then
+    Akat.ToggleButton.MouseButton1Click:Connect(function()
+        ToggleAimbotFix(not Akat.AimbotFix)
+    end)
+end
+
+local function GetClosestPlayerForAimbot()
+    local Closest, ClosestDistance = nil, math.huge
+    local Center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+
+    for _, v in ipairs(Players:GetPlayers()) do
+        if v == LocalPlayer or (Akat.TeamCheck and v.Team == LocalPlayer.Team) then continue end
+        local Char = v.Character
+        if not Char then continue end
+
+        local Hum = Char:FindFirstChildOfClass("Humanoid")
+        if not Hum or Hum.Health <= 0 then continue end
+
+        local TargetPart = GetTargetPart(Char)
+        if not TargetPart then continue end
+
+        local Pos, Visible = Camera:WorldToViewportPoint(TargetPart.Position)
+        if not Visible or Pos.Z <= 0 then continue end
+
+        if Akat.WallCheck then
+            local Params = RaycastParams.new()
+            Params.FilterType = Enum.RaycastFilterType.Blacklist
+            Params.FilterDescendantsInstances = {LocalPlayer.Character}
+            local Result = workspace:Raycast(Camera.CFrame.Position, TargetPart.Position - Camera.CFrame.Position, Params)
+            if Result and not Result.Instance:IsDescendantOf(Char) then continue end
+        end
+
+        local Distance = (Vector2.new(Pos.X, Pos.Y) - Center).Magnitude
+        if Distance > Akat.FOVRadius then continue end
+
+        if Distance < ClosestDistance then
+            ClosestDistance = Distance
+            Closest = TargetPart
+        end
+    end
+    return Closest
+end
+
+--// ANTI-LAG SYSTEM
+function Akat.AplicarAntiLag(ativo)
+    pcall(function()
+        if ativo then
+            settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+            Lighting.GlobalShadows = false
+            Lighting.FogEnd = 1000000
+            Lighting.Brightness = 1
+            Lighting.ClockTime = 12
+            Lighting.EnvironmentDiffuseScale = 0
+            Lighting.EnvironmentSpecularScale = 0
+            Lighting.Technology = Enum.Technology.Compatibility
+
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Smoke") or obj:IsA("Fire") or obj:IsA("Sparkles") then
+                    obj.Enabled = false
+                elseif obj:IsA("BasePart") then
+                    obj.Material = Enum.Material.Plastic
+                    obj.Reflectance = 0
                 end
             end
-            
-            return oldIndex(self, key)
-        end)
-        setreadonly(gmt, true)
+        else
+            settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
+            Lighting.GlobalShadows = true
+            Lighting.Technology = Enum.Technology.Future
+        end
+    end)
+end
+
+--// CORES DE VIDA
+local function GetHealthColor(ratio)
+    if ratio >= 0.5 then
+        local t = (ratio - 0.5) / 0.5
+        return Color3.fromRGB(math.floor(255 * (1 - t)), 255, 0)
+    else
+        local t = ratio / 0.5
+        return Color3.fromRGB(255, math.floor(255 * t), 0)
+    end
+end
+
+--// ESP SYSTEM
+local Highlights = {}
+local Drawings = {}
+local TracerLines = {}
+local HealthBars = {}
+local MaxHealthCache = {}
+
+local function CreateESP(Player)
+    if Player == LocalPlayer then return end
+
+    local Highlight = Instance.new("Highlight")
+    Highlight.FillTransparency = 0.5
+    Highlight.OutlineTransparency = 0
+    Highlight.Enabled = false
+    Highlight.Parent = Akat.uiParent or LocalPlayer:FindFirstChild("PlayerGui")
+    Highlights[Player] = Highlight
+
+    local Text = Drawing.new("Text")
+    Text.Size = 13
+    Text.Font = 2
+    Text.Center = true
+    Text.Outline = true
+    Text.Visible = false
+    Drawings[Player] = Text
+
+    local Tracer = Drawing.new("Line")
+    Tracer.Thickness = 1
+    Tracer.Transparency = 1
+    Tracer.Visible = false
+    TracerLines[Player] = Tracer
+
+    local HealthBarBG = Drawing.new("Square")
+    HealthBarBG.Filled = true
+    HealthBarBG.Color = Color3.fromRGB(0, 0, 0)
+    HealthBarBG.Transparency = 1
+    HealthBarBG.Visible = false
+
+    local HealthBarInner = Drawing.new("Square")
+    HealthBarInner.Filled = true
+    HealthBarInner.Color = Color3.fromRGB(20, 20, 20)
+    HealthBarInner.Transparency = 0.7
+    HealthBarInner.Visible = false
+
+    local HealthBarFill = Drawing.new("Square")
+    HealthBarFill.Filled = true
+    HealthBarFill.Color = Color3.fromRGB(0, 255, 0)
+    HealthBarFill.Transparency = 1
+    HealthBarFill.Visible = false
+
+    HealthBars[Player] = {BG = HealthBarBG, Inner = HealthBarInner, Fill = HealthBarFill}
+end
+
+for _, p in ipairs(Players:GetPlayers()) do CreateESP(p) end
+Players.PlayerAdded:Connect(CreateESP)
+
+Players.PlayerRemoving:Connect(function(Player)
+    if Highlights[Player] then Highlights[Player]:Destroy() Highlights[Player] = nil end
+    if Drawings[Player] then Drawings[Player]:Remove() Drawings[Player] = nil end
+    if TracerLines[Player] then TracerLines[Player]:Remove() TracerLines[Player] = nil end
+    if HealthBars[Player] then
+        HealthBars[Player].BG:Remove()
+        HealthBars[Player].Inner:Remove()
+        HealthBars[Player].Fill:Remove()
+        HealthBars[Player] = nil
+    end
+    MaxHealthCache[Player] = nil
+end)
+
+--// LOOP PRINCIPAL (RENDERSTEPPED)
+RunService.RenderStepped:Connect(function()
+    -- Atualização do FOV Circle
+    if Akat.Circle and Akat.Stroke then
+        Akat.Circle.Position = UDim2.new(0, Camera.ViewportSize.X/2, 0, Camera.ViewportSize.Y/2)
+        Akat.Circle.Size = UDim2.new(0, Akat.FOVRadius*2, 0, Akat.FOVRadius*2)
+        Akat.Circle.Visible = Akat.FOVCircle
+        Akat.Stroke.Thickness = Akat.FOVThickness
+        Akat.Stroke.Transparency = Akat.FOVTransparency
+        Akat.Stroke.Color = Akat.FOVRainbow and Color3.fromHSV(tick()%5/5, 1, 1) or Akat.FOVColor
+    end
+
+    -- Lógica de Mira
+    if Akat.AimbotFix and Akat.AimbotFixEnabled then
+        if ShouldReleaseTarget() then
+            Akat.LockedTarget = GetClosestPlayer()
+        end
+        if not Akat.LockedTarget then
+            Akat.LockedTarget = GetClosestPlayer()
+        end
+
+        if Akat.LockedTarget and Akat.LockedTarget.Character then
+            local Target = GetTargetPart(Akat.LockedTarget.Character)
+            if Target then
+                local Root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if Root then
+                    local LookPos = Vector3.new(Target.Position.X, Root.Position.Y, Target.Position.Z)
+                    Root.CFrame = CFrame.lookAt(Root.Position, LookPos)
+                end
+                Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, Target.Position)
+            end
+        end
+    elseif Akat.Aimbot then
+        local Target = GetClosestPlayerForAimbot()
+        if Target then
+            local TargetCFrame = CFrame.lookAt(Camera.CFrame.Position, Target.Position)
+            Camera.CFrame = Camera.CFrame:Lerp(TargetCFrame, 1 / Akat.AimSmoothness)
+        end
+    end
+
+    -- ESP Loop
+    local myChar = LocalPlayer.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+
+    for Player, Highlight in pairs(Highlights) do
+        local Char = Player.Character
+        local Text = Drawings[Player]
+        local Tracer = TracerLines[Player]
+        local HBar = HealthBars[Player]
+
+        local function HideAll()
+            if Highlight then Highlight.Enabled = false end
+            if Text then Text.Visible = false end
+            if Tracer then Tracer.Visible = false end
+            if HBar then
+                HBar.BG.Visible    = false
+                HBar.Inner.Visible = false
+                HBar.Fill.Visible  = false
+            end
+        end
+
+        if not Char then HideAll() continue end
+
+        local Hum  = Char:FindFirstChildOfClass("Humanoid")
+        local Root = Char:FindFirstChild("HumanoidRootPart")
+        local Head = Char:FindFirstChild("Head")
+
+        if not Hum or Hum.Health <= 0 or not Root then HideAll() continue end
+
+        if myRoot then
+            local worldDist = (Root.Position - myRoot.Position).Magnitude
+            if worldDist > ESP_MAX_DISTANCE then HideAll() continue end
+        end
+
+        local IsEnemy   = (Player.Team ~= LocalPlayer.Team)
+        local TeamColor = IsEnemy and Color3.fromRGB(255,0,0) or Color3.fromRGB(0,255,0)
+
+        Highlight.Adornee      = Char
+        Highlight.FillColor    = TeamColor
+        Highlight.OutlineColor = TeamColor
+        Highlight.Enabled      = Akat.ESP
+
+        local HeadWorld = Head and (Head.Position + Vector3.new(0, 2.8, 0)) or Root.Position
+        local HeadPos   = Camera:WorldToViewportPoint(HeadWorld)
+        local RootPos   = Camera:WorldToViewportPoint(Root.Position)
+        local headX, headY = HeadPos.X, HeadPos.Y
+        local behindCam = (HeadPos.Z < 0) or (RootPos.Z < 0)
+
+        local Dist = math.floor((Camera.CFrame.Position - Root.Position).Magnitude)
+
+        if Text then
+            if (Akat.Names or Akat.DistanceESP) and not behindCam then
+                local label = ""
+                if Akat.Names then label = Player.Name end
+                if Akat.DistanceESP then
+                    label = label .. (label ~= "" and " " or "") .. "[" .. Dist .. "m]"
+                end
+                Text.Text     = label
+                Text.Position = Vector2.new(headX, headY)
+                Text.Color    = TeamColor
+                Text.Visible  = true
+            else
+                Text.Visible = false
+            end
+        end
+
+        if Tracer then
+            if Akat.TracerESP and not behindCam then
+                Tracer.From         = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                Tracer.To           = Vector2.new(RootPos.X, RootPos.Y)
+                Tracer.Color        = TeamColor
+                Tracer.Thickness    = 1
+                Tracer.Transparency = 1
+                Tracer.Visible      = true
+            else
+                Tracer.Visible = false
+            end
+        end
+
+        if HBar then
+            if Akat.HealthESP and not behindCam then
+                local dist3d    = (Camera.CFrame.Position - Root.Position).Magnitude
+                local barWidth  = math.clamp(120 - dist3d * 0.18, 36, 120)
+                local barHeight = 2
+                local border    = 1
+
+                local curMax = Hum.MaxHealth
+                local curHp  = Hum.Health
+
+                if curMax and curMax == curMax and curMax > 0 then
+                    if not MaxHealthCache[Player] or curMax > MaxHealthCache[Player] then
+                        MaxHealthCache[Player] = curMax
+                    end
+                end
+
+                local maxHp = MaxHealthCache[Player] or 100
+                local hp    = (curHp and curHp == curHp and curHp >= 0) and curHp or maxHp
+                if hp > maxHp then hp = maxHp end
+
+                local healthRatio = math.clamp(hp / maxHp, 0, 1)
+                local healthColor = GetHealthColor(healthRatio)
+
+                local barX = headX - barWidth / 2
+                local barY = headY - 15
+
+                HBar.BG.Size     = Vector2.new(barWidth + border * 2, barHeight + border * 2)
+                HBar.BG.Position = Vector2.new(barX - border, barY - border)
+                HBar.BG.Visible  = true
+
+                HBar.Inner.Size     = Vector2.new(barWidth, barHeight)
+                HBar.Inner.Position = Vector2.new(barX, barY)
+                HBar.Inner.Visible  = true
+
+                local fillWidth = barWidth * healthRatio
+                if fillWidth < 1 and healthRatio > 0 then fillWidth = 1 end
+                HBar.Fill.Size     = Vector2.new(fillWidth, barHeight)
+                HBar.Fill.Position = Vector2.new(barX, barY)
+                HBar.Fill.Color    = healthColor
+                HBar.Fill.Visible  = (healthRatio > 0)
+            else
+                HBar.BG.Visible    = false
+                HBar.Inner.Visible = false
+                HBar.Fill.Visible  = false
+            end
+        end
     end
 end)
 
--- ==================== VARIÁVEIS DE ESTADO INTERNAS ====================
-local PlayerRoles = {}
-local ESPHighlights = {}
-local espEventConnections = {}
-local espPlayerAddedConn = nil
-local espPlayerRemovingConn = nil
-local ESP_UpdatePlayer 
-local hbConnection = nil
-local steppedConnection = nil
-local safePlatform = nil
-local lastPositionBeforeSafeSpot = nil
-local announcedThisRound = false
-local currentCollectTarget = nil
-local autoCollectTween = nil
+--// LOOP DO CONTADOR DE FPS
+local lastTime = tick()
+local frameCount = 0
+local hue = 0
 
-local ROLE_COLORS = {
-    Murderer  = Color3.fromRGB(220, 0,   0),    
-    Sheriff   = Color3.fromRGB(0,   120, 255),  
-    Hero      = Color3.fromRGB(255, 220, 0),    
-    Innocent  = Color3.fromRGB(0,   200, 80),   
-}
+RunService.RenderStepped:Connect(function()
+    if not Akat.ShowFPS or not Akat.FPSText then return end
+    frameCount += 1
+    local currentTime = tick()
+    if currentTime - lastTime >= 0.1 then
+        local fps = math.floor(frameCount / (currentTime - lastTime))
+        Akat.FPSText.Text = "FPS: " .. tostring(fps)
 
--- ==================== SISTEMAS AUXILIARES E DETECÇÕES ====================
-local function ESP_DetectRole(p)
-    if not p or not p.Parent then return "Innocent" end
-    
-    local function checkAttr(target)
-        if not target then return nil end
-        local role = target:GetAttribute("Role") or target:GetAttribute("role") or target:GetAttribute("MMRole")
-        if not role then return nil end
-        local r = tostring(role):lower()
-        if r:find("murder") or r:find("assassin") then return "Murderer" end
-        if r:find("sheriff") or r:find("xerife")   then return "Sheriff"  end
-        if r:find("hero")   or r:find("heroi")     then return "Hero"     end
-        return nil
-    end
-
-    local attrRole = checkAttr(p) or (p.Character and checkAttr(p.Character))
-    if attrRole then return attrRole end
-
-    local function scanTools(container)
-        if not container then return nil end
-        for _, item in ipairs(container:GetChildren()) do
-            if item:IsA("Tool") then
-                if item:FindFirstChild("KnifeScript") or item:FindFirstChild("Knife") then
-                    return "Murderer"
-                elseif item:FindFirstChild("GunScript") or item:FindFirstChild("Gun") then
-                    if gunDroppedThisRound then return "Hero" else return "Sheriff" end
-                end
-                
-                local n = item.Name:lower()
-                if n:find("knife") or n:find("faca") or n:find("sword") or n:find("blade") then
-                    return "Murderer"
-                elseif n:find("gun") or n:find("pistol") or n:find("revolver") or n:find("arma") or n:find("luger") or n:find("blaster") or n:find("laser") or n:find("shark") or n:find("fang") or n:find("seer") then
-                    if gunDroppedThisRound then return "Hero" else return "Sheriff" end
-                end
-            end
+        if Akat.RedMode then
+            local t = tick() * 3
+            local alpha = (math.sin(t) + 1) / 2
+            local color = Color3.fromRGB(160, math.floor(40 * alpha), math.floor(40 * alpha))
+            Akat.FPSText.TextColor3 = color
+            if Akat.FPSStroke then Akat.FPSStroke.Color = color end
+            if Akat.FPSGlow then Akat.FPSGlow.Color = color end
+        else
+            hue = (hue + 0.035) % 1
+            local color = Color3.fromHSV(hue, 1, 1)
+            Akat.FPSText.TextColor3 = color
+            if Akat.FPSStroke then Akat.FPSStroke.Color = color end
+            if Akat.FPSGlow then Akat.FPSGlow.Color = color end
         end
-        return nil
+
+        frameCount = 0
+        lastTime = currentTime
     end
+end)
 
-    return scanTools(p.Character) or scanTools(p:FindFirstChild("Backpack")) or "Innocent"
-end
-
-ESP_UpdatePlayer = function(p)
-    if not Configs.ESP or p == player then return end 
-    if not p or not p.Character then
-        if ESPHighlights[p] then
-            pcall(function() ESPHighlights[p]:Destroy() end)
-            ESPHighlights[p] = nil
-        end
-        return
-    end
-
-    local char = p.Character
-    local role = ESP_DetectRole(p)
-    PlayerRoles[p] = role
-
-    local color = ROLE_COLORS[role] or ROLE_COLORS.Innocent
-    local hl = char:FindFirstChild("AkatESP")
-    if not hl then
-        hl = Instance.new("Highlight")
-        hl.Name = "AkatESP"
-        hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        hl.FillTransparency = 0.3
-        hl.OutlineTransparency = 0
-        hl.Parent = char
-        ESPHighlights[p] = hl
-    end
-
-    hl.FillColor    = color
-    hl.OutlineColor = color
-end
-
-local function ESP_ClearAll()
-    for p, hl in pairs(ESPHighlights) do
-        pcall(function() if hl and hl.Parent then hl:Destroy() end end)
-        ESPHighlights[p] = nil
-        PlayerRoles[p] = nil
-    end
-end
-
-local function ESP_ConnectPlayer(p)
-    if p == player then return end
-    if espEventConnections[p] then return end
-
-    local connections = {}
-
-    local c1 = p.CharacterAdded:Connect(function(char)
+--// NOTIFICAÇÕES DE INICIALIZAÇÃO
+task.spawn(function()
+    if Akat.CriarNotificacao then
+        Akat.CriarNotificacao("Aimbot Hub Universal", "AKAT Edition carregado com sucesso!", 6)
         task.wait(0.5)
-        if Configs.ESP then
-            ESP_UpdatePlayer(p)
-            char.ChildAdded:Connect(function() task.wait(0.1); if Configs.ESP then ESP_UpdatePlayer(p) end end)
-            char.ChildRemoved:Connect(function() task.wait(0.1); if Configs.ESP then ESP_UpdatePlayer(p) end end)
-        end
-    end)
-    table.insert(connections, c1)
-
-    task.spawn(function()
-        local bp = p:WaitForChild("Backpack", 5)
-        if bp and espEventConnections[p] then
-            local c2 = bp.ChildAdded:Connect(function() task.wait(0.1); if Configs.ESP then ESP_UpdatePlayer(p) end end)
-            local c3 = bp.ChildRemoved:Connect(function() task.wait(0.1); if Configs.ESP then ESP_UpdatePlayer(p) end end)
-            table.insert(espEventConnections[p], c2)
-            table.insert(espEventConnections[p], c3)
-        end
-    end)
-
-    espEventConnections[p] = connections
-    ESP_UpdatePlayer(p)
-end
-
-local function ESP_DisconnectPlayer(p)
-    if espEventConnections[p] then
-        for _, c in ipairs(espEventConnections[p]) do
-            if c then pcall(function() c:Disconnect() end) end
-        end
-        espEventConnections[p] = nil
-    end
-    if ESPHighlights[p] then
-        pcall(function() ESPHighlights[p]:Destroy() end)
-        ESPHighlights[p] = nil
-    end
-    PlayerRoles[p] = nil
-end
-
-local function ESP_Enable()
-    Configs.ESP = true
-    if espPlayerAddedConn then espPlayerAddedConn:Disconnect() end
-    if espPlayerRemovingConn then espPlayerRemovingConn:Disconnect() end
-
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= player then ESP_ConnectPlayer(p) end
-    end
-
-    espPlayerAddedConn = Players.PlayerAdded:Connect(function(p)
-        if Configs.ESP then ESP_ConnectPlayer(p) end
-    end)
-    
-    espPlayerRemovingConn = Players.PlayerRemoving:Connect(function(p)
-        ESP_DisconnectPlayer(p)
-    end)
-end
-
-local function ESP_Disable()
-    Configs.ESP = false
-    if espPlayerAddedConn then espPlayerAddedConn:Disconnect(); espPlayerAddedConn = nil end
-    if espPlayerRemovingConn then espPlayerRemovingConn:Disconnect(); espPlayerRemovingConn = nil end
-    
-    for _, p in ipairs(Players:GetPlayers()) do
-        ESP_DisconnectPlayer(p)
-    end
-    ESP_ClearAll()
-end
-
--- ==================== LOCK DE CÂMERA INTEGRAL E FLUIDO ====================
-local function ToggleAimbot(enabled)
-    if Configs.Aimbot == enabled then return end 
-    Configs.Aimbot = enabled
-    if aimbotConnection then aimbotConnection:Disconnect(); aimbotConnection = nil end
-    
-    if enabled then
-        aimbotConnection = RunService.RenderStepped:Connect(function()
-            if not Configs.Aimbot then return end
-            if not CachedState.HasGun then return end
-            
-            local murderer = CachedState.Murderer
-            if murderer and murderer.Character then
-                local head = murderer.Character:FindFirstChild("Head")
-                local char = player.Character
-                local root = char and char:FindFirstChild("HumanoidRootPart")
-                local hum  = char and char:FindFirstChildOfClass("Humanoid")
-                
-                if head and root and hum and hum.Health > 0 then
-                    -- Rastreia a cabeça real visualmente (acaba com a mira torta)
-                    Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, head.Position)
-                    
-                    -- Alinha a orientação do corpo do personagem de forma estável
-                    local targetLook = Vector3.new(head.Position.X, root.Position.Y, head.Position.Z)
-                    root.CFrame = CFrame.lookAt(root.Position, targetLook)
-                end
-            end
-        end)
-    end
-end
-
--- ==================== LÓGICA DE PROCURA DE ITENS & SEGURANÇA ====================
-local function ObterArmaCaida(root)
-    local gun = workspace:FindFirstChild("GunDrop", true)
-    if gun then
-        local targetPart = nil
-        if gun:IsA("BasePart") then targetPart = gun
-        elseif gun:IsA("Model") then targetPart = gun:FindFirstChildOfClass("BasePart") or gun.PrimaryPart
-        elseif gun:IsA("Tool") then targetPart = gun:FindFirstChild("Handle") or gun:FindFirstChildOfClass("BasePart")
-        end
-        if targetPart and root then
-            if (root.Position - targetPart.Position).Magnitude < 1500 then return targetPart end
-        end
-    end
-    return nil
-end
-
-local function ObterMoedaProxima(root)
-    local closestCoin, closestDist = nil, math.huge
-    local listaMoedas = CachedState.Coins
-    
-    for i = 1, #listaMoedas do
-        local d = listaMoedas[i]
-        if d and d.Parent then
-            local dist = (root.Position - d.Position).Magnitude
-            if dist < closestDist and dist < 1500 then
-                closestDist = dist
-                closestCoin = d
-            end
-        end
-    end
-    return closestCoin
-end
-
-local function IsBagFull()
-    local full = false
-    pcall(function()
-        local mainGui = player:FindFirstChild("PlayerGui") and player.PlayerGui:FindFirstChild("MainGui")
-        local gameGui = mainGui and mainGui:FindFirstChild("Game")
-        local coinBag = gameGui and gameGui:FindFirstChild("CoinBag")
-        local amount = coinBag and coinBag:FindFirstChild("Container") and coinBag.Container:FindFirstChild("Amount")
-        if amount and amount:IsA("TextLabel") then
-            local current, max = amount.Text:match("(%d+)/(%d+)")
-            if current and max and tonumber(current) >= tonumber(max) then
-                full = true
-            end
-        end
-    end)
-    return full
-end
-
-local function EnviarMensagemChat(msg)
-    local TextChatService = game:GetService("TextChatService")
-    local ReplicatedStorage = game:GetService("ReplicatedStorage")
-    pcall(function()
-        if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
-            local channel = TextChatService.TextChannels:FindFirstChild("RBXGeneral")
-            if channel then channel:SendAsync(msg) end
-        else
-            local chatEvent = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
-                and ReplicatedStorage.DefaultChatSystemChatEvents:FindFirstChild("SayMessageRequest")
-            if chatEvent then chatEvent:FireServer(msg, "All") end
-        end
-    end)
-end
-
-local function LimparEDesligarAbsolutamente()
-    if hbConnection then hbConnection:Disconnect(); hbConnection = nil end
-    if steppedConnection then steppedConnection:Disconnect(); steppedConnection = nil end
-    if aimbotConnection then aimbotConnection:Disconnect(); aimbotConnection = nil end
-    for k in pairs(Configs) do Configs[k] = false end
-    autoCollectTemporarilyDisabled = false
-    ESP_Disable()
-    if safePlatform then pcall(function() safePlatform:Destroy() end); safePlatform = nil end
-    if autoCollectTween then autoCollectTween:Cancel(); autoCollectTween = nil end
-    pcall(function()
-        local char = player.Character
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if hum then 
-            hum.WalkSpeed = 16 
-            local root = char:FindFirstChild("HumanoidRootPart")
-            if root then root.Anchored = false end
-        end
-    end)
-end
-
--- ==================== PONTE DE COMUNICAÇÃO GLOBAL (UI -> BACKEND) ====================
-_G.AkatCallbacks = {
-    ESP = function(enabled)
-        if enabled then ESP_Enable() else ESP_Disable() end
-    end,
-    SafeSpot = function(enabled)
-        Configs.SafeSpot = enabled
-        local char = player.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        if not root then return end
-        if enabled then
-            lastPositionBeforeSafeSpot = root.CFrame
-            if not safePlatform or not safePlatform.Parent then
-                safePlatform = Instance.new("Part")
-                safePlatform.Name = "AkatSafePlatform"
-                safePlatform.Size = Vector3.new(15, 1, 15)
-                safePlatform.Position = Vector3.new(root.Position.X, 900, root.Position.Z)
-                safePlatform.Anchored = true
-                safePlatform.Transparency = 0.4
-                safePlatform.Material = Enum.Material.ForceField
-                safePlatform.Color = Color3.fromHex("#8B0000")
-                safePlatform.Parent = workspace
-            end
-            root.CFrame = safePlatform.CFrame * CFrame.new(0, 3, 0)
-        else
-            if safePlatform then safePlatform:Destroy(); safePlatform = nil end
-            if lastPositionBeforeSafeSpot and root.Parent then
-                root.CFrame = lastPositionBeforeSafeSpot
-                lastPositionBeforeSafeSpot = nil
-            end
-        end
-    end,
-    AutoCollect = function(enabled)
-        Configs.AutoCollect = enabled
-        if not enabled then 
-            currentCollectTarget = nil 
-            if autoCollectTween then
-                autoCollectTween:Cancel()
-                autoCollectTween = nil
-            end
-            
-            local char = player.Character
-            local root = char and char:FindFirstChild("HumanoidRootPart")
-            if root then 
-                root.Anchored = false 
-                root.AssemblyLinearVelocity = Vector3.zero
-                
-                local rayParams = RaycastParams.new()
-                rayParams.FilterDescendantsInstances = {char}
-                rayParams.FilterType = Enum.RaycastFilterType.Exclude
-                local result = workspace:Raycast(root.Position, Vector3.new(0, -1000, 0), rayParams)
-                if result then
-                    root.CFrame = CFrame.new(result.Position + Vector3.new(0, 3, 0))
-                end
-            end
-        end
-    end,
-    ["Tp to gun"] = function(enabled) Configs.TpToGun = enabled end,
-    ["Tp To Gun"] = function(enabled) Configs.TpToGun = enabled end,
-    TpToGun = function(enabled) Configs.TpToGun = enabled end,
-    ["Shoot murder"] = function(enabled) ToggleAimbot(enabled) end,
-    ["Shoot Murderer"] = function(enabled) ToggleAimbot(enabled) end,
-    AutoShoot = function(enabled) ToggleAimbot(enabled) end,
-    ShutdownAll = function() LimparEDesligarAbsolutamente() end
-}
-
--- ==================== THREAD DO AUTO COLLECT COLETANDO IMEDIATAMENTE ====================
-task.spawn(function()
-    while true do
-        task.wait(0.005)
-        if Configs.AutoCollect then
-            local char = player.Character
-            local root = char and char:FindFirstChild("HumanoidRootPart")
-            local hum  = char and char:FindFirstChildOfClass("Humanoid")
-            
-            if IsBagFull() then
-                if autoCollectTween then autoCollectTween:Cancel(); autoCollectTween = nil end
-                currentCollectTarget = nil
-                task.wait(0.5) 
-                continue
-            end
-
-            if root and hum and hum.Health > 0 then
-                local target = ObterMoedaProxima(root)
-                if target and target.Parent then
-                    if currentCollectTarget ~= target then
-                        currentCollectTarget = target
-                        if autoCollectTween then autoCollectTween:Cancel() end
-                        
-                        local goalCFrame = CFrame.new(target.Position)
-                        local dist = (root.Position - target.Position).Magnitude
-                        local timeToReach = dist / 37
-                        
-                        autoCollectTween = TweenService:Create(root, TweenInfo.new(timeToReach, Enum.EasingStyle.Linear), {CFrame = goalCFrame})
-                        autoCollectTween:Play()
-                        autoCollectTween.Completed:Wait() 
-                    end
-                    
-                    pcall(function()
-                        firetouchinterest(root, target, 0)
-                        firetouchinterest(root, target, 1)
-                        
-                        for _, part in ipairs(char:GetChildren()) do
-                            if part:IsA("BasePart") and (part.Name:find("Foot") or part.Name:find("Leg") or part.Name:find("Torso")) then
-                                firetouchinterest(part, target, 0)
-                                firetouchinterest(part, target, 1)
-                            end
-                        end
-                    end)
-                else
-                    if autoCollectTween then autoCollectTween:Cancel(); autoCollectTween = nil end
-                    currentCollectTarget = nil
-                end
-            end
-        end
-    end
-end)
-
--- ==================== THREAD TELEPORT TO GUN ====================
-task.spawn(function()
-    while true do
-        task.wait(0.05)
-        if Configs.TpToGun then
-            local char = player.Character
-            local root = char and char:FindFirstChild("HumanoidRootPart")
-            local hum  = char and char:FindFirstChildOfClass("Humanoid")
-            
-            if root and hum and hum.Health > 0 then
-                local isMurdererRole = (PlayerRoles[player] == "Murderer")
-                local hasKnife = player.Backpack:FindFirstChild("Knife") or char:FindFirstChild("Knife") or player.Backpack:FindFirstChild("Faca") or char:FindFirstChild("Faca")
-
-                if isMurdererRole or hasKnife then
-                    trackingTpToGun = false
-                    lastPositionBeforeTpToGun = nil
-                    if autoCollectTemporarilyDisabled then
-                        autoCollectTemporarilyDisabled = false
-                        Configs.AutoCollect = true
-                    end
-                    continue
-                end
-                
-                local gunPart = ObterArmaCaida(root)
-                if gunPart and gunPart.Parent then
-                    if not trackingTpToGun then
-                        lastPositionBeforeTpToGun = root.CFrame
-                        trackingTpToGun = true
-                        
-                        if Configs.AutoCollect then
-                            autoCollectTemporarilyDisabled = true
-                            Configs.AutoCollect = false
-                            if autoCollectTween then autoCollectTween:Cancel(); autoCollectTween = nil end
-                            currentCollectTarget = nil
-                        end
-                    end
-                    root.CFrame = gunPart.CFrame * CFrame.new(0, 3, 0)
-                else
-                    if trackingTpToGun then
-                        if lastPositionBeforeTpToGun then
-                            root.CFrame = lastPositionBeforeTpToGun
-                        end
-                        lastPositionBeforeTpToGun = nil
-                        trackingTpToGun = false
-                        
-                        if autoCollectTemporarilyDisabled then
-                            autoCollectTemporarilyDisabled = false
-                            Configs.AutoCollect = true
-                        end
-                    end
-                end
-            end
-        else
-            if trackingTpToGun then
-                local char = player.Character
-                local root = char and char:FindFirstChild("HumanoidRootPart")
-                if root and lastPositionBeforeTpToGun then
-                    root.CFrame = lastPositionBeforeTpToGun
-                end
-                lastPositionBeforeTpToGun = nil
-                trackingTpToGun = false
-                
-                if autoCollectTemporarilyDisabled then
-                    autoCollectTemporarilyDisabled = false
-                    Configs.AutoCollect = true
-                end
-            end
-        end
-    end
-end)
-
--- ==================== NOCLIP SEGURO ====================
-steppedConnection = RunService.Stepped:Connect(function()
-    if Configs.AutoCollect or Configs.SafeSpot or trackingTpToGun then
-        local char = player.Character
-        if char then
-            for _, part in ipairs(char:GetChildren()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = false
-                end
-            end
-        end
-    end
-end)
-
--- ==================== LOOP PRINCIPAL (HEARTBEAT) ====================
-hbConnection = RunService.Heartbeat:Connect(function(dt)
-    local char = player.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    local hum  = char and char:FindFirstChildOfClass("Humanoid")
-
-    if not root or not hum then return end
-
-    -- WALK SPEED
-    hum.WalkSpeed = Configs.Speed and 23 or 16
-
-    -- KNIFE REACH
-    if Configs.Reach then
-        local myKnife = char:FindFirstChild("Knife") or char:FindFirstChild("Faca")
-        local handle = myKnife and myKnife:FindFirstChild("Handle")
-        if handle then
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= player and p.Character then
-                    local enemyRoot = p.Character:FindFirstChild("HumanoidRootPart")
-                    local enemyHum = p.Character:FindFirstChildOfClass("Humanoid")
-                    if enemyRoot and enemyHum and enemyHum.Health > 0 then
-                        local dist = (root.Position - enemyRoot.Position).Magnitude
-                        if dist <= 18 then 
-                            pcall(function()
-                                firetouchinterest(enemyRoot, handle, 0)
-                                firetouchinterest(enemyRoot, handle, 1)
-                            end)
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    -- ANTI FLING
-    if Configs.AntiFling then
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= player and p.Character then
-                for _, part in ipairs(p.Character:GetChildren()) do
-                    if part:IsA("BasePart") then part.CanCollide = false end
-                end
-            end
-        end
-        if math.abs(root.AssemblyLinearVelocity.Magnitude) > 60 or math.abs(root.AssemblyAngularVelocity.Magnitude) > 60 then
-            root.AssemblyLinearVelocity = Vector3.zero
-            root.AssemblyAngularVelocity = Vector3.zero
-        end
-    end
-end)
-
--- ==================== THREAD CENTRAL DE SCANNER E CACHE COLETOR ====================
-task.spawn(function()
-    local tempoUltimoScanMoedas = 0
-    local tempoUltimoScanESP = 0
-    
-    while true do
-        local gunFoundInPlayers = false
-        local knifeFoundInPlayers = false
-        local localPlayerHasGun = false
-        local currentMurderer, currentSheriff = nil, nil
-        
-        local agora = tick()
-        local atualizarESP = Configs.ESP and (agora - tempoUltimoScanESP > 1.0)
-        if atualizarESP then
-            tempoUltimoScanESP = agora
-        end
-
-        for _, p in ipairs(Players:GetPlayers()) do
-            if atualizarESP and p ~= player then
-                ESP_UpdatePlayer(p)
-            end
-
-            local role = PlayerRoles[p]
-            if role == "Murderer" then currentMurderer = p end
-            if role == "Sheriff"  then currentSheriff  = p end
-            
-            if p.Character then
-                local temArma = p.Character:FindFirstChild("Gun") or p.Backpack:FindFirstChild("Gun")
-                if temArma then 
-                    gunFoundInPlayers = true 
-                    if p == player then localPlayerHasGun = true end
-                end
-                if p.Character:FindFirstChild("Knife") or p.Backpack:FindFirstChild("Knife") then 
-                    knifeFoundInPlayers = true 
-                end
-            end
-        end
-        
-        CachedState.HasGun = localPlayerHasGun
-        CachedState.Murderer = currentMurderer
-
-        if Configs.AutoCollect and (tick() - tempoUltimoScanMoedas > 0.3) then
-            tempoUltimoScanMoedas = tick()
-            local moedasEncontradas = {}
-            
-            for _, d in ipairs(workspace:GetDescendants()) do
-                if d:IsA("BasePart") and d.Transparency < 1 then
-                    local name = d.Name:lower()
-                    if name:find("coin") or name:find("moeda") or name:find("gold") or name == "snowflake"
-                        or name == "candycane" or name:find("token") or name:find("diamond")
-                        or name:find("present") or name:find("candy") then
-                        if not d:IsDescendantOf(Players) and not d:FindFirstAncestorOfClass("Tool")
-                            and not d:FindFirstAncestorOfClass("Accessory") then
-                            table.insert(moedasEncontradas, d)
-                        end
-                    end
-                end
-            end
-            CachedState.Coins = moedasEncontradas
-        end
-        
-        local gunDropExists = workspace:FindFirstChild("GunDrop", true) ~= nil
-        if gunDropExists then gunDroppedThisRound = true end
-        if not gunFoundInPlayers and not gunDropExists and not knifeFoundInPlayers then gunDroppedThisRound = false end
-
-        if not currentMurderer and not currentSheriff then
-            announcedThisRound = false
-        elseif Configs.ChatRoles and (currentMurderer or currentSheriff) and not announcedThisRound then
-            announcedThisRound = true
-            local msg = "[AKAT] "
-            if currentMurderer then
-                msg = msg .. "Murderer: " .. currentMurderer.DisplayName .. " (@" .. currentMurderer.Name .. ") "
-            end
-            if currentSheriff then
-                msg = msg .. "| Sheriff: " .. currentSheriff.DisplayName .. " (@" .. currentSheriff.Name .. ")"
-            end
-            EnviarMensagemChat(msg)
-        end
-        task.wait(0.2)
+        CopiarLinkDiscord()
+        Akat.CriarNotificacao("Discord AKAT", "Link do Discord copiado com sucesso!", 6)
     end
 end)
 
 -- ==================== CARGA DINÂMICA DA INTERFACE ====================
-local Link_Da_UI = "https://raw.githubusercontent.com/estratosfera88-afk/UI.lua/refs/heads/main/ui.lua"
+local Link_Da_UI = "https://raw.githubusercontent.com/estratosfera88-afk/ui.lua.DO-AIMBOT-HUB/refs/heads/main/lua"
 
 local Sucesso, Erro = pcall(function()
     loadstring(game:HttpGet(Link_Da_UI))()
