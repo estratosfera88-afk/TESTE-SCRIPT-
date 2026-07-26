@@ -354,44 +354,40 @@ Header.BackgroundTransparency = 1
 -- Container do Título
 local TitleContainer = Instance.new("Frame", Header)
 TitleContainer.Size = UDim2.new(0.82, 0, 1, 0)
-TitleContainer.Position = UDim2.new(0, 14, 0, 0)
+TitleContainer.Position = UDim2.new(0, 12, 0, 0)
 TitleContainer.BackgroundTransparency = 1
 
--- Texto AKAT (Tamanho Justo para Eliminar o Espaço)
-local TitleAkat = Instance.new("TextLabel", TitleContainer)
-TitleAkat.Size = UDim2.new(0, 36, 1, 0)
+-- Badge AKAT (Fundo com Bordas Arredondadas)
+local AkatBadge = Instance.new("Frame", TitleContainer)
+AkatBadge.AnchorPoint = Vector2.new(0, 0.5)
+AkatBadge.Size = UDim2.new(0, 48, 0, 22)
+AkatBadge.Position = UDim2.new(0, 0, 0.5, 0)
+AkatBadge.BackgroundColor3 = Color3.fromRGB(32, 10, 12)
+AkatBadge.BorderSizePixel = 0
+Instance.new("UICorner", AkatBadge).CornerRadius = UDim.new(0, 5)
+
+local AkatBadgeStroke = Instance.new("UIStroke", AkatBadge)
+AkatBadgeStroke.Thickness = 1
+AkatBadgeStroke.Color = Color3.fromHex("#8B0000")
+
+local TitleAkat = Instance.new("TextLabel", AkatBadge)
+TitleAkat.Size = UDim2.new(1, 0, 1, 0)
 TitleAkat.Text = "AKAT"
-TitleAkat.TextColor3 = Color3.fromHex("#8B0000")
+TitleAkat.TextColor3 = Color3.fromRGB(255, 60, 60)
 TitleAkat.Font = Enum.Font.GothamBold
-TitleAkat.TextSize = 13
-TitleAkat.TextXAlignment = Enum.TextXAlignment.Left
+TitleAkat.TextSize = 11
+TitleAkat.TextXAlignment = Enum.TextXAlignment.Center
 TitleAkat.BackgroundTransparency = 1
 
--- Separador com Container Quadrado (Para o Gradiente Girar Perfeitamente sem Achatamento)
-local SepContainer = Instance.new("CanvasGroup", TitleContainer)
-SepContainer.AnchorPoint = Vector2.new(0, 0.5)
-SepContainer.Size = UDim2.new(0, 14, 0, 14)
-SepContainer.Position = UDim2.new(0, 40, 0.5, 0)
-SepContainer.BackgroundTransparency = 1
-
-local SepBar = Instance.new("Frame", SepContainer)
-SepBar.AnchorPoint = Vector2.new(0.5, 0.5)
-SepBar.Size = UDim2.new(0, 2, 1, 0)
-SepBar.Position = UDim2.new(0.5, 0, 0.5, 0)
-SepBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-SepBar.BorderSizePixel = 0
-Instance.new("UICorner", SepBar).CornerRadius = UDim.new(1, 0)
-
-CriarGradienteRotativo(SepContainer, 3.5)
-
--- Nome do Jogo
+-- Nome do Jogo (Logo ao Lado Direito do Badge)
 local TitleGame = Instance.new("TextLabel", TitleContainer)
-TitleGame.Size = UDim2.new(1, -60, 1, 0)
-TitleGame.Position = UDim2.new(0, 58, 0, 0)
+TitleGame.AnchorPoint = Vector2.new(0, 0.5)
+TitleGame.Size = UDim2.new(1, -56, 1, 0)
+TitleGame.Position = UDim2.new(0, 56, 0.5, 0)
 TitleGame.Text = "JULES RNG (THE MINE)"
 TitleGame.TextColor3 = Color3.fromRGB(240, 240, 240)
 TitleGame.Font = Enum.Font.GothamBold
-TitleGame.TextSize = 12
+TitleGame.TextSize = 11
 TitleGame.TextXAlignment = Enum.TextXAlignment.Left
 TitleGame.BackgroundTransparency = 1
 
@@ -417,12 +413,11 @@ Separator.Position = UDim2.new(0.03, 0, 0, HEADER_HEIGHT)
 Separator.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
 Separator.BorderSizePixel = 0
 
--- Container de Conteúdo (CanvasGroup para Animação e Sincronização Perfeita)
-local ContentFrame = Instance.new("CanvasGroup", Main)
+-- Container de Conteúdo (Frame Nativo para Garantir Sincronismo e Fixar no Main)
+local ContentFrame = Instance.new("Frame", Main)
 ContentFrame.Size = UDim2.new(1, 0, 1, -HEADER_HEIGHT - 1)
 ContentFrame.Position = UDim2.new(0, 0, 0, HEADER_HEIGHT + 1)
 ContentFrame.BackgroundTransparency = 1
-ContentFrame.GroupTransparency = 0
 
 -- ==================== CONSTRUTOR DE TOGGLES ====================
 local function CriarToggle(yPos, texto, flagName)
@@ -484,7 +479,7 @@ CriarToggle(8, "X RAY MINES", "ESP")
 CriarToggle(54, "INSTANT MINE", "InstantMine")
 CriarToggle(100, "SPEED MOD", "Speed")
 
--- ==================== CONTROLES DA UI (ANIMAÇÃO 100% SINCRONIZADA) ====================
+-- ==================== CONTROLES DA UI ====================
 local menuAberto = true
 local isMinimized = false
 
@@ -512,9 +507,15 @@ MinimizeBtn.MouseButton1Click:Connect(function()
     local targetHeight = isMinimized and HEADER_HEIGHT or UI_HEIGHT
     MinimizeBtn.Text = isMinimized and "+" or "-"
 
-    -- Animação 100% Sincronizada entre Tamanho e Opacidade do Conteúdo
-    Animar(ContentFrame, {GroupTransparency = isMinimized and 1 or 0}, 0.2)
-    Animar(Main, {Size = UDim2.new(0, UI_WIDTH, 0, targetHeight)}, 0.2)
+    if isMinimized then
+        Animar(Main, {Size = UDim2.new(0, UI_WIDTH, 0, targetHeight)}, 0.2)
+        task.delay(0.12, function()
+            if isMinimized then ContentFrame.Visible = false end
+        end)
+    else
+        ContentFrame.Visible = true
+        Animar(Main, {Size = UDim2.new(0, UI_WIDTH, 0, targetHeight)}, 0.2)
+    end
 end)
 
 local function ConfigurarArrastar(inst)
