@@ -1,5 +1,5 @@
 -- [[
---     AKAT | JULES RNG (THE MINE) - ULTRA SMOOTH & ROTATING GRADIENTS
+--     AKAT | JULES RNG (THE MINE) - PERFECT SYNCHRONIZED & ROTATING GRADIENTS
 --     Otimizado para Delta Mobile 2026
 -- ]]
 
@@ -23,7 +23,7 @@ local flags = {
 local SPEED_MULTIPLIER = 32
 local DEFAULT_SPEED = 16
 
--- Dimensões Expandidas da UI
+-- Dimensões da UI
 local UI_WIDTH = 370
 local HEADER_HEIGHT = 42
 local UI_HEIGHT = 200
@@ -74,12 +74,11 @@ local function CriarGradienteRotativo(parent, speed)
     })
     grad.Parent = parent
 
-    -- Animação contínua e fluida de rotação 360°
     TweenService:Create(grad, TweenInfo.new(speed or 3.5, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), {Rotation = 360}):Play()
     return grad
 end
 
--- ==================== ANIMAÇÕES FLUIDAS (NÃO BLOQUEANTES) ====================
+-- ==================== ANIMAÇÕES FLUIDAS ====================
 local function Animar(obj, goal, time, style, dir)
     local tween = TweenService:Create(
         obj, 
@@ -352,14 +351,15 @@ local Header = Instance.new("Frame", Main)
 Header.Size = UDim2.new(1, 0, 0, HEADER_HEIGHT)
 Header.BackgroundTransparency = 1
 
--- Título com Separador Rotativo
+-- Container do Título
 local TitleContainer = Instance.new("Frame", Header)
 TitleContainer.Size = UDim2.new(0.82, 0, 1, 0)
 TitleContainer.Position = UDim2.new(0, 14, 0, 0)
 TitleContainer.BackgroundTransparency = 1
 
+-- Texto AKAT (Tamanho Justo para Eliminar o Espaço)
 local TitleAkat = Instance.new("TextLabel", TitleContainer)
-TitleAkat.Size = UDim2.new(0, 44, 1, 0)
+TitleAkat.Size = UDim2.new(0, 36, 1, 0)
 TitleAkat.Text = "AKAT"
 TitleAkat.TextColor3 = Color3.fromHex("#8B0000")
 TitleAkat.Font = Enum.Font.GothamBold
@@ -367,17 +367,26 @@ TitleAkat.TextSize = 13
 TitleAkat.TextXAlignment = Enum.TextXAlignment.Left
 TitleAkat.BackgroundTransparency = 1
 
-local ModernSeparator = Instance.new("Frame", TitleContainer)
-ModernSeparator.AnchorPoint = Vector2.new(0, 0.5)
-ModernSeparator.Size = UDim2.new(0, 2, 0, 16)
-ModernSeparator.Position = UDim2.new(0, 48, 0.5, 0)
-ModernSeparator.BackgroundColor3 = Color3.fromHex("#8B0000")
-ModernSeparator.BorderSizePixel = 0
-Instance.new("UICorner", ModernSeparator).CornerRadius = UDim.new(1, 0)
-CriarGradienteRotativo(ModernSeparator, 2.5)
+-- Separador com Container Quadrado (Para o Gradiente Girar Perfeitamente sem Achatamento)
+local SepContainer = Instance.new("CanvasGroup", TitleContainer)
+SepContainer.AnchorPoint = Vector2.new(0, 0.5)
+SepContainer.Size = UDim2.new(0, 14, 0, 14)
+SepContainer.Position = UDim2.new(0, 40, 0.5, 0)
+SepContainer.BackgroundTransparency = 1
 
+local SepBar = Instance.new("Frame", SepContainer)
+SepBar.AnchorPoint = Vector2.new(0.5, 0.5)
+SepBar.Size = UDim2.new(0, 2, 1, 0)
+SepBar.Position = UDim2.new(0.5, 0, 0.5, 0)
+SepBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+SepBar.BorderSizePixel = 0
+Instance.new("UICorner", SepBar).CornerRadius = UDim.new(1, 0)
+
+CriarGradienteRotativo(SepContainer, 3.5)
+
+-- Nome do Jogo
 local TitleGame = Instance.new("TextLabel", TitleContainer)
-TitleGame.Size = UDim2.new(1, -58, 1, 0)
+TitleGame.Size = UDim2.new(1, -60, 1, 0)
 TitleGame.Position = UDim2.new(0, 58, 0, 0)
 TitleGame.Text = "JULES RNG (THE MINE)"
 TitleGame.TextColor3 = Color3.fromRGB(240, 240, 240)
@@ -408,11 +417,12 @@ Separator.Position = UDim2.new(0.03, 0, 0, HEADER_HEIGHT)
 Separator.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
 Separator.BorderSizePixel = 0
 
--- Container de Conteúdo
-local ContentFrame = Instance.new("Frame", Main)
+-- Container de Conteúdo (CanvasGroup para Animação e Sincronização Perfeita)
+local ContentFrame = Instance.new("CanvasGroup", Main)
 ContentFrame.Size = UDim2.new(1, 0, 1, -HEADER_HEIGHT - 1)
 ContentFrame.Position = UDim2.new(0, 0, 0, HEADER_HEIGHT + 1)
 ContentFrame.BackgroundTransparency = 1
+ContentFrame.GroupTransparency = 0
 
 -- ==================== CONSTRUTOR DE TOGGLES ====================
 local function CriarToggle(yPos, texto, flagName)
@@ -470,12 +480,11 @@ local function CriarToggle(yPos, texto, flagName)
     end)
 end
 
--- Nomes Atualizados & Posições Ajustadas
 CriarToggle(8, "X RAY MINES", "ESP")
 CriarToggle(54, "INSTANT MINE", "InstantMine")
 CriarToggle(100, "SPEED MOD", "Speed")
 
--- ==================== CONTROLES DA UI (EXTREMAMENTE FLUIDOS) ====================
+-- ==================== CONTROLES DA UI (ANIMAÇÃO 100% SINCRONIZADA) ====================
 local menuAberto = true
 local isMinimized = false
 
@@ -487,9 +496,9 @@ FloatBtn.MouseButton1Click:Connect(function()
         Main.Visible = true
         local targetHeight = isMinimized and HEADER_HEIGHT or UI_HEIGHT
         Main.Size = UDim2.new(0, UI_WIDTH, 0, targetHeight)
-        Animar(Main, {GroupTransparency = 0}, 0.15)
+        Animar(Main, {GroupTransparency = 0}, 0.18)
     else
-        local t = Animar(Main, {GroupTransparency = 1}, 0.15)
+        local t = Animar(Main, {GroupTransparency = 1}, 0.18)
         t.Completed:Connect(function()
             if not menuAberto then Main.Visible = false end
         end)
@@ -500,15 +509,12 @@ MinimizeBtn.MouseButton1Click:Connect(function()
     EfeitoClique(MinimizeBtn)
     isMinimized = not isMinimized
     
-    if isMinimized then
-        MinimizeBtn.Text = "+"
-        ContentFrame.Visible = false
-        Animar(Main, {Size = UDim2.new(0, UI_WIDTH, 0, HEADER_HEIGHT)}, 0.16)
-    else
-        MinimizeBtn.Text = "-"
-        ContentFrame.Visible = true
-        Animar(Main, {Size = UDim2.new(0, UI_WIDTH, 0, UI_HEIGHT)}, 0.16)
-    end
+    local targetHeight = isMinimized and HEADER_HEIGHT or UI_HEIGHT
+    MinimizeBtn.Text = isMinimized and "+" or "-"
+
+    -- Animação 100% Sincronizada entre Tamanho e Opacidade do Conteúdo
+    Animar(ContentFrame, {GroupTransparency = isMinimized and 1 or 0}, 0.2)
+    Animar(Main, {Size = UDim2.new(0, UI_WIDTH, 0, targetHeight)}, 0.2)
 end)
 
 local function ConfigurarArrastar(inst)
@@ -533,7 +539,7 @@ end
 ConfigurarArrastar(Main)
 ConfigurarArrastar(FloatBtn)
 
--- ==================== INTRODUÇÃO ESTILO MM2 (FLUIDA) ====================
+-- ==================== INTRODUÇÃO ESTILO MM2 ====================
 local function ExecutarIntro()
     local Blur = Instance.new("BlurEffect")
     Blur.Size = 0
@@ -583,7 +589,6 @@ local function ExecutarIntro()
     SubText.TextTransparency = 1
     SubText.ZIndex = 502
 
-    -- Transições
     Animar(IntroFrame, {BackgroundTransparency = 0.25}, 0.4) 
     Animar(Blur, {Size = 20}, 0.4) 
     task.wait(0.15)
