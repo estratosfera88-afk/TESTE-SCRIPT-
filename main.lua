@@ -1,7 +1,7 @@
 -- [[
---     AKAT | JULES RNG (THE MINE)
+--     AKAT | JULES RNG (THE MINE) - ULTRA OPTIMIZED & FIXED UI
 --     Otimizado para Delta Mobile 2026
---     Funções: X-Ray V2 Corrigido, Instant Mine, Speed, UI Animada
+--     Funções: X-Ray V2 Corrigido, Instant Mine, Speed, UI Animada Sincronizada
 -- ]]
 
 local Players = game:GetService("Players")
@@ -24,15 +24,15 @@ local flags = {
 local SPEED_MULTIPLIER = 32
 local DEFAULT_SPEED = 16
 
--- Dimensões da UI
-local UI_WIDTH = 280
-local UI_HEIGHT = 210
-local HEADER_HEIGHT = 36
+-- Dimensões Ajustadas da UI (Sem espaço sobrando)
+local UI_WIDTH = 340
+local HEADER_HEIGHT = 40
+local UI_HEIGHT = 188 
 
 -- Configurações do X-Ray V2
-local MAX_DISTANCE = 180          -- Distância máxima em studs
-local MAX_HIGHLIGHTS = 45         -- Teto de highlights ativos (Evita crash no celular)
-local UPDATE_INTERVAL = 0.65      -- Frequência de varredura
+local MAX_DISTANCE = 180          
+local MAX_HIGHLIGHTS = 45         
+local UPDATE_INTERVAL = 0.65      
 local espCache = {}
 
 local RARITY_PRIORITY = {
@@ -87,7 +87,19 @@ local function EfeitoClique(btn)
     Animar(btn, {Size = origSize}, 0.15, Enum.EasingStyle.Circular, Enum.EasingDirection.Out)
 end
 
--- ==================== LÓGICA DO X-RAY V2 (CORRIGIDO) ====================
+local function CriarGradienteVermelhoEscuro(parent)
+    local grad = Instance.new("UIGradient")
+    grad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromHex("#8B0000")),
+        ColorSequenceKeypoint.new(0.5, Color3.fromHex("#2B0000")),
+        ColorSequenceKeypoint.new(1, Color3.fromHex("#0A0A0A"))
+    })
+    grad.Rotation = 45
+    grad.Parent = parent
+    return grad
+end
+
+-- ==================== LÓGICA DO X-RAY V2 ====================
 local function ClearESP(obj)
     local data = espCache[obj]
     if not data then return end
@@ -122,14 +134,12 @@ local function GetOreInfo(obj)
     local name = obj.Name:lower()
     if IsIgnored(name) then return nil end
 
-    -- Prioridade 1: Minérios configurados
     for key, info in pairs(ORES_CONFIG) do
         if name:find(key) then
             return info, (RARITY_PRIORITY[key] or 1)
         end
     end
 
-    -- Prioridade 2: Nomes genéricos
     if name:find("ore") or name:find("minerio") or name:find("gem") or name:find("cristal") then
         return {Name = obj.Name, Color = Color3.fromRGB(255, 200, 50)}, 2
     end
@@ -210,9 +220,7 @@ end
 
 local function UpdateESP()
     if not flags.ESP then
-        if next(espCache) then
-            ClearAllESP()
-        end
+        if next(espCache) then ClearAllESP() end
         return
     end
 
@@ -230,19 +238,13 @@ local function UpdateESP()
             if not isTracked then
                 local p = obj.Parent
                 while p and p ~= workspace do
-                    if candidateObjs[p] then
-                        isTracked = true
-                        break
-                    end
+                    if candidateObjs[p] then isTracked = true; break end
                     p = p.Parent
                 end
             end
 
-            -- Evita pegar peças internas ("Ore") se o Modelo Pai for um minério válido
             if not isTracked and obj:IsA("BasePart") and obj.Parent:IsA("Model") and obj.Parent ~= workspace then
-                if GetOreInfo(obj.Parent) then
-                    isTracked = true
-                end
+                if GetOreInfo(obj.Parent) then isTracked = true end
             end
 
             if not isTracked then
@@ -267,9 +269,7 @@ local function UpdateESP()
     end
 
     table.sort(candidates, function(a, b)
-        if a.Priority ~= b.Priority then
-            return a.Priority > b.Priority
-        end
+        if a.Priority ~= b.Priority then return a.Priority > b.Priority end
         return a.Distance < b.Distance
     end)
 
@@ -309,103 +309,152 @@ pcall(function() uiParent = CoreGui end)
 if uiParent:FindFirstChild("DeltaAkatTheMineGui") then uiParent.DeltaAkatTheMineGui:Destroy() end
 ScreenGui.Parent = uiParent
 
--- ==================== BOTÃO FLUTUANTE ====================
+-- ==================== BOTÃO FLUTUANTE (ESTILO MM2) ====================
 local FloatBtn = Instance.new("ImageButton", ScreenGui)
-FloatBtn.AnchorPoint = Vector2.new(0.5, 0.5) 
-FloatBtn.Size = UDim2.new(0, 0, 0, 0)
-FloatBtn.Position = UDim2.new(0.08, 0, 0.25, 0)
-FloatBtn.Image = "rbxthumb://type=Asset&id=74407434556912&w=420&h=420"
-FloatBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
+FloatBtn.Name = "FloatBtn"
+FloatBtn.AnchorPoint = Vector2.new(0.5, 0.5)
+FloatBtn.Size = UDim2.new(0, 44, 0, 44)
+FloatBtn.Position = UDim2.new(0.1, 0, 0.35, 0)
+FloatBtn.Image = "rbxthumb://type=Asset&id=99997714241420&w=150&h=150"
+FloatBtn.ImageColor3 = Color3.fromRGB(255, 255, 255)
+FloatBtn.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
 FloatBtn.Visible = false
-Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(1, 0)
+FloatBtn.ZIndex = 30
+Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(0, 8)
+
 local FloatStroke = Instance.new("UIStroke", FloatBtn)
-FloatStroke.Color = Color3.fromRGB(150, 0, 0)
-FloatStroke.Thickness = 1.5
+FloatStroke.Thickness = 1.2
+FloatStroke.Color = Color3.fromHex("#8B0000")
+
+local FloatGradient = Instance.new("UIGradient", FloatStroke)
+FloatGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromHex("#8B0000")),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(15, 15, 15)),
+    ColorSequenceKeypoint.new(1, Color3.fromHex("#8B0000"))
+})
+
+TweenService:Create(FloatGradient, TweenInfo.new(4, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), {Rotation = 360}):Play()
 
 -- ==================== JANELA PRINCIPAL ====================
 local Main = Instance.new("CanvasGroup", ScreenGui)
 Main.AnchorPoint = Vector2.new(0.5, 0.5)
 Main.Size = UDim2.new(0, UI_WIDTH, 0, UI_HEIGHT) 
 Main.Position = UDim2.new(0.5, 0, 0.45, 0)
-Main.BackgroundColor3 = Color3.fromRGB(14, 14, 16)
+Main.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
 Main.GroupTransparency = 1 
 Main.Visible = false
 Main.ClipsDescendants = true
 
 local MainStroke = Instance.new("UIStroke", Main)
-MainStroke.Color = Color3.fromRGB(150, 0, 0)
 MainStroke.Thickness = 1.5
-Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 8)
+MainStroke.Color = Color3.fromHex("#8B0000")
+CriarGradienteVermelhoEscuro(MainStroke)
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 9)
 
 -- Cabeçalho
 local Header = Instance.new("Frame", Main)
 Header.Size = UDim2.new(1, 0, 0, HEADER_HEIGHT)
 Header.BackgroundTransparency = 1
 
-local TitleText = Instance.new("TextLabel", Header)
-TitleText.Size = UDim2.new(0.7, 0, 1, 0)
-TitleText.Position = UDim2.new(0, 12, 0, 0)
-TitleText.Text = "AKAT | JULES RNG"
-TitleText.TextColor3 = Color3.fromRGB(255, 255, 255)
-TitleText.Font = Enum.Font.GothamBold
-TitleText.TextSize = 13
-TitleText.TextXAlignment = Enum.TextXAlignment.Left
-TitleText.BackgroundTransparency = 1
+-- Título com Separador Moderno
+local TitleContainer = Instance.new("Frame", Header)
+TitleContainer.Size = UDim2.new(0.8, 0, 1, 0)
+TitleContainer.Position = UDim2.new(0, 12, 0, 0)
+TitleContainer.BackgroundTransparency = 1
+
+local TitleAkat = Instance.new("TextLabel", TitleContainer)
+TitleAkat.Size = UDim2.new(0, 42, 1, 0)
+TitleAkat.Text = "AKAT"
+TitleAkat.TextColor3 = Color3.fromHex("#8B0000")
+TitleAkat.Font = Enum.Font.GothamBold
+TitleAkat.TextSize = 13
+TitleAkat.TextXAlignment = Enum.TextXAlignment.Left
+TitleAkat.BackgroundTransparency = 1
+
+-- Separador Moderno (Barra Estilizada ao invés de "|")
+local ModernSeparator = Instance.new("Frame", TitleContainer)
+ModernSeparator.AnchorPoint = Vector2.new(0, 0.5)
+ModernSeparator.Size = UDim2.new(0, 2, 0, 14)
+ModernSeparator.Position = UDim2.new(0, 48, 0.5, 0)
+ModernSeparator.BackgroundColor3 = Color3.fromHex("#8B0000")
+ModernSeparator.BorderSizePixel = 0
+Instance.new("UICorner", ModernSeparator).CornerRadius = UDim.new(1, 0)
+CriarGradienteVermelhoEscuro(ModernSeparator)
+
+local TitleGame = Instance.new("TextLabel", TitleContainer)
+TitleGame.Size = UDim2.new(1, -58, 1, 0)
+TitleGame.Position = UDim2.new(0, 58, 0, 0)
+TitleGame.Text = "JULES RNG (THE MINE)"
+TitleGame.TextColor3 = Color3.fromRGB(240, 240, 240)
+TitleGame.Font = Enum.Font.GothamBold
+TitleGame.TextSize = 12
+TitleGame.TextXAlignment = Enum.TextXAlignment.Left
+TitleGame.BackgroundTransparency = 1
 
 -- Botão Minimizar
 local MinimizeBtn = Instance.new("TextButton", Header)
 MinimizeBtn.Size = UDim2.new(0, 24, 0, 24)
 MinimizeBtn.Position = UDim2.new(1, -32, 0.5, -12)
 MinimizeBtn.Text = "-"
-MinimizeBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
+MinimizeBtn.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
 MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 MinimizeBtn.Font = Enum.Font.GothamBold
 MinimizeBtn.TextSize = 14
-Instance.new("UICorner", MinimizeBtn).CornerRadius = UDim.new(0, 4)
+Instance.new("UICorner", MinimizeBtn).CornerRadius = UDim.new(0, 5)
 local MinStroke = Instance.new("UIStroke", MinimizeBtn)
-MinStroke.Color = Color3.fromRGB(60, 60, 65)
+MinStroke.Color = Color3.fromHex("#8B0000")
 MinStroke.Thickness = 1
+CriarGradienteVermelhoEscuro(MinStroke)
 
 local Separator = Instance.new("Frame", Main)
-Separator.Size = UDim2.new(0.92, 0, 0, 1)
-Separator.Position = UDim2.new(0.04, 0, 0, HEADER_HEIGHT)
-Separator.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+Separator.Size = UDim2.new(0.94, 0, 0, 1)
+Separator.Position = UDim2.new(0.03, 0, 0, HEADER_HEIGHT)
+Separator.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
 Separator.BorderSizePixel = 0
 
 -- Container de Configurações
 local ContentFrame = Instance.new("Frame", Main)
-ContentFrame.Size = UDim2.new(1, 0, 1, -HEADER_HEIGHT - 2)
-ContentFrame.Position = UDim2.new(0, 0, 0, HEADER_HEIGHT + 2)
+ContentFrame.Size = UDim2.new(1, 0, 1, -HEADER_HEIGHT - 1)
+ContentFrame.Position = UDim2.new(0, 0, 0, HEADER_HEIGHT + 1)
 ContentFrame.BackgroundTransparency = 1
 
--- ==================== CONSTRUTOR DE TOGGLES ====================
+-- ==================== CONSTRUTOR DE TOGGLES (TEXTO NO MEIO) ====================
 local function CriarToggle(yPos, texto, flagName)
     local row = Instance.new("Frame", ContentFrame)
-    row.Size = UDim2.new(0.92, 0, 0, 36)
-    row.Position = UDim2.new(0.04, 0, 0, yPos)
-    row.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
+    row.Size = UDim2.new(0.94, 0, 0, 38)
+    row.Position = UDim2.new(0.03, 0, 0, yPos)
+    row.BackgroundColor3 = Color3.fromRGB(16, 16, 20)
     row.BorderSizePixel = 0
     Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
 
+    local rowStroke = Instance.new("UIStroke", row)
+    rowStroke.Color = Color3.fromRGB(30, 30, 35)
+    rowStroke.Thickness = 1
+
+    -- Nome centralizado no meio da linha
     local lbl = Instance.new("TextLabel", row)
-    lbl.Size = UDim2.new(0.65, 0, 1, 0)
+    lbl.Size = UDim2.new(1, -70, 1, 0)
     lbl.Position = UDim2.new(0, 10, 0, 0)
     lbl.Text = texto
     lbl.TextColor3 = Color3.fromRGB(230, 230, 230)
     lbl.Font = Enum.Font.GothamBold
-    lbl.TextSize = 12
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.TextSize = 11
+    lbl.TextXAlignment = Enum.TextXAlignment.Center
     lbl.BackgroundTransparency = 1
 
     local btn = Instance.new("TextButton", row)
-    btn.Size = UDim2.new(0, 56, 0, 24)
-    btn.Position = UDim2.new(1, -62, 0.5, -12)
-    btn.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+    btn.Size = UDim2.new(0, 50, 0, 22)
+    btn.Position = UDim2.new(1, -56, 0.5, -11)
+    btn.BackgroundColor3 = Color3.fromRGB(28, 28, 32)
     btn.Text = "OFF"
-    btn.TextColor3 = Color3.fromRGB(160, 160, 160)
+    btn.TextColor3 = Color3.fromRGB(150, 150, 150)
     btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 11
+    btn.TextSize = 10
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+
+    local btnStroke = Instance.new("UIStroke", btn)
+    btnStroke.Color = Color3.fromRGB(45, 45, 50)
+    btnStroke.Thickness = 1
 
     btn.MouseButton1Click:Connect(function()
         EfeitoClique(btn)
@@ -413,25 +462,25 @@ local function CriarToggle(yPos, texto, flagName)
         if flags[flagName] then
             btn.Text = "ON"
             btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            Animar(btn, {BackgroundColor3 = Color3.fromRGB(150, 0, 0)}, 0.15)
+            btnStroke.Color = Color3.fromHex("#8B0000")
+            Animar(btn, {BackgroundColor3 = Color3.fromRGB(120, 10, 10)}, 0.15)
         else
             btn.Text = "OFF"
-            btn.TextColor3 = Color3.fromRGB(160, 160, 160)
-            Animar(btn, {BackgroundColor3 = Color3.fromRGB(35, 35, 40)}, 0.15)
+            btn.TextColor3 = Color3.fromRGB(150, 150, 150)
+            btnStroke.Color = Color3.fromRGB(45, 45, 50)
+            Animar(btn, {BackgroundColor3 = Color3.fromRGB(28, 28, 32)}, 0.15)
             
-            -- Limpa o ESP imediatamente ao desligar
-            if flagName == "ESP" then
-                ClearAllESP()
-            end
+            if flagName == "ESP" then ClearAllESP() end
         end
     end)
 end
 
-CriarToggle(12, "X-RAY MINÉRIOS V2", "ESP")
-CriarToggle(56, "INSTANT MINE", "InstantMine")
-CriarToggle(100, "SPEED MODERADO", "Speed")
+-- Posições perfeitamente ajustadas sem espaço sobrando no final
+CriarToggle(8, "X-RAY MINÉRIOS V2", "ESP")
+CriarToggle(52, "INSTANT MINE", "InstantMine")
+CriarToggle(96, "SPEED MODERADO", "Speed")
 
--- ==================== CONTROLES DE UI ====================
+-- ==================== CONTROLES DE UI (ANIMAÇÃO SINCRONIZADA) ====================
 local menuAberto = true
 local isMinimized = false
 local isAnimating = false
@@ -444,8 +493,10 @@ FloatBtn.MouseButton1Click:Connect(function()
     menuAberto = not menuAberto
     if menuAberto then
         Main.Visible = true
-        local targetSize = isMinimized and UDim2.new(0, UI_WIDTH, 0, HEADER_HEIGHT) or UDim2.new(0, UI_WIDTH, 0, UI_HEIGHT)
-        Main.Size = targetSize
+        local targetHeight = isMinimized and HEADER_HEIGHT or UI_HEIGHT
+        Main.Size = UDim2.new(0, UI_WIDTH, 0, targetHeight)
+        
+        -- Sincronização Perfeita usando GroupTransparency do CanvasGroup
         local tween = Animar(Main, {GroupTransparency = 0}, 0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
         tween.Completed:Wait()
     else
@@ -464,9 +515,9 @@ MinimizeBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     if isMinimized then
         MinimizeBtn.Text = "+"
+        ContentFrame.Visible = false
         local tween = Animar(Main, {Size = UDim2.new(0, UI_WIDTH, 0, HEADER_HEIGHT)}, 0.22, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out)
         tween.Completed:Wait()
-        ContentFrame.Visible = false
     else
         MinimizeBtn.Text = "-"
         ContentFrame.Visible = true
@@ -506,7 +557,7 @@ local function ExecutarIntro()
 
     local IntroFrame = Instance.new("Frame", ScreenGui)
     IntroFrame.Size = UDim2.new(1, 0, 1, 0)
-    IntroFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
+    IntroFrame.BackgroundColor3 = Color3.fromRGB(5, 5, 5)
     IntroFrame.BackgroundTransparency = 1
     IntroFrame.BorderSizePixel = 0
     IntroFrame.ZIndex = 500
@@ -519,7 +570,7 @@ local function ExecutarIntro()
     IntroText.Font = Enum.Font.GothamBold
     IntroText.TextSize = 24
     IntroText.RichText = true
-    IntroText.Text = '<font color="rgb(255, 255, 255)">Scripts | </font><font color="rgb(150, 0, 0)">By A̷K̷A̷T̷ Community</font>'
+    IntroText.Text = '<font color="rgb(255, 255, 255)">Scripts | </font><font color="#8B0000">By A̷K̷A̷T̷ Community</font>'
     IntroText.TextTransparency = 1
     IntroText.ZIndex = 501
 
@@ -527,12 +578,13 @@ local function ExecutarIntro()
     IntroLine.AnchorPoint = Vector2.new(0.5, 0.5)
     IntroLine.Size = UDim2.new(0, 0, 0, 2) 
     IntroLine.Position = UDim2.new(0.5, 0, 0.5, 35)
-    IntroLine.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+    IntroLine.BackgroundColor3 = Color3.fromHex("#8B0000")
     IntroLine.BorderSizePixel = 0
     IntroLine.ZIndex = 501
+    CriarGradienteVermelhoEscuro(IntroLine)
 
-    Animar(IntroFrame, {BackgroundTransparency = 0.25}, 0.7) 
-    Animar(Blur, {Size = 20}, 0.7) 
+    Animar(IntroFrame, {BackgroundTransparency = 0.15}, 0.7) 
+    Animar(Blur, {Size = 24}, 0.7) 
     task.wait(0.3)
 
     Animar(IntroText, {TextTransparency = 0, Position = UDim2.new(0.5, 0, 0.5, 0)}, 0.6)
@@ -552,11 +604,11 @@ local function ExecutarIntro()
     FloatBtn.Visible = true
     Main.Visible = true
     ContentFrame.Visible = true
-    Animar(FloatBtn, {Size = UDim2.new(0, 48, 0, 48)}, 0.3, Enum.EasingStyle.Back)
-    Animar(Main, {GroupTransparency = 0}, 0.3, Enum.EasingStyle.Sine)
+    Animar(FloatBtn, {Size = UDim2.new(0, 44, 0, 44)}, 0.3, Enum.EasingStyle.Back)
+    Animar(Main, {GroupTransparency = 0}, 0.35, Enum.EasingStyle.Sine)
 end
 
--- ==================== OUTROS CHEATS ====================
+-- ==================== CHEATS AUXILIARES ====================
 local function ForceBreakBlocks()
     if not flags.InstantMine then return end
     
@@ -598,7 +650,6 @@ RunService.Heartbeat:Connect(function()
     ForceBreakBlocks()
 end)
 
--- Loop do X-Ray V2
 task.spawn(function()
     while true do
         task.wait(UPDATE_INTERVAL)
@@ -606,11 +657,8 @@ task.spawn(function()
     end
 end)
 
--- Eventos de Limpeza
 workspace.DescendantRemoving:Connect(function(obj)
-    if espCache[obj] then
-        ClearESP(obj)
-    end
+    if espCache[obj] then ClearESP(obj) end
 end)
 
 player.CharacterAdded:Connect(function(char)
@@ -618,5 +666,5 @@ player.CharacterAdded:Connect(function(char)
     ClearAllESP()
 end)
 
--- Inicia a Introdução
+-- Inicialização
 task.spawn(ExecutarIntro)
