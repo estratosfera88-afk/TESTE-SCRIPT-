@@ -357,14 +357,29 @@ TitleContainer.Size = UDim2.new(0.82, 0, 1, 0)
 TitleContainer.Position = UDim2.new(0, 12, 0, 0)
 TitleContainer.BackgroundTransparency = 1
 
--- Badge AKAT (Fundo com Bordas Arredondadas)
+-- Badge AKAT (Fundo com Bordas Arredondadas e Altura Reduzida)
 local AkatBadge = Instance.new("Frame", TitleContainer)
 AkatBadge.AnchorPoint = Vector2.new(0, 0.5)
-AkatBadge.Size = UDim2.new(0, 48, 0, 22)
+AkatBadge.Size = UDim2.new(0, 48, 0, 18) -- Altura abaixada ligeiramente (22 -> 18)
 AkatBadge.Position = UDim2.new(0, 0, 0.5, 0)
 AkatBadge.BackgroundColor3 = Color3.fromRGB(32, 10, 12)
 AkatBadge.BorderSizePixel = 0
+AkatBadge.ZIndex = 2
 Instance.new("UICorner", AkatBadge).CornerRadius = UDim.new(0, 5)
+
+-- Efeito Glow / Drop Shadow Neon atras da caixinha AKAT
+local AkatGlow = Instance.new("ImageLabel", AkatBadge)
+AkatGlow.Name = "AkatGlow"
+AkatGlow.AnchorPoint = Vector2.new(0.5, 0.5)
+AkatGlow.Position = UDim2.new(0.5, 0, 0.5, 0)
+AkatGlow.Size = UDim2.new(1, 16, 1, 16)
+AkatGlow.BackgroundTransparency = 1
+AkatGlow.Image = "rbxassetid://6015180143"
+AkatGlow.ImageColor3 = Color3.fromHex("#8B0000")
+AkatGlow.ImageTransparency = 0.25
+AkatGlow.ScaleType = Enum.ScaleType.Slice
+AkatGlow.SliceCenter = Rect.new(49, 49, 101, 101)
+AkatGlow.ZIndex = 1
 
 local AkatBadgeStroke = Instance.new("UIStroke", AkatBadge)
 AkatBadgeStroke.Thickness = 1
@@ -378,6 +393,7 @@ TitleAkat.Font = Enum.Font.GothamBold
 TitleAkat.TextSize = 11
 TitleAkat.TextXAlignment = Enum.TextXAlignment.Center
 TitleAkat.BackgroundTransparency = 1
+TitleAkat.ZIndex = 3
 
 -- Nome do Jogo (Logo ao Lado Direito do Badge)
 local TitleGame = Instance.new("TextLabel", TitleContainer)
@@ -413,11 +429,14 @@ Separator.Position = UDim2.new(0.03, 0, 0, HEADER_HEIGHT)
 Separator.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
 Separator.BorderSizePixel = 0
 
--- Container de Conteúdo (Frame Nativo para Garantir Sincronismo e Fixar no Main)
-local ContentFrame = Instance.new("Frame", Main)
-ContentFrame.Size = UDim2.new(1, 0, 1, -HEADER_HEIGHT - 1)
+-- Container de Conteúdo (CanvasGroup para garantir transições suaves e perfeitamente sincronizadas)
+local ContentFrame = Instance.new("CanvasGroup", Main)
+ContentFrame.Size = UDim2.new(1, 0, 0, UI_HEIGHT - HEADER_HEIGHT - 1)
 ContentFrame.Position = UDim2.new(0, 0, 0, HEADER_HEIGHT + 1)
 ContentFrame.BackgroundTransparency = 1
+ContentFrame.BorderSizePixel = 0
+ContentFrame.GroupTransparency = 0
+ContentFrame.ClipsDescendants = true
 
 -- ==================== CONSTRUTOR DE TOGGLES ====================
 local function CriarToggle(yPos, texto, flagName)
@@ -479,42 +498,73 @@ CriarToggle(8, "X RAY MINES", "ESP")
 CriarToggle(54, "INSTANT MINE", "InstantMine")
 CriarToggle(100, "SPEED MOD", "Speed")
 
--- ==================== CONTROLES DA UI ====================
+-- ==================== CONTROLES DA UI E ANIMAÇÕES SINCRONIZADAS ====================
 local menuAberto = true
 local isMinimized = false
 
-FloatBtn.MouseButton1Click:Connect(function()
-    EfeitoClique(FloatBtn)
-    menuAberto = not menuAberto
+local mainTween = nil
+local contentTween = nil
+
+local function ToggleMenu(open)
+    menuAberto = open
+    if mainTween then mainTween:Cancel() end
+    if contentTween then contentTween:Cancel() end
     
-    if menuAberto then
+    if open then
         Main.Visible = true
+        RunService.RenderStepped:Wait() -- Garante o buffer do CanvasGroup antes de iniciar o fade
+        
         local targetHeight = isMinimized and HEADER_HEIGHT or UI_HEIGHT
         Main.Size = UDim2.new(0, UI_WIDTH, 0, targetHeight)
-        Animar(Main, {GroupTransparency = 0}, 0.18)
+        
+        if not isMinimized then
+            ContentFrame.Visible = true
+            ContentFrame.GroupTransparency = 0
+        else
+            ContentFrame.Visible = false
+        end
+        
+        mainTween = Animar(Main, {GroupTransparency = 0}, 0.2)
     else
-        local t = Animar(Main, {GroupTransparency = 1}, 0.18)
-        t.Completed:Connect(function()
-            if not menuAberto then Main.Visible = false end
+        mainTween = Animar(Main, {GroupTransparency = 1}, 0.18)
+        mainTween.Completed:Connect(function(state)
+            if state == Enum.PlaybackState.Completed and not menuAberto then
+                Main.Visible = false
+            end
         end)
     end
+end
+
+FloatBtn.MouseButton1Click:Connect(function()
+    EfeitoClique(FloatBtn)
+    ToggleMenu(not menuAberto)
 end)
 
 MinimizeBtn.MouseButton1Click:Connect(function()
     EfeitoClique(MinimizeBtn)
     isMinimized = not isMinimized
-    
-    local targetHeight = isMinimized and HEADER_HEIGHT or UI_HEIGHT
     MinimizeBtn.Text = isMinimized and "+" or "-"
+    
+    if mainTween then mainTween:Cancel() end
+    if contentTween then contentTween:Cancel() end
+
+    local targetHeight = isMinimized and HEADER_HEIGHT or UI_HEIGHT
 
     if isMinimized then
-        Animar(Main, {Size = UDim2.new(0, UI_WIDTH, 0, targetHeight)}, 0.2)
-        task.delay(0.12, function()
-            if isMinimized then ContentFrame.Visible = false end
+        contentTween = Animar(ContentFrame, {GroupTransparency = 1}, 0.15)
+        mainTween = Animar(Main, {Size = UDim2.new(0, UI_WIDTH, 0, targetHeight)}, 0.2)
+        
+        mainTween.Completed:Connect(function(state)
+            if state == Enum.PlaybackState.Completed and isMinimized then
+                ContentFrame.Visible = false
+            end
         end)
     else
         ContentFrame.Visible = true
-        Animar(Main, {Size = UDim2.new(0, UI_WIDTH, 0, targetHeight)}, 0.2)
+        ContentFrame.GroupTransparency = 1
+        
+        mainTween = Animar(Main, {Size = UDim2.new(0, UI_WIDTH, 0, targetHeight)}, 0.2)
+        contentTween = Animar(ContentFrame, {GroupTransparency = 0}, 0.2)
     end
 end)
 
@@ -614,6 +664,9 @@ local function ExecutarIntro()
     FloatBtn.Visible = true
     Main.Visible = true
     ContentFrame.Visible = true
+    ContentFrame.GroupTransparency = 0
+    Main.GroupTransparency = 1
+
     Animar(FloatBtn, {Size = UDim2.new(0, 46, 0, 46)}, 0.25)
     Animar(Main, {GroupTransparency = 0}, 0.25)
 end
