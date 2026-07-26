@@ -1,7 +1,6 @@
 -- [[
---     AKAT SCRIPT - THE STRONGEST BATTLEGROUNDS (TBS) [v4.0]
---     ULTRA OPTIMIZED & FULLY FUNCTIONAL 2026 EDITION
---     Design: Dynamic Dark UI + Soft Blur + Rayfield-style Notifications + Smooth Animations
+--     AKAT SCRIPT - THE STRONGEST BATTLEGROUNDS (TBS) [v4.5]
+--     ULTRA OPTIMIZED & REPAIRED EDITION
 -- ]]
 
 local Players = game:GetService("Players")
@@ -12,9 +11,8 @@ local Lighting = game:GetService("Lighting")
 
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
-local mouse = player:GetMouse()
 
--- Configurações Globais
+-- Configurações Globais (Nomes diretos e simplificados)
 _G.Configs = _G.Configs or {
     Speed = false,
     InfDash = false,
@@ -22,8 +20,7 @@ _G.Configs = _G.Configs or {
     AutoBlock = false,
     AutoTech = false,
     HitboxReach = false,
-    TargetLock = false,
-    ESP = false,
+    AimLock = false,
     HitboxESP = false,
     TpArena = false,
     SafeSpot = false,
@@ -33,6 +30,7 @@ _G.Configs = _G.Configs or {
 }
 
 local Configs = _G.Configs
+local toggleElements = {}
 
 -- [TEXTOS E INTERFACE TBS]
 local UI_TEXT = {
@@ -49,24 +47,23 @@ local UI_TEXT = {
         Misc = "Outros"
     },
     Options = {
-        Speed = { Title = "Velocidade (WalkSpeed)", Desc = "Aumenta a velocidade de movimento do personagem suavemente para 24." },
-        InfDash = { Title = "Dash Infinito", Desc = "Remove a recarga e restrições de distância ao esquivar/dash." },
-        Noclip = { Title = "Atravessar Paredes", Desc = "Permite atravessar objetos e estruturas da arena livremente." },
+        Speed = { Title = "Speed", Desc = "Aumenta a velocidade de movimento do personagem para 24." },
+        InfDash = { Title = "InfDash", Desc = "Remove recargas e restrições de esquiva." },
+        Noclip = { Title = "Noclip", Desc = "Permite atravessar paredes e estruturas livremente." },
         
-        AutoBlock = { Title = "Auto Defesa (Auto Block)", Desc = "Detecta golpes inimigos de M1/Habilidades e bloqueia automaticamente." },
-        AutoTech = { Title = "Auto Tech / Counter", Desc = "Executa cancelamento de queda e recuperação (Tech) no tempo perfeito." },
-        HitboxReach = { Title = "Alcance M1 (Hitbox)", Desc = "Aumenta a área de colisão dos seus ataques M1 para acertar de longe." },
-        TargetLock = { Title = "Travar Mira (Lock-On)", Desc = "Trava a câmera e os ataques diretamente no adversário mais próximo." },
+        AutoBlock = { Title = "AutoBlock", Desc = "Detecta golpes inimigos de M1 e habilidades e bloqueia automaticamente." },
+        AutoTech = { Title = "AutoTech", Desc = "Executa recuperação (Tech) e cancelamento de queda instantaneamente." },
+        HitboxReach = { Title = "HitboxReach", Desc = "Aumenta o alcance dos seus ataques M1 para acertar à distância." },
+        AimLock = { Title = "AimLock", Desc = "Carrega o script de trava de mira externo otimizado para TBS." },
         
-        ESP = { Title = "ESP Jogadores", Desc = "Destaca os adversários através das paredes com caixas e vida." },
-        HitboxESP = { Title = "Visualizador de Hitbox", Desc = "Exibe caixas semi-transparentes indicando a área de ataque dos inimigos." },
+        HitboxESP = { Title = "HitboxESP", Desc = "Exibe a área da caixa de colisão/ataque dos adversários." },
         
-        TpArena = { Title = "TP Arena Principal", Desc = "Teleporta seu personagem de forma rápida para o centro do mapa." },
-        SafeSpot = { Title = "Plataforma Segura", Desc = "Teleporta você para uma plataforma invisível no céu para regenerar." },
-        TpTarget = { Title = "TP Atrás do Alvo", Desc = "Teleporta instantaneamente para as costas do jogador travado." },
+        TpArena = { Title = "TpArena", Desc = "Teleporta seu personagem instantaneamente para o centro da arena." },
+        SafeSpot = { Title = "SafeSpot", Desc = "Cria e te teleporta para uma plataforma segura no céu." },
+        TpTarget = { Title = "TpTarget", Desc = "Teleporta instantaneamente para as costas do jogador mais próximo." },
         
-        AntiFling = { Title = "Anti-Fling & Empurrão", Desc = "Desativa colisão com jogadores para evitar arremessos e bugs." },
-        AutoEmote = { Title = "Cancelamento de Emote", Desc = "Permite cancelar animações de emote instantaneamente em combate." }
+        AntiFling = { Title = "AntiFling", Desc = "Desativa colisões com outros jogadores para impedir arremessos." },
+        AutoEmote = { Title = "AutoEmote", Desc = "Cancela animações de emote instantaneamente ao atacar." }
     }
 }
 
@@ -161,18 +158,7 @@ local function AplicarFadeSincronizado(raiz, fadeOut, duracao)
     for _, desc in ipairs(raiz:GetDescendants()) do tratarObjeto(desc) end
 end
 
--- [SISTEMA DE NOTIFICAÇÕES AKAT]
-local function CopiarLinkDiscord()
-    local link = "https://discord.gg/tfQYbRXT9Q"
-    if setclipboard then
-        pcall(setclipboard, link)
-    elseif toclipboard then
-        pcall(toclipboard, link)
-    elseif syn and syn.write_clipboard then
-        pcall(syn.write_clipboard, link)
-    end
-end
-
+-- [SISTEMA DE NOTIFICAÇÕES]
 local notifContainer = Instance.new("Frame", screenGui)
 notifContainer.Name = "NotifContainer"
 notifContainer.AnchorPoint = Vector2.new(1, 1)
@@ -399,7 +385,7 @@ subtitle.Name = "Subtitle"
 subtitle.Size = UDim2.new(0, 200, 0, 14)
 subtitle.Position = UDim2.new(0, 16, 0, 28)
 subtitle.BackgroundTransparency = 1
-subtitle.Text = "TBS EDITION [v4.0]"
+subtitle.Text = "TBS EDITION [v4.5]"
 subtitle.TextColor3 = Color3.fromHex("#8B0000")
 subtitle.TextSize = 10
 subtitle.Font = Enum.Font.Gotham
@@ -876,6 +862,17 @@ local function createTabBtn(tabName)
     tabButtons[tabName] = tabBtn
 end
 
+local function UpdateToggleVisual(configKey, state)
+    local elem = toggleElements[configKey]
+    if elem then
+        local targetPos   = state and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
+        local targetColor = state and Color3.fromHex("#8B0000") or Color3.fromRGB(30, 30, 30)
+        local anim = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        TweenService:Create(elem.Circle, anim, {Position = targetPos}):Play()
+        TweenService:Create(elem.Track, anim, {BackgroundColor3 = targetColor}):Play()
+    end
+end
+
 local function createToggle(parent, configKey, tabCategory)
     local toggleFrame = Instance.new("Frame")
     toggleFrame.Name = configKey
@@ -928,12 +925,16 @@ local function createToggle(parent, configKey, tabCategory)
     local trackStroke = Instance.new("UIStroke", switchTrack)
     trackStroke.Color = Color3.fromRGB(45, 45, 45)
     trackStroke.Thickness = 1
+
     local switchCircle = Instance.new("Frame", switchTrack)
     switchCircle.Size = UDim2.new(0, 14, 0, 14)
     switchCircle.Position = Configs[configKey] and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
     switchCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     switchCircle.ZIndex = 7
     Instance.new("UICorner", switchCircle).CornerRadius = UDim.new(1, 0)
+
+    toggleElements[configKey] = { Track = switchTrack, Circle = switchCircle }
+
     local triggerBtn = Instance.new("TextButton", toggleFrame)
     triggerBtn.Size = UDim2.new(1, 0, 1, 0)
     triggerBtn.BackgroundTransparency = 1
@@ -942,14 +943,12 @@ local function createToggle(parent, configKey, tabCategory)
     
     triggerBtn.MouseButton1Click:Connect(function()
         Configs[configKey] = not Configs[configKey]
-        local targetPos   = Configs[configKey] and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
-        local targetColor = Configs[configKey] and Color3.fromHex("#8B0000") or Color3.fromRGB(30, 30, 30)
-        local anim = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-        TweenService:Create(switchCircle, anim, {Position = targetPos}):Play()
-        TweenService:Create(switchTrack, anim, {BackgroundColor3 = targetColor}):Play()
+        UpdateToggleVisual(configKey, Configs[configKey])
         
         if _G.AkatCallbacks and _G.AkatCallbacks[configKey] then
-            task.spawn(_G.AkatCallbacks[configKey], Configs[configKey])
+            task.spawn(function()
+                pcall(_G.AkatCallbacks[configKey], Configs[configKey])
+            end)
         end
     end)
 end
@@ -1178,8 +1177,7 @@ local function ExecutarIntroAkat()
         IntroFrame:Destroy()
         Blur:Destroy()
 
-        CopiarLinkDiscord()
-        CriarNotificacao("AKAT TBS EDITION", "Carregado com Sucesso! Discord Copiado.", 4)
+        CriarNotificacao("AKAT TBS EDITION", "Carregado com Sucesso!", 4)
     end)
 end
 
@@ -1221,7 +1219,7 @@ createTabBtn("Visuals")
 createTabBtn("Teleports")
 createTabBtn("Misc")
 
--- CRIAÇÃO DAS OPÇÕES REAIS DE TBS
+-- CRIAÇÃO DAS OPÇÕES
 createToggle(togglesContainer, "Speed",       "Player")
 createToggle(togglesContainer, "InfDash",     "Player")
 createToggle(togglesContainer, "Noclip",      "Player")
@@ -1229,9 +1227,8 @@ createToggle(togglesContainer, "Noclip",      "Player")
 createToggle(togglesContainer, "AutoBlock",   "Combat")
 createToggle(togglesContainer, "AutoTech",    "Combat")
 createToggle(togglesContainer, "HitboxReach", "Combat")
-createToggle(togglesContainer, "TargetLock",  "Combat")
+createToggle(togglesContainer, "AimLock",     "Combat")
 
-createToggle(togglesContainer, "ESP",         "Visuals")
 createToggle(togglesContainer, "HitboxESP",   "Visuals")
 
 createToggle(togglesContainer, "TpArena",     "Teleports")
@@ -1333,11 +1330,10 @@ ConfigurarArrastarAkat(FloatBtn)
 -- ====================================================================
 
 local connections = {}
-local espHighlights = {}
 local safePlatform = nil
 
 local function GetClosestTarget(maxDistance)
-    maxDistance = maxDistance or 150
+    maxDistance = maxDistance or 300
     local closestPlayer = nil
     local shortestDistance = maxDistance
 
@@ -1364,9 +1360,9 @@ _G.AkatCallbacks = {
     Speed = function(state)
         if state then
             connections["Speed"] = RunService.Heartbeat:Connect(function()
-                if player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
+                if player.Character then
                     local hum = player.Character:FindFirstChildOfClass("Humanoid")
-                    if hum.WalkSpeed < 24 then
+                    if hum and hum.WalkSpeed < 24 then
                         hum.WalkSpeed = 24
                     end
                 end
@@ -1416,13 +1412,10 @@ _G.AkatCallbacks = {
             connections["AutoBlock"] = RunService.RenderStepped:Connect(function()
                 local target = GetClosestTarget(22)
                 if target and target.Character then
-                    local char = target.Character
-                    -- Verifica animações de ataque ativas do adversário em TBS
-                    local hum = char:FindFirstChildOfClass("Humanoid")
+                    local hum = target.Character:FindFirstChildOfClass("Humanoid")
                     if hum then
                         for _, track in ipairs(hum:GetPlayingAnimationTracks()) do
                             if track.IsPlaying and (track.Name:lower():find("m1") or track.Name:lower():find("attack") or track.Name:lower():find("punch") or track.Name:lower():find("kick")) then
-                                -- Simula ativação de bloqueio
                                 local myChar = player.Character
                                 if myChar and myChar:FindFirstChild("Communicator") then
                                     pcall(function() myChar.Communicator:FireServer({Goal = "Block", State = true}) end)
@@ -1442,8 +1435,7 @@ _G.AkatCallbacks = {
         if state then
             connections["AutoTech"] = RunService.Heartbeat:Connect(function()
                 local char = player.Character
-                if char and char:FindFirstChild("Ragdoll") then
-                    -- Cancela o estado de caindo/ragdoll (Tech)
+                if char and (char:FindFirstChild("Ragdoll") or char:FindFirstChild("Knocked")) then
                     local hum = char:FindFirstChildOfClass("Humanoid")
                     if hum then
                         hum:ChangeState(Enum.HumanoidStateType.GettingUp)
@@ -1459,70 +1451,35 @@ _G.AkatCallbacks = {
         if state then
             connections["HitboxReach"] = RunService.RenderStepped:Connect(function()
                 local myChar = player.Character
-                if myChar and myChar:FindFirstChild("RightHand") then
-                    myChar.RightHand.Size = Vector3.new(12, 12, 12)
-                    myChar.RightHand.Transparency = 0.8
-                    myChar.RightHand.CanCollide = false
+                if myChar then
+                    local rHand = myChar:FindFirstChild("RightHand") or myChar:FindFirstChild("Right Arm")
+                    if rHand then
+                        rHand.Size = Vector3.new(12, 12, 12)
+                        rHand.Transparency = 0.8
+                        rHand.CanCollide = false
+                    end
                 end
             end)
         else
             if connections["HitboxReach"] then connections["HitboxReach"]:Disconnect() connections["HitboxReach"] = nil end
             local myChar = player.Character
-            if myChar and myChar:FindFirstChild("RightHand") then
-                myChar.RightHand.Size = Vector3.new(1, 1, 1)
-                myChar.RightHand.Transparency = 0
+            if myChar then
+                local rHand = myChar:FindFirstChild("RightHand") or myChar:FindFirstChild("Right Arm")
+                if rHand then
+                    rHand.Size = Vector3.new(1, 1, 1)
+                    rHand.Transparency = 0
+                end
             end
         end
     end,
 
-    TargetLock = function(state)
+    -- AIM LOCK MODIFICADO: Carrega o script externo solicitado ao ser ativado
+    AimLock = function(state)
         if state then
-            connections["TargetLock"] = RunService.RenderStepped:Connect(function()
-                local target = GetClosestTarget(120)
-                if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-                    camera.CFrame = CFrame.new(camera.CFrame.Position, target.Character.HumanoidRootPart.Position)
-                end
+            pcall(function()
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/estratosfera88-afk/AIM-LOCK-TBS/refs/heads/main/main.lua"))()
             end)
-        else
-            if connections["TargetLock"] then connections["TargetLock"]:Disconnect() connections["TargetLock"] = nil end
-        end
-    end,
-
-    ESP = function(state)
-        if state then
-            local function aplicarESP(p)
-                if p ~= player and p.Character then
-                    local highlight = Instance.new("Highlight")
-                    highlight.Name = "AkatESP"
-                    highlight.FillColor = Color3.fromRGB(220, 20, 60)
-                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-                    highlight.FillTransparency = 0.5
-                    highlight.OutlineTransparency = 0
-                    highlight.Parent = p.Character
-                    espHighlights[p] = highlight
-                end
-            end
-
-            for _, p in ipairs(Players:GetPlayers()) do
-                aplicarESP(p)
-                p.CharacterAdded:Connect(function()
-                    task.wait(0.5)
-                    if Configs.ESP then aplicarESP(p) end
-                end)
-            end
-
-            connections["ESP_Added"] = Players.PlayerAdded:Connect(function(p)
-                p.CharacterAdded:Connect(function()
-                    task.wait(0.5)
-                    if Configs.ESP then aplicarESP(p) end
-                end)
-            end)
-        else
-            if connections["ESP_Added"] then connections["ESP_Added"]:Disconnect() connections["ESP_Added"] = nil end
-            for _, hl in pairs(espHighlights) do
-                pcall(function() hl:Destroy() end)
-            end
-            espHighlights = {}
+            CriarNotificacao("Aim Lock", "Script externo de Aim Lock executado!", 3)
         end
     end,
 
@@ -1558,7 +1515,10 @@ _G.AkatCallbacks = {
             if myChar and myChar:FindFirstChild("HumanoidRootPart") then
                 myChar.HumanoidRootPart.CFrame = CFrame.new(0, 50, 0)
             end
-            Configs.TpArena = false
+            task.delay(0.1, function()
+                Configs.TpArena = false
+                UpdateToggleVisual("TpArena", false)
+            end)
         end
     end,
 
@@ -1597,7 +1557,10 @@ _G.AkatCallbacks = {
                     myChar.HumanoidRootPart.CFrame = target.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
                 end
             end
-            Configs.TpTarget = false
+            task.delay(0.1, function()
+                Configs.TpTarget = false
+                UpdateToggleVisual("TpTarget", false)
+            end)
         end
     end,
 
@@ -1647,10 +1610,6 @@ _G.AkatCallbacks = {
             if conn then conn:Disconnect() end
         end
         connections = {}
-        for _, hl in pairs(espHighlights) do
-            pcall(function() hl:Destroy() end)
-        end
-        espHighlights = {}
         if safePlatform then
             safePlatform:Destroy()
             safePlatform = nil
