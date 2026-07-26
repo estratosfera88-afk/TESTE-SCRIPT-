@@ -1,7 +1,7 @@
 -- [[
 --     AKAT | JULES RNG (THE MINE)
 --     Otimizado para Delta Mobile 2026
---     Funções: X-Ray Filtrado, Instant Mine (Block Hit), Speed, UI Animada
+--     Funções: X-Ray V2 Inteligente, Instant Mine, Speed, UI Animada
 -- ]]
 
 local Players = game:GetService("Players")
@@ -12,6 +12,7 @@ local Lighting = game:GetService("Lighting")
 local CoreGui = game:GetService("CoreGui")
 
 local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
 
 -- ==================== CONFIGURAÇÕES GERAIS ====================
 local flags = {
@@ -22,23 +23,46 @@ local flags = {
 
 local SPEED_MULTIPLIER = 32
 local DEFAULT_SPEED = 16
-local espCache = {}
 
 -- Dimensoes da UI
 local UI_WIDTH = 280
 local UI_HEIGHT = 210
 local HEADER_HEIGHT = 36
 
--- Dicionário de Minérios (Cores e Nomes Corretos)
+-- Configurações do X-Ray V2 (Otimizado Mobile)
+local MAX_DISTANCE = 180          -- Distância máxima em studs
+local MAX_HIGHLIGHTS = 45         -- Teto de highlights ativos (Evita crash no celular)
+local UPDATE_INTERVAL = 0.65      -- Frequência de varredura
+local espCache = {}
+
+local RARITY_PRIORITY = {
+    ["diamond"] = 10,
+    ["mythril"] = 9,
+    ["ruby"]    = 8,
+    ["emerald"] = 7,
+    ["gold"]    = 6,
+    ["lapis"]   = 5,
+    ["iron"]    = 4,
+    ["coal"]    = 3,
+    ["ore"]     = 2,
+    ["minerio"] = 2
+}
+
 local ORES_CONFIG = {
-    ["coal"] = {Name = "Coal", Color = Color3.fromRGB(80, 80, 80)},
-    ["iron"] = {Name = "Iron", Color = Color3.fromRGB(220, 220, 220)},
+    ["coal"]    = {Name = "Coal",    Color = Color3.fromRGB(90, 90, 90)},
+    ["iron"]    = {Name = "Iron",    Color = Color3.fromRGB(210, 210, 210)},
     ["emerald"] = {Name = "Emerald", Color = Color3.fromRGB(46, 204, 113)},
-    ["ruby"] = {Name = "Ruby", Color = Color3.fromRGB(231, 76, 60)},
+    ["ruby"]    = {Name = "Ruby",    Color = Color3.fromRGB(231, 76, 60)},
     ["diamond"] = {Name = "Diamond", Color = Color3.fromRGB(52, 152, 219)},
     ["mythril"] = {Name = "Mythril", Color = Color3.fromRGB(155, 89, 182)},
-    ["lapis"] = {Name = "Lapis", Color = Color3.fromRGB(41, 128, 185)},
-    ["gold"] = {Name = "Gold", Color = Color3.fromRGB(241, 196, 15)}
+    ["lapis"]   = {Name = "Lapis",   Color = Color3.fromRGB(41, 128, 185)},
+    ["gold"]    = {Name = "Gold",    Color = Color3.fromRGB(241, 196, 15)}
+}
+
+local IGNORE_KEYWORDS = {
+    "stone", "pedra", "dirt", "terra", "baseplate", "grass", "rock",
+    "wall", "floor", "ceiling", "part", "mesh", "handle", "tool",
+    "character", "humanoid", "accessory", "hat", "hair"
 }
 
 -- ==================== FUNÇÕES DE ANIMAÇÃO CORE ====================
@@ -87,7 +111,7 @@ local FloatStroke = Instance.new("UIStroke", FloatBtn)
 FloatStroke.Color = Color3.fromRGB(150, 0, 0)
 FloatStroke.Thickness = 1.5
 
--- ==================== JANELA PRINCIPAL (CANVAS GROUP) ====================
+-- ==================== JANELA PRINCIPAL ====================
 local Main = Instance.new("CanvasGroup", ScreenGui)
 Main.AnchorPoint = Vector2.new(0.5, 0.5)
 Main.Size = UDim2.new(0, UI_WIDTH, 0, UI_HEIGHT) 
@@ -187,11 +211,11 @@ local function CriarToggle(yPos, texto, flagName)
     end)
 end
 
-CriarToggle(12, "X-RAY MINÉRIOS", "ESP")
+CriarToggle(12, "X-RAY MINÉRIOS V2", "ESP")
 CriarToggle(56, "INSTANT MINE", "InstantMine")
 CriarToggle(100, "SPEED MODERADO", "Speed")
 
--- ==================== CONTROLES DE UI (FADE & DRAG) ====================
+-- ==================== CONTROLES DE UI ====================
 local menuAberto = true
 local isMinimized = false
 local isAnimating = false
@@ -258,7 +282,7 @@ end
 ConfigurarArrastar(Main)
 ConfigurarArrastar(FloatBtn)
 
--- ==================== SISTEMA DA INTRODUÇÃO AKAT ====================
+-- ==================== INTRODUÇÃO AKAT ====================
 local function ExecutarIntro()
     local Blur = Instance.new("BlurEffect")
     Blur.Size = 0
@@ -309,7 +333,6 @@ local function ExecutarIntro()
     IntroFrame:Destroy()
     Blur:Destroy()
 
-    -- Revela a UI após a Intro
     FloatBtn.Visible = true
     Main.Visible = true
     ContentFrame.Visible = true
@@ -317,42 +340,113 @@ local function ExecutarIntro()
     Animar(Main, {GroupTransparency = 0}, 0.3, Enum.EasingStyle.Sine)
 end
 
--- ==================== LÓGICA DOS CHEATS ====================
-
--- 1. X-Ray (ESP Inteligente Corrigido)
-local function GetOreInfo(obj)
-    local name = obj.Name:lower()
-    
-    -- Ignora terras, pedras comuns e cenários
-    if name:find("stone") or name:find("pedra") or name:find("dirt") or name:find("terra") or name:find("baseplate") then 
-        return nil 
-    end
-    
-    -- Checa minérios configurados
-    for key, info in pairs(ORES_CONFIG) do
-        if name:find(key) then 
-            return info 
+-- ==================== LÓGICA DO X-RAY V2 (OTIMIZADO) ====================
+local function IsIgnored(name)
+    name = name:lower()
+    for _, keyword in ipairs(IGNORE_KEYWORDS) do
+        if name:find(keyword) then
+            return true
         end
     end
-    
-    -- Fallback: Se tiver ProximityPrompt ou contiver "ore"/"minerio" no nome
-    if name:find("ore") or name:find("minerio") or obj:FindFirstChildOfClass("ProximityPrompt") then
-        return {Name = obj.Name, Color = Color3.fromRGB(255, 215, 0)}
+    return false
+end
+
+local function GetOreInfo(obj)
+    if not obj or not obj.Parent then return nil end
+
+    local name = obj.Name:lower()
+    if IsIgnored(name) then return nil end
+
+    for key, info in pairs(ORES_CONFIG) do
+        if name:find(key) then
+            return info, (RARITY_PRIORITY[key] or 1)
+        end
     end
-    
+
+    if name:find("ore") or name:find("minerio") or name:find("gem") or name:find("cristal") then
+        return {Name = obj.Name, Color = Color3.fromRGB(255, 200, 50)}, 2
+    end
+
+    if obj:FindFirstChildOfClass("ProximityPrompt") then
+        return {Name = obj.Name, Color = Color3.fromRGB(255, 180, 0)}, 2
+    end
+
+    if obj:GetAttribute("Health") or obj:GetAttribute("HP") or obj:GetAttribute("Durability") then
+        return {Name = obj.Name, Color = Color3.fromRGB(200, 200, 100)}, 1
+    end
+
     return nil
 end
 
+local function GetTargetPart(obj)
+    if obj:IsA("BasePart") then
+        return obj
+    elseif obj:IsA("Model") then
+        return obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart", true)
+    end
+    return nil
+end
+
+local function ClearESP(obj)
+    local data = espCache[obj]
+    if not data then return end
+
+    pcall(function()
+        if data.Highlight and data.Highlight.Parent then data.Highlight:Destroy() end
+        if data.Billboard and data.Billboard.Parent then data.Billboard:Destroy() end
+    end)
+    espCache[obj] = nil
+end
+
 local function ClearAllESP()
-    for obj, data in pairs(espCache) do
-        if data then
-            pcall(function()
-                if data.Highlight then data.Highlight:Destroy() end
-                if data.Billboard then data.Billboard:Destroy() end
-            end)
-        end
+    for obj in pairs(espCache) do
+        ClearESP(obj)
     end
     table.clear(espCache)
+end
+
+local function CreateESP(obj, oreInfo, priority)
+    if espCache[obj] then return end
+
+    local targetPart = GetTargetPart(obj)
+    if not targetPart then return end
+
+    local hl = Instance.new("Highlight")
+    hl.Adornee = obj
+    hl.FillColor = oreInfo.Color
+    hl.FillTransparency = 0.72
+    hl.OutlineColor = oreInfo.Color
+    hl.OutlineTransparency = 0
+    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    hl.Parent = obj
+
+    local bgui = Instance.new("BillboardGui")
+    bgui.Adornee = targetPart
+    bgui.Size = UDim2.new(0, 110, 0, 28)
+    bgui.StudsOffset = Vector3.new(0, 2.8, 0)
+    bgui.AlwaysOnTop = true
+    bgui.MaxDistance = MAX_DISTANCE + 20
+    bgui.Parent = targetPart
+
+    local txt = Instance.new("TextLabel")
+    txt.Size = UDim2.new(1, 0, 1, 0)
+    txt.BackgroundTransparency = 1
+    txt.Text = oreInfo.Name
+    txt.TextColor3 = oreInfo.Color
+    txt.TextStrokeTransparency = 0.3
+    txt.TextStrokeColor3 = Color3.new(0, 0, 0)
+    txt.Font = Enum.Font.GothamBold
+    txt.TextSize = 13
+    txt.Parent = bgui
+
+    espCache[obj] = {
+        Highlight = hl,
+        Billboard = bgui,
+        Label = txt,
+        Name = oreInfo.Name,
+        Priority = priority or 1,
+        Part = targetPart
+    }
 end
 
 local function UpdateESP()
@@ -363,53 +457,66 @@ local function UpdateESP()
         return
     end
 
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("Model") or obj:IsA("BasePart") then
-            local oreInfo = GetOreInfo(obj)
-            
-            if oreInfo then
-                if not espCache[obj] then
-                    local targetPart = obj:IsA("BasePart") and obj or (obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChildOfClass("BasePart")))
-                    
-                    if targetPart then
-                        local color = oreInfo.Color
-                        
-                        -- Highlight Outline + Fill
-                        local hl = Instance.new("Highlight")
-                        hl.Parent = obj
-                        hl.Adornee = obj
-                        hl.FillColor = color
-                        hl.FillTransparency = 0.8
-                        hl.OutlineColor = color
-                        hl.OutlineTransparency = 0
-                        hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-                        
-                        -- Nome do Minério Flutuante
-                        local bgui = Instance.new("BillboardGui")
-                        bgui.Parent = targetPart
-                        bgui.Adornee = targetPart
-                        bgui.Size = UDim2.new(0, 100, 0, 20)
-                        bgui.StudsOffset = Vector3.new(0, 2.5, 0)
-                        bgui.AlwaysOnTop = true
-                        
-                        local txt = Instance.new("TextLabel", bgui)
-                        txt.Size = UDim2.new(1, 0, 1, 0)
-                        txt.BackgroundTransparency = 1
-                        txt.Text = oreInfo.Name
-                        txt.TextColor3 = color
-                        txt.TextStrokeTransparency = 0
-                        txt.Font = Enum.Font.GothamBold
-                        txt.TextSize = 12
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
 
-                        espCache[obj] = {Highlight = hl, Billboard = bgui}
+    local myPos = root.Position
+    local candidates = {}
+
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if (obj:IsA("Model") or obj:IsA("BasePart")) and not espCache[obj] then
+            local oreInfo, priority = GetOreInfo(obj)
+            if oreInfo then
+                local part = GetTargetPart(obj)
+                if part then
+                    local dist = (part.Position - myPos).Magnitude
+                    if dist <= MAX_DISTANCE then
+                        table.insert(candidates, {
+                            Object = obj,
+                            Info = oreInfo,
+                            Priority = priority,
+                            Distance = dist
+                        })
                     end
+                end
+            end
+        end
+    end
+
+    -- Ordenação corrigida (~= ao invés de \~=)
+    table.sort(candidates, function(a, b)
+        if a.Priority ~= b.Priority then
+            return a.Priority > b.Priority
+        end
+        return a.Distance < b.Distance
+    end)
+
+    local created = 0
+    for _, data in ipairs(candidates) do
+        if created >= MAX_HIGHLIGHTS then break end
+        if not espCache[data.Object] then
+            CreateESP(data.Object, data.Info, data.Priority)
+            created = created + 1
+        end
+    end
+
+    for obj, data in pairs(espCache) do
+        if not obj.Parent or not data.Part or not data.Part.Parent then
+            ClearESP(obj)
+        else
+            local dist = (data.Part.Position - myPos).Magnitude
+            if dist > MAX_DISTANCE + 15 then
+                ClearESP(obj)
+            else
+                if data.Label then
+                    data.Label.Text = string.format("%s\n%.0fm", data.Name, dist)
                 end
             end
         end
     end
 end
 
--- 2. Instant Mine (Zero Health/Durability Direto no Bloco)
+-- ==================== OUTROS CHEATS ====================
 local function ForceBreakBlocks()
     if not flags.InstantMine then return end
     
@@ -434,10 +541,9 @@ local function ForceBreakBlocks()
     end
 end
 
--- 3. Loop Principal
+-- ==================== LOOPS PRINCIPAIS ====================
 RunService.Heartbeat:Connect(function()
-    local char = player.Character
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local hum = character and character:FindFirstChildOfClass("Humanoid")
 
     if hum then
         if flags.Speed then
@@ -452,23 +558,27 @@ RunService.Heartbeat:Connect(function()
     ForceBreakBlocks()
 end)
 
--- Task separada para o X-Ray não gerar lag no Mobile
+-- Loop otimizado do X-Ray V2
 task.spawn(function()
-    while task.wait(1) do
-        UpdateESP()
+    while true do
+        task.wait(UPDATE_INTERVAL)
+        if flags.ESP then
+            pcall(UpdateESP)
+        end
     end
 end)
 
--- Limpeza de Memória quando o minério é destruído
+-- Eventos de Limpeza
 workspace.DescendantRemoving:Connect(function(obj)
     if espCache[obj] then
-        pcall(function()
-            if espCache[obj].Highlight then espCache[obj].Highlight:Destroy() end
-            if espCache[obj].Billboard then espCache[obj].Billboard:Destroy() end
-        end)
-        espCache[obj] = nil
+        ClearESP(obj)
     end
 end)
 
--- Inicia a Intro
+player.CharacterAdded:Connect(function(char)
+    character = char
+    ClearAllESP()
+end)
+
+-- Inicia a Introdução
 task.spawn(ExecutarIntro)
