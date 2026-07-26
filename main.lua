@@ -1,6 +1,6 @@
 -- [[
 --     AKAT | JULES RNG (THE MINE) - PERFECT SYNCHRONIZED & ROTATING GRADIENTS
---     Otimizado para Delta Mobile 2026
+--     Otimizado para Delta Mobile 2026 (Fix: CanvasGroup & Neon Effect)
 -- ]]
 
 local Players = game:GetService("Players")
@@ -68,9 +68,9 @@ local IGNORE_KEYWORDS = {
 local function CriarGradienteRotativo(parent, speed)
     local grad = Instance.new("UIGradient")
     grad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromHex("#8B0000")),
+        ColorSequenceKeypoint.new(0, Color3.fromHex("#FF1E1E")),
         ColorSequenceKeypoint.new(0.5, Color3.fromRGB(15, 15, 15)),
-        ColorSequenceKeypoint.new(1, Color3.fromHex("#8B0000"))
+        ColorSequenceKeypoint.new(1, Color3.fromHex("#FF1E1E"))
     })
     grad.Parent = parent
 
@@ -82,7 +82,7 @@ end
 local function Animar(obj, goal, time, style, dir)
     local tween = TweenService:Create(
         obj, 
-        TweenInfo.new(time or 0.18, style or Enum.EasingStyle.Quad, dir or Enum.EasingDirection.Out), 
+        TweenInfo.new(time or 0.2, style or Enum.EasingStyle.Quart, dir or Enum.EasingDirection.Out), 
         goal
     )
     tween:Play()
@@ -312,11 +312,11 @@ pcall(function() uiParent = CoreGui end)
 if uiParent:FindFirstChild("DeltaAkatTheMineGui") then uiParent.DeltaAkatTheMineGui:Destroy() end
 ScreenGui.Parent = uiParent
 
--- ==================== BOTÃO FLUTUANTE (MM2) ====================
+-- ==================== BOTÃO FLUTUANTE ====================
 local FloatBtn = Instance.new("ImageButton", ScreenGui)
 FloatBtn.Name = "FloatBtn"
 FloatBtn.AnchorPoint = Vector2.new(0.5, 0.5)
-FloatBtn.Size = UDim2.new(0, 46, 0, 46)
+FloatBtn.Size = UDim2.new(0, 0, 0, 0) -- Iniciado em 0 para efeito Pop-in
 FloatBtn.Position = UDim2.new(0.1, 0, 0.35, 0)
 FloatBtn.Image = "rbxthumb://type=Asset&id=99997714241420&w=150&h=150"
 FloatBtn.ImageColor3 = Color3.fromRGB(255, 255, 255)
@@ -327,10 +327,10 @@ Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(0, 8)
 
 local FloatStroke = Instance.new("UIStroke", FloatBtn)
 FloatStroke.Thickness = 1.4
-FloatStroke.Color = Color3.fromHex("#8B0000")
+FloatStroke.Color = Color3.fromHex("#FF1E1E")
 CriarGradienteRotativo(FloatStroke, 3)
 
--- ==================== JANELA PRINCIPAL ====================
+-- ==================== JANELA PRINCIPAL (CANVASGROUP ÚNICO) ====================
 local Main = Instance.new("CanvasGroup", ScreenGui)
 Main.AnchorPoint = Vector2.new(0.5, 0.5)
 Main.Size = UDim2.new(0, UI_WIDTH, 0, UI_HEIGHT) 
@@ -342,7 +342,7 @@ Main.ClipsDescendants = true
 
 local MainStroke = Instance.new("UIStroke", Main)
 MainStroke.Thickness = 1.5
-MainStroke.Color = Color3.fromHex("#8B0000")
+MainStroke.Color = Color3.fromHex("#FF1E1E")
 CriarGradienteRotativo(MainStroke, 4)
 Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10)
 
@@ -357,45 +357,44 @@ TitleContainer.Size = UDim2.new(0.82, 0, 1, 0)
 TitleContainer.Position = UDim2.new(0, 12, 0, 0)
 TitleContainer.BackgroundTransparency = 1
 
--- Badge AKAT (Fundo com Bordas Arredondadas e Altura Reduzida)
+-- Badge AKAT com Efeito NEON Reconstruído
 local AkatBadge = Instance.new("Frame", TitleContainer)
 AkatBadge.AnchorPoint = Vector2.new(0, 0.5)
-AkatBadge.Size = UDim2.new(0, 48, 0, 18) -- Altura abaixada ligeiramente (22 -> 18)
+AkatBadge.Size = UDim2.new(0, 48, 0, 18)
 AkatBadge.Position = UDim2.new(0, 0, 0.5, 0)
-AkatBadge.BackgroundColor3 = Color3.fromRGB(32, 10, 12)
+AkatBadge.BackgroundColor3 = Color3.fromRGB(45, 8, 10)
 AkatBadge.BorderSizePixel = 0
 AkatBadge.ZIndex = 2
 Instance.new("UICorner", AkatBadge).CornerRadius = UDim.new(0, 5)
 
--- Efeito Glow / Drop Shadow Neon atras da caixinha AKAT
+-- Borda Neon Vibrante no Badge AKAT
+local AkatBadgeStroke = Instance.new("UIStroke", AkatBadge)
+AkatBadgeStroke.Thickness = 1.2
+AkatBadgeStroke.Color = Color3.fromRGB(255, 30, 30)
+
+-- Glow Neon Interno/Externo
 local AkatGlow = Instance.new("ImageLabel", AkatBadge)
 AkatGlow.Name = "AkatGlow"
 AkatGlow.AnchorPoint = Vector2.new(0.5, 0.5)
 AkatGlow.Position = UDim2.new(0.5, 0, 0.5, 0)
-AkatGlow.Size = UDim2.new(1, 16, 1, 16)
+AkatGlow.Size = UDim2.new(1, 12, 1, 12)
 AkatGlow.BackgroundTransparency = 1
-AkatGlow.Image = "rbxassetid://6015180143"
-AkatGlow.ImageColor3 = Color3.fromHex("#8B0000")
-AkatGlow.ImageTransparency = 0.25
-AkatGlow.ScaleType = Enum.ScaleType.Slice
-AkatGlow.SliceCenter = Rect.new(49, 49, 101, 101)
+AkatGlow.Image = "rbxassetid://5028857472" -- Textura de Glow Neon Universal
+AkatGlow.ImageColor3 = Color3.fromRGB(255, 30, 30)
+AkatGlow.ImageTransparency = 0.15
 AkatGlow.ZIndex = 1
-
-local AkatBadgeStroke = Instance.new("UIStroke", AkatBadge)
-AkatBadgeStroke.Thickness = 1
-AkatBadgeStroke.Color = Color3.fromHex("#8B0000")
 
 local TitleAkat = Instance.new("TextLabel", AkatBadge)
 TitleAkat.Size = UDim2.new(1, 0, 1, 0)
 TitleAkat.Text = "AKAT"
-TitleAkat.TextColor3 = Color3.fromRGB(255, 60, 60)
+TitleAkat.TextColor3 = Color3.fromRGB(255, 100, 100)
 TitleAkat.Font = Enum.Font.GothamBold
 TitleAkat.TextSize = 11
 TitleAkat.TextXAlignment = Enum.TextXAlignment.Center
 TitleAkat.BackgroundTransparency = 1
 TitleAkat.ZIndex = 3
 
--- Nome do Jogo (Logo ao Lado Direito do Badge)
+-- Nome do Jogo
 local TitleGame = Instance.new("TextLabel", TitleContainer)
 TitleGame.AnchorPoint = Vector2.new(0, 0.5)
 TitleGame.Size = UDim2.new(1, -56, 1, 0)
@@ -419,7 +418,7 @@ MinimizeBtn.TextSize = 14
 Instance.new("UICorner", MinimizeBtn).CornerRadius = UDim.new(0, 6)
 
 local MinStroke = Instance.new("UIStroke", MinimizeBtn)
-MinStroke.Color = Color3.fromHex("#8B0000")
+MinStroke.Color = Color3.fromHex("#FF1E1E")
 MinStroke.Thickness = 1
 CriarGradienteRotativo(MinStroke, 3)
 
@@ -429,13 +428,12 @@ Separator.Position = UDim2.new(0.03, 0, 0, HEADER_HEIGHT)
 Separator.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
 Separator.BorderSizePixel = 0
 
--- Container de Conteúdo (CanvasGroup para garantir transições suaves e perfeitamente sincronizadas)
-local ContentFrame = Instance.new("CanvasGroup", Main)
+-- Container de Conteúdo (Convertido para FRAME normal para evitar Bugs do CanvasGroup)
+local ContentFrame = Instance.new("Frame", Main)
 ContentFrame.Size = UDim2.new(1, 0, 0, UI_HEIGHT - HEADER_HEIGHT - 1)
 ContentFrame.Position = UDim2.new(0, 0, 0, HEADER_HEIGHT + 1)
 ContentFrame.BackgroundTransparency = 1
 ContentFrame.BorderSizePixel = 0
-ContentFrame.GroupTransparency = 0
 ContentFrame.ClipsDescendants = true
 
 -- ==================== CONSTRUTOR DE TOGGLES ====================
@@ -481,8 +479,8 @@ local function CriarToggle(yPos, texto, flagName)
         if flags[flagName] then
             btn.Text = "ON"
             btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            btnStroke.Color = Color3.fromHex("#8B0000")
-            Animar(btn, {BackgroundColor3 = Color3.fromRGB(130, 15, 15)}, 0.12)
+            btnStroke.Color = Color3.fromHex("#FF1E1E")
+            Animar(btn, {BackgroundColor3 = Color3.fromRGB(150, 20, 20)}, 0.12)
         else
             btn.Text = "OFF"
             btn.TextColor3 = Color3.fromRGB(150, 150, 150)
@@ -501,33 +499,18 @@ CriarToggle(100, "SPEED MOD", "Speed")
 -- ==================== CONTROLES DA UI E ANIMAÇÕES SINCRONIZADAS ====================
 local menuAberto = true
 local isMinimized = false
-
-local mainTween = nil
-local contentTween = nil
+local currentMainTween = nil
 
 local function ToggleMenu(open)
     menuAberto = open
-    if mainTween then mainTween:Cancel() end
-    if contentTween then contentTween:Cancel() end
-    
+    if currentMainTween then currentMainTween:Cancel() end
+
     if open then
         Main.Visible = true
-        RunService.RenderStepped:Wait() -- Garante o buffer do CanvasGroup antes de iniciar o fade
-        
-        local targetHeight = isMinimized and HEADER_HEIGHT or UI_HEIGHT
-        Main.Size = UDim2.new(0, UI_WIDTH, 0, targetHeight)
-        
-        if not isMinimized then
-            ContentFrame.Visible = true
-            ContentFrame.GroupTransparency = 0
-        else
-            ContentFrame.Visible = false
-        end
-        
-        mainTween = Animar(Main, {GroupTransparency = 0}, 0.2)
+        currentMainTween = Animar(Main, {GroupTransparency = 0}, 0.22)
     else
-        mainTween = Animar(Main, {GroupTransparency = 1}, 0.18)
-        mainTween.Completed:Connect(function(state)
+        currentMainTween = Animar(Main, {GroupTransparency = 1}, 0.18)
+        currentMainTween.Completed:Connect(function(state)
             if state == Enum.PlaybackState.Completed and not menuAberto then
                 Main.Visible = false
             end
@@ -544,28 +527,9 @@ MinimizeBtn.MouseButton1Click:Connect(function()
     EfeitoClique(MinimizeBtn)
     isMinimized = not isMinimized
     MinimizeBtn.Text = isMinimized and "+" or "-"
-    
-    if mainTween then mainTween:Cancel() end
-    if contentTween then contentTween:Cancel() end
 
     local targetHeight = isMinimized and HEADER_HEIGHT or UI_HEIGHT
-
-    if isMinimized then
-        contentTween = Animar(ContentFrame, {GroupTransparency = 1}, 0.15)
-        mainTween = Animar(Main, {Size = UDim2.new(0, UI_WIDTH, 0, targetHeight)}, 0.2)
-        
-        mainTween.Completed:Connect(function(state)
-            if state == Enum.PlaybackState.Completed and isMinimized then
-                ContentFrame.Visible = false
-            end
-        end)
-    else
-        ContentFrame.Visible = true
-        ContentFrame.GroupTransparency = 1
-        
-        mainTween = Animar(Main, {Size = UDim2.new(0, UI_WIDTH, 0, targetHeight)}, 0.2)
-        contentTween = Animar(ContentFrame, {GroupTransparency = 0}, 0.2)
-    end
+    Animar(Main, {Size = UDim2.new(0, UI_WIDTH, 0, targetHeight)}, 0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
 end)
 
 local function ConfigurarArrastar(inst)
@@ -614,7 +578,7 @@ local function ExecutarIntro()
 
     local CardStroke = Instance.new("UIStroke", Card)
     CardStroke.Thickness = 1.5
-    CardStroke.Color = Color3.fromHex("#8B0000")
+    CardStroke.Color = Color3.fromHex("#FF1E1E")
     CardStroke.Transparency = 1
     CriarGradienteRotativo(CardStroke, 2)
 
@@ -625,7 +589,7 @@ local function ExecutarIntro()
     IntroText.Font = Enum.Font.GothamBold
     IntroText.TextSize = 20
     IntroText.RichText = true
-    IntroText.Text = '<font color="#FFFFFF">AKAT</font> <font color="#8B0000">COMMUNITY</font>'
+    IntroText.Text = '<font color="#FFFFFF">AKAT</font> <font color="#FF1E1E">COMMUNITY</font>'
     IntroText.TextTransparency = 1
     IntroText.ZIndex = 502
 
@@ -663,8 +627,6 @@ local function ExecutarIntro()
 
     FloatBtn.Visible = true
     Main.Visible = true
-    ContentFrame.Visible = true
-    ContentFrame.GroupTransparency = 0
     Main.GroupTransparency = 1
 
     Animar(FloatBtn, {Size = UDim2.new(0, 46, 0, 46)}, 0.25)
