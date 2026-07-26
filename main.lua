@@ -1,6 +1,6 @@
 -- [[
---     AKAT | JULES RNG (THE MINE) - PERFECT SYNCHRONIZED & ROTATING GRADIENTS
---     Otimizado para Delta Mobile 2026 (Fix: CanvasGroup & Neon Effect)
+--     AKAT | JULES RNG (THE MINE) - DARK RED EDITION
+--     Otimizado para Delta Mobile 2026 (Fix: UI Sync, Neon Bug & Clean Toggles)
 -- ]]
 
 local Players = game:GetService("Players")
@@ -27,6 +27,10 @@ local DEFAULT_SPEED = 16
 local UI_WIDTH = 370
 local HEADER_HEIGHT = 42
 local UI_HEIGHT = 200
+
+-- Cores do Tema
+local DARK_RED = Color3.fromRGB(139, 0, 0)
+local AKAT_RED = Color3.fromRGB(220, 30, 30)
 
 -- Configurações do X-Ray V2
 local MAX_DISTANCE = 180          
@@ -68,9 +72,9 @@ local IGNORE_KEYWORDS = {
 local function CriarGradienteRotativo(parent, speed)
     local grad = Instance.new("UIGradient")
     grad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromHex("#FF1E1E")),
+        ColorSequenceKeypoint.new(0, DARK_RED),
         ColorSequenceKeypoint.new(0.5, Color3.fromRGB(15, 15, 15)),
-        ColorSequenceKeypoint.new(1, Color3.fromHex("#FF1E1E"))
+        ColorSequenceKeypoint.new(1, DARK_RED)
     })
     grad.Parent = parent
 
@@ -82,7 +86,7 @@ end
 local function Animar(obj, goal, time, style, dir)
     local tween = TweenService:Create(
         obj, 
-        TweenInfo.new(time or 0.2, style or Enum.EasingStyle.Quart, dir or Enum.EasingDirection.Out), 
+        TweenInfo.new(time or 0.15, style or Enum.EasingStyle.Quart, dir or Enum.EasingDirection.Out), 
         goal
     )
     tween:Play()
@@ -98,7 +102,7 @@ local function EfeitoClique(btn)
         
         Animar(btn, {Size = UDim2.new(origSize.X.Scale, origSize.X.Offset - 2, origSize.Y.Scale, origSize.Y.Offset - 2)}, 0.05)
         task.wait(0.05)
-        Animar(btn, {Size = origSize}, 0.1)
+        Animar(btn, {Size = origSize}, 0.08)
     end)
 end
 
@@ -316,7 +320,7 @@ ScreenGui.Parent = uiParent
 local FloatBtn = Instance.new("ImageButton", ScreenGui)
 FloatBtn.Name = "FloatBtn"
 FloatBtn.AnchorPoint = Vector2.new(0.5, 0.5)
-FloatBtn.Size = UDim2.new(0, 0, 0, 0) -- Iniciado em 0 para efeito Pop-in
+FloatBtn.Size = UDim2.new(0, 0, 0, 0)
 FloatBtn.Position = UDim2.new(0.1, 0, 0.35, 0)
 FloatBtn.Image = "rbxthumb://type=Asset&id=99997714241420&w=150&h=150"
 FloatBtn.ImageColor3 = Color3.fromRGB(255, 255, 255)
@@ -327,10 +331,10 @@ Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(0, 8)
 
 local FloatStroke = Instance.new("UIStroke", FloatBtn)
 FloatStroke.Thickness = 1.4
-FloatStroke.Color = Color3.fromHex("#FF1E1E")
+FloatStroke.Color = DARK_RED
 CriarGradienteRotativo(FloatStroke, 3)
 
--- ==================== JANELA PRINCIPAL (CANVASGROUP ÚNICO) ====================
+-- ==================== JANELA PRINCIPAL ====================
 local Main = Instance.new("CanvasGroup", ScreenGui)
 Main.AnchorPoint = Vector2.new(0.5, 0.5)
 Main.Size = UDim2.new(0, UI_WIDTH, 0, UI_HEIGHT) 
@@ -342,7 +346,7 @@ Main.ClipsDescendants = true
 
 local MainStroke = Instance.new("UIStroke", Main)
 MainStroke.Thickness = 1.5
-MainStroke.Color = Color3.fromHex("#FF1E1E")
+MainStroke.Color = DARK_RED
 CriarGradienteRotativo(MainStroke, 4)
 Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10)
 
@@ -357,37 +361,26 @@ TitleContainer.Size = UDim2.new(0.82, 0, 1, 0)
 TitleContainer.Position = UDim2.new(0, 12, 0, 0)
 TitleContainer.BackgroundTransparency = 1
 
--- Badge AKAT com Efeito NEON Reconstruído
+-- Badge AKAT (Cor Mantida & Efeito Neon Corrigido)
 local AkatBadge = Instance.new("Frame", TitleContainer)
 AkatBadge.AnchorPoint = Vector2.new(0, 0.5)
 AkatBadge.Size = UDim2.new(0, 48, 0, 18)
 AkatBadge.Position = UDim2.new(0, 0, 0.5, 0)
-AkatBadge.BackgroundColor3 = Color3.fromRGB(45, 8, 10)
+AkatBadge.BackgroundColor3 = AKAT_RED
 AkatBadge.BorderSizePixel = 0
 AkatBadge.ZIndex = 2
 Instance.new("UICorner", AkatBadge).CornerRadius = UDim.new(0, 5)
 
--- Borda Neon Vibrante no Badge AKAT
+-- Borda Neon do Badge AKAT
 local AkatBadgeStroke = Instance.new("UIStroke", AkatBadge)
 AkatBadgeStroke.Thickness = 1.2
-AkatBadgeStroke.Color = Color3.fromRGB(255, 30, 30)
-
--- Glow Neon Interno/Externo
-local AkatGlow = Instance.new("ImageLabel", AkatBadge)
-AkatGlow.Name = "AkatGlow"
-AkatGlow.AnchorPoint = Vector2.new(0.5, 0.5)
-AkatGlow.Position = UDim2.new(0.5, 0, 0.5, 0)
-AkatGlow.Size = UDim2.new(1, 12, 1, 12)
-AkatGlow.BackgroundTransparency = 1
-AkatGlow.Image = "rbxassetid://5028857472" -- Textura de Glow Neon Universal
-AkatGlow.ImageColor3 = Color3.fromRGB(255, 30, 30)
-AkatGlow.ImageTransparency = 0.15
-AkatGlow.ZIndex = 1
+AkatBadgeStroke.Color = Color3.fromRGB(255, 80, 80)
+AkatBadgeStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
 local TitleAkat = Instance.new("TextLabel", AkatBadge)
 TitleAkat.Size = UDim2.new(1, 0, 1, 0)
 TitleAkat.Text = "AKAT"
-TitleAkat.TextColor3 = Color3.fromRGB(255, 100, 100)
+TitleAkat.TextColor3 = Color3.fromRGB(255, 255, 255)
 TitleAkat.Font = Enum.Font.GothamBold
 TitleAkat.TextSize = 11
 TitleAkat.TextXAlignment = Enum.TextXAlignment.Center
@@ -418,7 +411,7 @@ MinimizeBtn.TextSize = 14
 Instance.new("UICorner", MinimizeBtn).CornerRadius = UDim.new(0, 6)
 
 local MinStroke = Instance.new("UIStroke", MinimizeBtn)
-MinStroke.Color = Color3.fromHex("#FF1E1E")
+MinStroke.Color = DARK_RED
 MinStroke.Thickness = 1
 CriarGradienteRotativo(MinStroke, 3)
 
@@ -428,7 +421,7 @@ Separator.Position = UDim2.new(0.03, 0, 0, HEADER_HEIGHT)
 Separator.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
 Separator.BorderSizePixel = 0
 
--- Container de Conteúdo (Convertido para FRAME normal para evitar Bugs do CanvasGroup)
+-- Container de Conteúdo
 local ContentFrame = Instance.new("Frame", Main)
 ContentFrame.Size = UDim2.new(1, 0, 0, UI_HEIGHT - HEADER_HEIGHT - 1)
 ContentFrame.Position = UDim2.new(0, 0, 0, HEADER_HEIGHT + 1)
@@ -436,7 +429,7 @@ ContentFrame.BackgroundTransparency = 1
 ContentFrame.BorderSizePixel = 0
 ContentFrame.ClipsDescendants = true
 
--- ==================== CONSTRUTOR DE TOGGLES ====================
+-- ==================== CONSTRUTOR DE TOGGLES (ESTILO PADRÃO MANTIDO) ====================
 local function CriarToggle(yPos, texto, flagName)
     local row = Instance.new("Frame", ContentFrame)
     row.Size = UDim2.new(0.94, 0, 0, 40)
@@ -479,13 +472,11 @@ local function CriarToggle(yPos, texto, flagName)
         if flags[flagName] then
             btn.Text = "ON"
             btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            btnStroke.Color = Color3.fromHex("#FF1E1E")
-            Animar(btn, {BackgroundColor3 = Color3.fromRGB(150, 20, 20)}, 0.12)
+            btnStroke.Color = DARK_RED
         else
             btn.Text = "OFF"
             btn.TextColor3 = Color3.fromRGB(150, 150, 150)
             btnStroke.Color = Color3.fromRGB(45, 45, 50)
-            Animar(btn, {BackgroundColor3 = Color3.fromRGB(28, 28, 32)}, 0.12)
             
             if flagName == "ESP" then ClearAllESP() end
         end
@@ -507,9 +498,9 @@ local function ToggleMenu(open)
 
     if open then
         Main.Visible = true
-        currentMainTween = Animar(Main, {GroupTransparency = 0}, 0.22)
+        currentMainTween = Animar(Main, {GroupTransparency = 0}, 0.15)
     else
-        currentMainTween = Animar(Main, {GroupTransparency = 1}, 0.18)
+        currentMainTween = Animar(Main, {GroupTransparency = 1}, 0.15)
         currentMainTween.Completed:Connect(function(state)
             if state == Enum.PlaybackState.Completed and not menuAberto then
                 Main.Visible = false
@@ -529,7 +520,7 @@ MinimizeBtn.MouseButton1Click:Connect(function()
     MinimizeBtn.Text = isMinimized and "+" or "-"
 
     local targetHeight = isMinimized and HEADER_HEIGHT or UI_HEIGHT
-    Animar(Main, {Size = UDim2.new(0, UI_WIDTH, 0, targetHeight)}, 0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+    Animar(Main, {Size = UDim2.new(0, UI_WIDTH, 0, targetHeight)}, 0.18, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
 end)
 
 local function ConfigurarArrastar(inst)
@@ -578,7 +569,7 @@ local function ExecutarIntro()
 
     local CardStroke = Instance.new("UIStroke", Card)
     CardStroke.Thickness = 1.5
-    CardStroke.Color = Color3.fromHex("#FF1E1E")
+    CardStroke.Color = DARK_RED
     CardStroke.Transparency = 1
     CriarGradienteRotativo(CardStroke, 2)
 
@@ -589,7 +580,7 @@ local function ExecutarIntro()
     IntroText.Font = Enum.Font.GothamBold
     IntroText.TextSize = 20
     IntroText.RichText = true
-    IntroText.Text = '<font color="#FFFFFF">AKAT</font> <font color="#FF1E1E">COMMUNITY</font>'
+    IntroText.Text = '<font color="#FFFFFF">AKAT</font> <font color="#8B0000">COMMUNITY</font>'
     IntroText.TextTransparency = 1
     IntroText.ZIndex = 502
 
@@ -604,23 +595,23 @@ local function ExecutarIntro()
     SubText.TextTransparency = 1
     SubText.ZIndex = 502
 
-    Animar(IntroFrame, {BackgroundTransparency = 0.25}, 0.4) 
-    Animar(Blur, {Size = 20}, 0.4) 
-    task.wait(0.15)
+    Animar(IntroFrame, {BackgroundTransparency = 0.25}, 0.3) 
+    Animar(Blur, {Size = 20}, 0.3) 
+    task.wait(0.12)
 
-    Animar(Card, {BackgroundTransparency = 0.05}, 0.35)
-    Animar(CardStroke, {Transparency = 0}, 0.35)
-    Animar(IntroText, {TextTransparency = 0}, 0.35)
-    Animar(SubText, {TextTransparency = 0}, 0.35)
-    task.wait(1.8) 
+    Animar(Card, {BackgroundTransparency = 0.05}, 0.3)
+    Animar(CardStroke, {Transparency = 0}, 0.3)
+    Animar(IntroText, {TextTransparency = 0}, 0.3)
+    Animar(SubText, {TextTransparency = 0}, 0.3)
+    task.wait(1.5) 
 
-    Animar(IntroText, {TextTransparency = 1}, 0.3)
-    Animar(SubText, {TextTransparency = 1}, 0.3)
-    Animar(Card, {BackgroundTransparency = 1}, 0.3)
-    Animar(CardStroke, {Transparency = 1}, 0.3)
-    Animar(IntroFrame, {BackgroundTransparency = 1}, 0.4)
-    Animar(Blur, {Size = 0}, 0.4)
-    task.wait(0.4)
+    Animar(IntroText, {TextTransparency = 1}, 0.25)
+    Animar(SubText, {TextTransparency = 1}, 0.25)
+    Animar(Card, {BackgroundTransparency = 1}, 0.25)
+    Animar(CardStroke, {Transparency = 1}, 0.25)
+    Animar(IntroFrame, {BackgroundTransparency = 1}, 0.3)
+    Animar(Blur, {Size = 0}, 0.3)
+    task.wait(0.3)
 
     IntroFrame:Destroy()
     Blur:Destroy()
@@ -629,8 +620,8 @@ local function ExecutarIntro()
     Main.Visible = true
     Main.GroupTransparency = 1
 
-    Animar(FloatBtn, {Size = UDim2.new(0, 46, 0, 46)}, 0.25)
-    Animar(Main, {GroupTransparency = 0}, 0.25)
+    Animar(FloatBtn, {Size = UDim2.new(0, 46, 0, 46)}, 0.2)
+    Animar(Main, {GroupTransparency = 0}, 0.2)
 end
 
 -- ==================== CHEATS AUXILIARES ====================
