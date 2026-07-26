@@ -1,7 +1,6 @@
 -- [[
---     AKAT | JULES RNG (THE MINE) - ULTRA OPTIMIZED & FIXED UI
+--     AKAT | JULES RNG (THE MINE) - ULTRA SMOOTH & ROTATING GRADIENTS
 --     Otimizado para Delta Mobile 2026
---     Funções: X-Ray V2 Corrigido, Instant Mine, Speed, UI Animada Sincronizada
 -- ]]
 
 local Players = game:GetService("Players")
@@ -24,10 +23,10 @@ local flags = {
 local SPEED_MULTIPLIER = 32
 local DEFAULT_SPEED = 16
 
--- Dimensões Ajustadas da UI (Sem espaço sobrando)
-local UI_WIDTH = 340
-local HEADER_HEIGHT = 40
-local UI_HEIGHT = 188 
+-- Dimensões Expandidas da UI
+local UI_WIDTH = 370
+local HEADER_HEIGHT = 42
+local UI_HEIGHT = 200
 
 -- Configurações do X-Ray V2
 local MAX_DISTANCE = 180          
@@ -65,11 +64,26 @@ local IGNORE_KEYWORDS = {
     "character", "humanoid", "accessory", "hat", "hair"
 }
 
--- ==================== FUNÇÕES DE ANIMAÇÃO CORE ====================
+-- ==================== GERENCIADOR DE GRADIENTES ROTATIVOS ====================
+local function CriarGradienteRotativo(parent, speed)
+    local grad = Instance.new("UIGradient")
+    grad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromHex("#8B0000")),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(15, 15, 15)),
+        ColorSequenceKeypoint.new(1, Color3.fromHex("#8B0000"))
+    })
+    grad.Parent = parent
+
+    -- Animação contínua e fluida de rotação 360°
+    TweenService:Create(grad, TweenInfo.new(speed or 3.5, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), {Rotation = 360}):Play()
+    return grad
+end
+
+-- ==================== ANIMAÇÕES FLUIDAS (NÃO BLOQUEANTES) ====================
 local function Animar(obj, goal, time, style, dir)
     local tween = TweenService:Create(
         obj, 
-        TweenInfo.new(time or 0.25, style or Enum.EasingStyle.Cubic, dir or Enum.EasingDirection.Out), 
+        TweenInfo.new(time or 0.18, style or Enum.EasingStyle.Quad, dir or Enum.EasingDirection.Out), 
         goal
     )
     tween:Play()
@@ -77,26 +91,16 @@ local function Animar(obj, goal, time, style, dir)
 end
 
 local function EfeitoClique(btn)
-    local origSize = btn:GetAttribute("OriginalSize") or btn.Size
-    if not btn:GetAttribute("OriginalSize") then
-        btn:SetAttribute("OriginalSize", origSize)
-    end
-    
-    Animar(btn, {Size = UDim2.new(origSize.X.Scale, origSize.X.Offset - 2, origSize.Y.Scale, origSize.Y.Offset - 2)}, 0.08, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
-    task.wait(0.08)
-    Animar(btn, {Size = origSize}, 0.15, Enum.EasingStyle.Circular, Enum.EasingDirection.Out)
-end
-
-local function CriarGradienteVermelhoEscuro(parent)
-    local grad = Instance.new("UIGradient")
-    grad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromHex("#8B0000")),
-        ColorSequenceKeypoint.new(0.5, Color3.fromHex("#2B0000")),
-        ColorSequenceKeypoint.new(1, Color3.fromHex("#0A0A0A"))
-    })
-    grad.Rotation = 45
-    grad.Parent = parent
-    return grad
+    task.spawn(function()
+        local origSize = btn:GetAttribute("OriginalSize") or btn.Size
+        if not btn:GetAttribute("OriginalSize") then
+            btn:SetAttribute("OriginalSize", origSize)
+        end
+        
+        Animar(btn, {Size = UDim2.new(origSize.X.Scale, origSize.X.Offset - 2, origSize.Y.Scale, origSize.Y.Offset - 2)}, 0.05)
+        task.wait(0.05)
+        Animar(btn, {Size = origSize}, 0.1)
+    end)
 end
 
 -- ==================== LÓGICA DO X-RAY V2 ====================
@@ -309,11 +313,11 @@ pcall(function() uiParent = CoreGui end)
 if uiParent:FindFirstChild("DeltaAkatTheMineGui") then uiParent.DeltaAkatTheMineGui:Destroy() end
 ScreenGui.Parent = uiParent
 
--- ==================== BOTÃO FLUTUANTE (ESTILO MM2) ====================
+-- ==================== BOTÃO FLUTUANTE (MM2) ====================
 local FloatBtn = Instance.new("ImageButton", ScreenGui)
 FloatBtn.Name = "FloatBtn"
 FloatBtn.AnchorPoint = Vector2.new(0.5, 0.5)
-FloatBtn.Size = UDim2.new(0, 44, 0, 44)
+FloatBtn.Size = UDim2.new(0, 46, 0, 46)
 FloatBtn.Position = UDim2.new(0.1, 0, 0.35, 0)
 FloatBtn.Image = "rbxthumb://type=Asset&id=99997714241420&w=150&h=150"
 FloatBtn.ImageColor3 = Color3.fromRGB(255, 255, 255)
@@ -323,17 +327,9 @@ FloatBtn.ZIndex = 30
 Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(0, 8)
 
 local FloatStroke = Instance.new("UIStroke", FloatBtn)
-FloatStroke.Thickness = 1.2
+FloatStroke.Thickness = 1.4
 FloatStroke.Color = Color3.fromHex("#8B0000")
-
-local FloatGradient = Instance.new("UIGradient", FloatStroke)
-FloatGradient.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromHex("#8B0000")),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(15, 15, 15)),
-    ColorSequenceKeypoint.new(1, Color3.fromHex("#8B0000"))
-})
-
-TweenService:Create(FloatGradient, TweenInfo.new(4, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), {Rotation = 360}):Play()
+CriarGradienteRotativo(FloatStroke, 3)
 
 -- ==================== JANELA PRINCIPAL ====================
 local Main = Instance.new("CanvasGroup", ScreenGui)
@@ -348,22 +344,22 @@ Main.ClipsDescendants = true
 local MainStroke = Instance.new("UIStroke", Main)
 MainStroke.Thickness = 1.5
 MainStroke.Color = Color3.fromHex("#8B0000")
-CriarGradienteVermelhoEscuro(MainStroke)
-Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 9)
+CriarGradienteRotativo(MainStroke, 4)
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10)
 
 -- Cabeçalho
 local Header = Instance.new("Frame", Main)
 Header.Size = UDim2.new(1, 0, 0, HEADER_HEIGHT)
 Header.BackgroundTransparency = 1
 
--- Título com Separador Moderno
+-- Título com Separador Rotativo
 local TitleContainer = Instance.new("Frame", Header)
-TitleContainer.Size = UDim2.new(0.8, 0, 1, 0)
-TitleContainer.Position = UDim2.new(0, 12, 0, 0)
+TitleContainer.Size = UDim2.new(0.82, 0, 1, 0)
+TitleContainer.Position = UDim2.new(0, 14, 0, 0)
 TitleContainer.BackgroundTransparency = 1
 
 local TitleAkat = Instance.new("TextLabel", TitleContainer)
-TitleAkat.Size = UDim2.new(0, 42, 1, 0)
+TitleAkat.Size = UDim2.new(0, 44, 1, 0)
 TitleAkat.Text = "AKAT"
 TitleAkat.TextColor3 = Color3.fromHex("#8B0000")
 TitleAkat.Font = Enum.Font.GothamBold
@@ -371,15 +367,14 @@ TitleAkat.TextSize = 13
 TitleAkat.TextXAlignment = Enum.TextXAlignment.Left
 TitleAkat.BackgroundTransparency = 1
 
--- Separador Moderno (Barra Estilizada ao invés de "|")
 local ModernSeparator = Instance.new("Frame", TitleContainer)
 ModernSeparator.AnchorPoint = Vector2.new(0, 0.5)
-ModernSeparator.Size = UDim2.new(0, 2, 0, 14)
+ModernSeparator.Size = UDim2.new(0, 2, 0, 16)
 ModernSeparator.Position = UDim2.new(0, 48, 0.5, 0)
 ModernSeparator.BackgroundColor3 = Color3.fromHex("#8B0000")
 ModernSeparator.BorderSizePixel = 0
 Instance.new("UICorner", ModernSeparator).CornerRadius = UDim.new(1, 0)
-CriarGradienteVermelhoEscuro(ModernSeparator)
+CriarGradienteRotativo(ModernSeparator, 2.5)
 
 local TitleGame = Instance.new("TextLabel", TitleContainer)
 TitleGame.Size = UDim2.new(1, -58, 1, 0)
@@ -393,18 +388,19 @@ TitleGame.BackgroundTransparency = 1
 
 -- Botão Minimizar
 local MinimizeBtn = Instance.new("TextButton", Header)
-MinimizeBtn.Size = UDim2.new(0, 24, 0, 24)
-MinimizeBtn.Position = UDim2.new(1, -32, 0.5, -12)
+MinimizeBtn.Size = UDim2.new(0, 26, 0, 26)
+MinimizeBtn.Position = UDim2.new(1, -34, 0.5, -13)
 MinimizeBtn.Text = "-"
 MinimizeBtn.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
 MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 MinimizeBtn.Font = Enum.Font.GothamBold
 MinimizeBtn.TextSize = 14
-Instance.new("UICorner", MinimizeBtn).CornerRadius = UDim.new(0, 5)
+Instance.new("UICorner", MinimizeBtn).CornerRadius = UDim.new(0, 6)
+
 local MinStroke = Instance.new("UIStroke", MinimizeBtn)
 MinStroke.Color = Color3.fromHex("#8B0000")
 MinStroke.Thickness = 1
-CriarGradienteVermelhoEscuro(MinStroke)
+CriarGradienteRotativo(MinStroke, 3)
 
 local Separator = Instance.new("Frame", Main)
 Separator.Size = UDim2.new(0.94, 0, 0, 1)
@@ -412,16 +408,16 @@ Separator.Position = UDim2.new(0.03, 0, 0, HEADER_HEIGHT)
 Separator.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
 Separator.BorderSizePixel = 0
 
--- Container de Configurações
+-- Container de Conteúdo
 local ContentFrame = Instance.new("Frame", Main)
 ContentFrame.Size = UDim2.new(1, 0, 1, -HEADER_HEIGHT - 1)
 ContentFrame.Position = UDim2.new(0, 0, 0, HEADER_HEIGHT + 1)
 ContentFrame.BackgroundTransparency = 1
 
--- ==================== CONSTRUTOR DE TOGGLES (TEXTO NO MEIO) ====================
+-- ==================== CONSTRUTOR DE TOGGLES ====================
 local function CriarToggle(yPos, texto, flagName)
     local row = Instance.new("Frame", ContentFrame)
-    row.Size = UDim2.new(0.94, 0, 0, 38)
+    row.Size = UDim2.new(0.94, 0, 0, 40)
     row.Position = UDim2.new(0.03, 0, 0, yPos)
     row.BackgroundColor3 = Color3.fromRGB(16, 16, 20)
     row.BorderSizePixel = 0
@@ -431,7 +427,6 @@ local function CriarToggle(yPos, texto, flagName)
     rowStroke.Color = Color3.fromRGB(30, 30, 35)
     rowStroke.Thickness = 1
 
-    -- Nome centralizado no meio da linha
     local lbl = Instance.new("TextLabel", row)
     lbl.Size = UDim2.new(1, -70, 1, 0)
     lbl.Position = UDim2.new(0, 10, 0, 0)
@@ -443,14 +438,14 @@ local function CriarToggle(yPos, texto, flagName)
     lbl.BackgroundTransparency = 1
 
     local btn = Instance.new("TextButton", row)
-    btn.Size = UDim2.new(0, 50, 0, 22)
-    btn.Position = UDim2.new(1, -56, 0.5, -11)
+    btn.Size = UDim2.new(0, 52, 0, 24)
+    btn.Position = UDim2.new(1, -58, 0.5, -12)
     btn.BackgroundColor3 = Color3.fromRGB(28, 28, 32)
     btn.Text = "OFF"
     btn.TextColor3 = Color3.fromRGB(150, 150, 150)
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 10
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
 
     local btnStroke = Instance.new("UIStroke", btn)
     btnStroke.Color = Color3.fromRGB(45, 45, 50)
@@ -463,68 +458,57 @@ local function CriarToggle(yPos, texto, flagName)
             btn.Text = "ON"
             btn.TextColor3 = Color3.fromRGB(255, 255, 255)
             btnStroke.Color = Color3.fromHex("#8B0000")
-            Animar(btn, {BackgroundColor3 = Color3.fromRGB(120, 10, 10)}, 0.15)
+            Animar(btn, {BackgroundColor3 = Color3.fromRGB(130, 15, 15)}, 0.12)
         else
             btn.Text = "OFF"
             btn.TextColor3 = Color3.fromRGB(150, 150, 150)
             btnStroke.Color = Color3.fromRGB(45, 45, 50)
-            Animar(btn, {BackgroundColor3 = Color3.fromRGB(28, 28, 32)}, 0.15)
+            Animar(btn, {BackgroundColor3 = Color3.fromRGB(28, 28, 32)}, 0.12)
             
             if flagName == "ESP" then ClearAllESP() end
         end
     end)
 end
 
--- Posições perfeitamente ajustadas sem espaço sobrando no final
-CriarToggle(8, "X-RAY MINÉRIOS V2", "ESP")
-CriarToggle(52, "INSTANT MINE", "InstantMine")
-CriarToggle(96, "SPEED MODERADO", "Speed")
+-- Nomes Atualizados & Posições Ajustadas
+CriarToggle(8, "X RAY MINES", "ESP")
+CriarToggle(54, "INSTANT MINE", "InstantMine")
+CriarToggle(100, "SPEED MOD", "Speed")
 
--- ==================== CONTROLES DE UI (ANIMAÇÃO SINCRONIZADA) ====================
+-- ==================== CONTROLES DA UI (EXTREMAMENTE FLUIDOS) ====================
 local menuAberto = true
 local isMinimized = false
-local isAnimating = false
 
 FloatBtn.MouseButton1Click:Connect(function()
-    if isAnimating then return end
-    isAnimating = true
     EfeitoClique(FloatBtn)
-    
     menuAberto = not menuAberto
+    
     if menuAberto then
         Main.Visible = true
         local targetHeight = isMinimized and HEADER_HEIGHT or UI_HEIGHT
         Main.Size = UDim2.new(0, UI_WIDTH, 0, targetHeight)
-        
-        -- Sincronização Perfeita usando GroupTransparency do CanvasGroup
-        local tween = Animar(Main, {GroupTransparency = 0}, 0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
-        tween.Completed:Wait()
+        Animar(Main, {GroupTransparency = 0}, 0.15)
     else
-        local tween = Animar(Main, {GroupTransparency = 1}, 0.18, Enum.EasingStyle.Sine, Enum.EasingDirection.In)
-        tween.Completed:Wait()
-        Main.Visible = false
+        local t = Animar(Main, {GroupTransparency = 1}, 0.15)
+        t.Completed:Connect(function()
+            if not menuAberto then Main.Visible = false end
+        end)
     end
-    isAnimating = false
 end)
 
 MinimizeBtn.MouseButton1Click:Connect(function()
-    if isAnimating or not menuAberto then return end
-    isAnimating = true
     EfeitoClique(MinimizeBtn)
-    
     isMinimized = not isMinimized
+    
     if isMinimized then
         MinimizeBtn.Text = "+"
         ContentFrame.Visible = false
-        local tween = Animar(Main, {Size = UDim2.new(0, UI_WIDTH, 0, HEADER_HEIGHT)}, 0.22, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out)
-        tween.Completed:Wait()
+        Animar(Main, {Size = UDim2.new(0, UI_WIDTH, 0, HEADER_HEIGHT)}, 0.16)
     else
         MinimizeBtn.Text = "-"
         ContentFrame.Visible = true
-        local tween = Animar(Main, {Size = UDim2.new(0, UI_WIDTH, 0, UI_HEIGHT)}, 0.22, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out)
-        tween.Completed:Wait()
+        Animar(Main, {Size = UDim2.new(0, UI_WIDTH, 0, UI_HEIGHT)}, 0.16)
     end
-    isAnimating = false
 end)
 
 local function ConfigurarArrastar(inst)
@@ -549,7 +533,7 @@ end
 ConfigurarArrastar(Main)
 ConfigurarArrastar(FloatBtn)
 
--- ==================== INTRODUÇÃO AKAT ====================
+-- ==================== INTRODUÇÃO ESTILO MM2 (FLUIDA) ====================
 local function ExecutarIntro()
     local Blur = Instance.new("BlurEffect")
     Blur.Size = 0
@@ -557,46 +541,66 @@ local function ExecutarIntro()
 
     local IntroFrame = Instance.new("Frame", ScreenGui)
     IntroFrame.Size = UDim2.new(1, 0, 1, 0)
-    IntroFrame.BackgroundColor3 = Color3.fromRGB(5, 5, 5)
+    IntroFrame.BackgroundColor3 = Color3.fromRGB(5, 5, 7)
     IntroFrame.BackgroundTransparency = 1
     IntroFrame.BorderSizePixel = 0
     IntroFrame.ZIndex = 500
 
-    local IntroText = Instance.new("TextLabel", IntroFrame)
-    IntroText.AnchorPoint = Vector2.new(0.5, 0.5)
-    IntroText.Size = UDim2.new(1, 0, 0, 50)
-    IntroText.Position = UDim2.new(0.5, 0, 0.5, 15) 
+    local Card = Instance.new("Frame", IntroFrame)
+    Card.AnchorPoint = Vector2.new(0.5, 0.5)
+    Card.Size = UDim2.new(0, 290, 0, 70)
+    Card.Position = UDim2.new(0.5, 0, 0.5, 0)
+    Card.BackgroundColor3 = Color3.fromRGB(12, 12, 15)
+    Card.BackgroundTransparency = 1
+    Card.ZIndex = 501
+    Instance.new("UICorner", Card).CornerRadius = UDim.new(0, 10)
+
+    local CardStroke = Instance.new("UIStroke", Card)
+    CardStroke.Thickness = 1.5
+    CardStroke.Color = Color3.fromHex("#8B0000")
+    CardStroke.Transparency = 1
+    CriarGradienteRotativo(CardStroke, 2)
+
+    local IntroText = Instance.new("TextLabel", Card)
+    IntroText.Size = UDim2.new(1, 0, 0, 30)
+    IntroText.Position = UDim2.new(0, 0, 0, 12)
     IntroText.BackgroundTransparency = 1
     IntroText.Font = Enum.Font.GothamBold
-    IntroText.TextSize = 24
+    IntroText.TextSize = 20
     IntroText.RichText = true
-    IntroText.Text = '<font color="rgb(255, 255, 255)">Scripts | </font><font color="#8B0000">By A̷K̷A̷T̷ Community</font>'
+    IntroText.Text = '<font color="#FFFFFF">AKAT</font> <font color="#8B0000">COMMUNITY</font>'
     IntroText.TextTransparency = 1
-    IntroText.ZIndex = 501
+    IntroText.ZIndex = 502
 
-    local IntroLine = Instance.new("Frame", IntroFrame)
-    IntroLine.AnchorPoint = Vector2.new(0.5, 0.5)
-    IntroLine.Size = UDim2.new(0, 0, 0, 2) 
-    IntroLine.Position = UDim2.new(0.5, 0, 0.5, 35)
-    IntroLine.BackgroundColor3 = Color3.fromHex("#8B0000")
-    IntroLine.BorderSizePixel = 0
-    IntroLine.ZIndex = 501
-    CriarGradienteVermelhoEscuro(IntroLine)
+    local SubText = Instance.new("TextLabel", Card)
+    SubText.Size = UDim2.new(1, 0, 0, 20)
+    SubText.Position = UDim2.new(0, 0, 0, 38)
+    SubText.BackgroundTransparency = 1
+    SubText.Font = Enum.Font.GothamMedium
+    SubText.TextSize = 11
+    SubText.Text = "JULES RNG (THE MINE) • LOADING..."
+    SubText.TextColor3 = Color3.fromRGB(180, 180, 180)
+    SubText.TextTransparency = 1
+    SubText.ZIndex = 502
 
-    Animar(IntroFrame, {BackgroundTransparency = 0.15}, 0.7) 
-    Animar(Blur, {Size = 24}, 0.7) 
-    task.wait(0.3)
-
-    Animar(IntroText, {TextTransparency = 0, Position = UDim2.new(0.5, 0, 0.5, 0)}, 0.6)
-    Animar(IntroLine, {Size = UDim2.new(0, 280, 0, 2)}, 0.6)
-    task.wait(2.2) 
-
-    Animar(IntroText, {TextTransparency = 1, Position = UDim2.new(0.5, 0, 0.5, -15)}, 0.5)
-    Animar(IntroLine, {Size = UDim2.new(0, 0, 0, 2)}, 0.5)
+    -- Transições
+    Animar(IntroFrame, {BackgroundTransparency = 0.25}, 0.4) 
+    Animar(Blur, {Size = 20}, 0.4) 
     task.wait(0.15)
-    Animar(IntroFrame, {BackgroundTransparency = 1}, 0.5)
-    Animar(Blur, {Size = 0}, 0.5)
-    task.wait(0.5)
+
+    Animar(Card, {BackgroundTransparency = 0.05}, 0.35)
+    Animar(CardStroke, {Transparency = 0}, 0.35)
+    Animar(IntroText, {TextTransparency = 0}, 0.35)
+    Animar(SubText, {TextTransparency = 0}, 0.35)
+    task.wait(1.8) 
+
+    Animar(IntroText, {TextTransparency = 1}, 0.3)
+    Animar(SubText, {TextTransparency = 1}, 0.3)
+    Animar(Card, {BackgroundTransparency = 1}, 0.3)
+    Animar(CardStroke, {Transparency = 1}, 0.3)
+    Animar(IntroFrame, {BackgroundTransparency = 1}, 0.4)
+    Animar(Blur, {Size = 0}, 0.4)
+    task.wait(0.4)
 
     IntroFrame:Destroy()
     Blur:Destroy()
@@ -604,8 +608,8 @@ local function ExecutarIntro()
     FloatBtn.Visible = true
     Main.Visible = true
     ContentFrame.Visible = true
-    Animar(FloatBtn, {Size = UDim2.new(0, 44, 0, 44)}, 0.3, Enum.EasingStyle.Back)
-    Animar(Main, {GroupTransparency = 0}, 0.35, Enum.EasingStyle.Sine)
+    Animar(FloatBtn, {Size = UDim2.new(0, 46, 0, 46)}, 0.25)
+    Animar(Main, {GroupTransparency = 0}, 0.25)
 end
 
 -- ==================== CHEATS AUXILIARES ====================
