@@ -1,31 +1,39 @@
 -- [[
---     A̷K̷A̷T̷ THE MINE V1.0 | JULES RNG EDITION
+--     AKAT | JULES RNG (THE MINE)
 --     Otimizado para Delta Mobile 2026
---     Funções: X-Ray, Instant Mine, Speed (Fade UI)
+--     Funções: X-Ray Filtrado, Instant Mine (Block Hit), Speed, UI Animada
 -- ]]
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local Lighting = game:GetService("Lighting")
 local CoreGui = game:GetService("CoreGui")
 
 local player = Players.LocalPlayer
-local camera = workspace.CurrentCamera
 
--- Variáveis de Controle das Funções
+-- ==================== CONFIGURAÇÕES GERAIS ====================
 local flags = {
     ESP = false,
     InstantMine = false,
     Speed = false
 }
 
--- Configurações
-local SPEED_MULTIPLIER = 32 -- Velocidade moderada
+local SPEED_MULTIPLIER = 32
 local DEFAULT_SPEED = 16
-
--- Cache para otimização
 local espCache = {}
+
+-- Dicionário de Minérios (Cores e Nomes Corretos)
+local ORES_CONFIG = {
+    ["coal"] = {Name = "Coal", Color = Color3.fromRGB(40, 40, 40)},
+    ["iron"] = {Name = "Iron", Color = Color3.fromRGB(220, 220, 220)},
+    ["emerald"] = {Name = "Emerald", Color = Color3.fromRGB(46, 204, 113)},
+    ["ruby"] = {Name = "Ruby", Color = Color3.fromRGB(231, 76, 60)},
+    ["diamond"] = {Name = "Diamond", Color = Color3.fromRGB(52, 152, 219)},
+    ["mythril"] = {Name = "Mythril", Color = Color3.fromRGB(155, 89, 182)},
+    ["lapis"] = {Name = "Lapis", Color = Color3.fromRGB(41, 128, 185)}
+}
 
 -- ==================== FUNÇÕES DE ANIMAÇÃO CORE ====================
 local function Animar(obj, goal, time, style, dir)
@@ -40,7 +48,7 @@ end
 
 local function EfeitoClique(btn)
     local baseSize = btn.Size
-    Animar(btn, {Size = baseSize - UDim2.new(0, 3, 0, 3)}, 0.08, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+    Animar(btn, {Size = baseSize - UDim2.new(0, 2, 0, 2)}, 0.08, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
     task.wait(0.08)
     Animar(btn, {Size = baseSize}, 0.15, Enum.EasingStyle.Circular, Enum.EasingDirection.Out)
 end
@@ -51,7 +59,6 @@ ScreenGui.Name = "DeltaAkatTheMineGui"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.IgnoreGuiInset = true
 
--- Proteção e injeção (compatível com Delta)
 local uiParent = player:WaitForChild("PlayerGui")
 pcall(function() uiParent = CoreGui end)
 if uiParent:FindFirstChild("DeltaAkatTheMineGui") then uiParent.DeltaAkatTheMineGui:Destroy() end
@@ -60,23 +67,23 @@ ScreenGui.Parent = uiParent
 -- ==================== BOTÃO FLUTUANTE ====================
 local FloatBtn = Instance.new("ImageButton", ScreenGui)
 FloatBtn.AnchorPoint = Vector2.new(0.5, 0.5) 
-FloatBtn.Size = UDim2.new(0, 45, 0, 45)
+FloatBtn.Size = UDim2.new(0, 0, 0, 0) -- Inicia invisível para a Intro
 FloatBtn.Position = UDim2.new(0.07, 22, 0.25, 22)
 FloatBtn.Image = "rbxthumb://type=Asset&id=74407434556912&w=420&h=420"
 FloatBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
+FloatBtn.Visible = false
 Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(1, 0)
-
 local FloatStroke = Instance.new("UIStroke", FloatBtn)
 FloatStroke.Color = Color3.fromRGB(150, 0, 0)
 FloatStroke.Thickness = 1.5
 
--- ==================== JANELA PRINCIPAL (CANVAS GROUP PARA FADE) ====================
+-- ==================== JANELA PRINCIPAL (CANVAS GROUP) ====================
 local Main = Instance.new("CanvasGroup", ScreenGui)
 Main.AnchorPoint = Vector2.new(0.5, 0.5)
 Main.Size = UDim2.new(0, 240, 0, 160) 
 Main.Position = UDim2.new(0.5, 0, 0.45, 0)
 Main.BackgroundColor3 = Color3.fromRGB(14, 14, 16)
-Main.GroupTransparency = 1 -- Inicia invisível para o Fade In
+Main.GroupTransparency = 1 
 Main.Visible = false
 
 local MainStroke = Instance.new("UIStroke", Main)
@@ -89,31 +96,29 @@ local Header = Instance.new("Frame", Main)
 Header.Size = UDim2.new(1, 0, 0, 32)
 Header.BackgroundTransparency = 1
 
-local TitleAkat = Instance.new("TextLabel", Header)
-TitleAkat.Size = UDim2.new(0, 36, 1, 0)
-TitleAkat.Position = UDim2.new(0, 10, 0, 0)
-TitleAkat.Text = "A̷K̷A̷T̷"
-TitleAkat.TextColor3 = Color3.fromRGB(180, 0, 0)
-TitleAkat.Font = Enum.Font.GothamBold
-TitleAkat.TextSize = 11
-TitleAkat.TextXAlignment = Enum.TextXAlignment.Left
-TitleAkat.BackgroundTransparency = 1
-
-local TitleLine = Instance.new("Frame", Header)
-TitleLine.Size = UDim2.new(0, 1, 0, 14)
-TitleLine.Position = UDim2.new(0, 48, 0.5, -7)
-TitleLine.BackgroundColor3 = Color3.fromRGB(70, 70, 75)
-TitleLine.BorderSizePixel = 0
-
 local TitleText = Instance.new("TextLabel", Header)
-TitleText.Size = UDim2.new(0.55, 0, 1, 0)
-TitleText.Position = UDim2.new(0, 56, 0, 0)
-TitleText.Text = "THE MINE V1.0"
+TitleText.Size = UDim2.new(0.7, 0, 1, 0)
+TitleText.Position = UDim2.new(0, 12, 0, 0)
+TitleText.Text = "AKAT |JULES RNG"
 TitleText.TextColor3 = Color3.fromRGB(255, 255, 255)
 TitleText.Font = Enum.Font.GothamBold
-TitleText.TextSize = 11
+TitleText.TextSize = 12
 TitleText.TextXAlignment = Enum.TextXAlignment.Left
 TitleText.BackgroundTransparency = 1
+
+-- Botão Minimizar Inteligente
+local MinimizeBtn = Instance.new("TextButton", Header)
+MinimizeBtn.Size = UDim2.new(0, 22, 0, 22)
+MinimizeBtn.Position = UDim2.new(1, -30, 0.5, -11)
+MinimizeBtn.Text = "-"
+MinimizeBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
+MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinimizeBtn.Font = Enum.Font.GothamBold
+MinimizeBtn.TextSize = 14
+Instance.new("UICorner", MinimizeBtn).CornerRadius = UDim.new(0, 4)
+local MinStroke = Instance.new("UIStroke", MinimizeBtn)
+MinStroke.Color = Color3.fromRGB(60, 60, 65)
+MinStroke.Thickness = 1
 
 local Separator = Instance.new("Frame", Main)
 Separator.Size = UDim2.new(0.92, 0, 0, 1)
@@ -121,7 +126,7 @@ Separator.Position = UDim2.new(0.04, 0, 0, 32)
 Separator.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
 Separator.BorderSizePixel = 0
 
--- Container de Botões
+-- Container de Configurações
 local ContentFrame = Instance.new("Frame", Main)
 ContentFrame.Size = UDim2.new(1, 0, 1, -35)
 ContentFrame.Position = UDim2.new(0, 0, 0, 35)
@@ -129,27 +134,44 @@ ContentFrame.BackgroundTransparency = 1
 
 -- ==================== CONSTRUTOR DE TOGGLES ====================
 local function CriarToggle(yPos, texto, flagName)
-    local btn = Instance.new("TextButton", ContentFrame)
-    btn.Size = UDim2.new(0.92, 0, 0, 30)
-    btn.Position = UDim2.new(0.04, 0, 0, yPos)
-    btn.BackgroundColor3 = Color3.fromRGB(28, 28, 32)
-    btn.Text = texto .. " [OFF]"
+    local row = Instance.new("Frame", ContentFrame)
+    row.Size = UDim2.new(0.92, 0, 0, 30)
+    row.Position = UDim2.new(0.04, 0, 0, yPos)
+    row.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
+    row.BorderSizePixel = 0
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 4)
+
+    local lbl = Instance.new("TextLabel", row)
+    lbl.Size = UDim2.new(0.65, 0, 1, 0)
+    lbl.Position = UDim2.new(0, 8, 0, 0)
+    lbl.Text = texto
+    lbl.TextColor3 = Color3.fromRGB(230, 230, 230)
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextSize = 11
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.BackgroundTransparency = 1
+
+    local btn = Instance.new("TextButton", row)
+    btn.Size = UDim2.new(0, 50, 0, 22)
+    btn.Position = UDim2.new(1, -56, 0.5, -11)
+    btn.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+    btn.Text = "OFF"
     btn.TextColor3 = Color3.fromRGB(160, 160, 160)
     btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 11
+    btn.TextSize = 10
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
 
     btn.MouseButton1Click:Connect(function()
         EfeitoClique(btn)
         flags[flagName] = not flags[flagName]
         if flags[flagName] then
-            btn.Text = texto .. " [ON]"
+            btn.Text = "ON"
             btn.TextColor3 = Color3.fromRGB(255, 255, 255)
             Animar(btn, {BackgroundColor3 = Color3.fromRGB(150, 0, 0)}, 0.15)
         else
-            btn.Text = texto .. " [OFF]"
+            btn.Text = "OFF"
             btn.TextColor3 = Color3.fromRGB(160, 160, 160)
-            Animar(btn, {BackgroundColor3 = Color3.fromRGB(28, 28, 32)}, 0.15)
+            Animar(btn, {BackgroundColor3 = Color3.fromRGB(35, 35, 40)}, 0.15)
         end
     end)
 end
@@ -158,23 +180,47 @@ CriarToggle(10, "X-RAY MINÉRIOS", "ESP")
 CriarToggle(45, "INSTANT MINE", "InstantMine")
 CriarToggle(80, "SPEED MODERADO", "Speed")
 
--- ==================== LÓGICA DE FADE IN/OUT ====================
-local menuAberto = false
+-- ==================== CONTROLES DE UI (FADE & DRAG) ====================
+local menuAberto = true
+local isMinimized = false
+local isAnimating = false
+
 FloatBtn.MouseButton1Click:Connect(function()
+    if isAnimating then return end
+    isAnimating = true
     EfeitoClique(FloatBtn)
+    
     menuAberto = not menuAberto
     if menuAberto then
         Main.Visible = true
-        Animar(Main, {GroupTransparency = 0}, 0.3, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+        local tween = Animar(Main, {GroupTransparency = 0}, 0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+        tween.Completed:Wait()
     else
-        local fecharTween = Animar(Main, {GroupTransparency = 1}, 0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.In)
-        fecharTween.Completed:Connect(function()
-            if not menuAberto then Main.Visible = false end
-        end)
+        local tween = Animar(Main, {GroupTransparency = 1}, 0.15, Enum.EasingStyle.Sine, Enum.EasingDirection.In)
+        tween.Completed:Wait()
+        Main.Visible = false
     end
+    isAnimating = false
 end)
 
--- ==================== LÓGICA DE ARRASTAR ====================
+MinimizeBtn.MouseButton1Click:Connect(function()
+    if isAnimating then return end
+    isAnimating = true
+    EfeitoClique(MinimizeBtn)
+    
+    isMinimized = not isMinimized
+    if isMinimized then
+        MinimizeBtn.Text = "+"
+        local tween = Animar(Main, {Size = UDim2.new(0, 240, 0, 32)}, 0.25, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out)
+        tween.Completed:Wait()
+    else
+        MinimizeBtn.Text = "-"
+        local tween = Animar(Main, {Size = UDim2.new(0, 240, 0, 160)}, 0.25, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out)
+        tween.Completed:Wait()
+    end
+    isAnimating = false
+end)
+
 local function ConfigurarArrastar(inst)
     local drag = false
     local startPos, dragStart, dragInput
@@ -197,42 +243,100 @@ end
 ConfigurarArrastar(Main)
 ConfigurarArrastar(FloatBtn)
 
--- ==================== SISTEMAS DO JOGO ====================
+-- ==================== SISTEMA DA INTRODUÇÃO AKAT ====================
+local function ExecutarIntro()
+    local Blur = Instance.new("BlurEffect")
+    Blur.Size = 0
+    Blur.Parent = Lighting
 
--- Cores dinâmicas baseadas na raridade presumida (Adapte os nomes conforme o jogo)
-local function GetOreColor(name)
-    name = name:lower()
-    if name:find("diamond") or name:find("diamante") then return Color3.fromRGB(0, 255, 255) end
-    if name:find("gold") or name:find("ouro") then return Color3.fromRGB(255, 215, 0) end
-    if name:find("emerald") or name:find("esmeralda") then return Color3.fromRGB(80, 200, 120) end
-    if name:find("ruby") or name:find("rubi") then return Color3.fromRGB(220, 20, 60) end
-    if name:find("iron") or name:find("ferro") then return Color3.fromRGB(200, 200, 200) end
-    return Color3.fromRGB(255, 255, 255) -- Cor padrão para outros
+    local IntroFrame = Instance.new("Frame", ScreenGui)
+    IntroFrame.Size = UDim2.new(1, 0, 1, 0)
+    IntroFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
+    IntroFrame.BackgroundTransparency = 1
+    IntroFrame.BorderSizePixel = 0
+    IntroFrame.ZIndex = 500
+
+    local IntroText = Instance.new("TextLabel", IntroFrame)
+    IntroText.AnchorPoint = Vector2.new(0.5, 0.5)
+    IntroText.Size = UDim2.new(1, 0, 0, 50)
+    IntroText.Position = UDim2.new(0.5, 0, 0.5, 15) 
+    IntroText.BackgroundTransparency = 1
+    IntroText.Font = Enum.Font.GothamBold
+    IntroText.TextSize = 24
+    IntroText.RichText = true
+    IntroText.Text = '<font color="rgb(255, 255, 255)">Scripts | </font><font color="rgb(150, 0, 0)">By A̷K̷A̷T̷ Community</font>'
+    IntroText.TextTransparency = 1
+    IntroText.ZIndex = 501
+
+    local IntroLine = Instance.new("Frame", IntroFrame)
+    IntroLine.AnchorPoint = Vector2.new(0.5, 0.5)
+    IntroLine.Size = UDim2.new(0, 0, 0, 2) 
+    IntroLine.Position = UDim2.new(0.5, 0, 0.5, 35)
+    IntroLine.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+    IntroLine.BorderSizePixel = 0
+    IntroLine.ZIndex = 501
+
+    Animar(IntroFrame, {BackgroundTransparency = 0.25}, 0.7) 
+    Animar(Blur, {Size = 20}, 0.7) 
+    task.wait(0.3)
+
+    Animar(IntroText, {TextTransparency = 0, Position = UDim2.new(0.5, 0, 0.5, 0)}, 0.6)
+    Animar(IntroLine, {Size = UDim2.new(0, 280, 0, 2)}, 0.6)
+    task.wait(2.2) 
+
+    Animar(IntroText, {TextTransparency = 1, Position = UDim2.new(0.5, 0, 0.5, -15)}, 0.5)
+    Animar(IntroLine, {Size = UDim2.new(0, 0, 0, 2)}, 0.5)
+    task.wait(0.15)
+    Animar(IntroFrame, {BackgroundTransparency = 1}, 0.5)
+    Animar(Blur, {Size = 0}, 0.5)
+    task.wait(0.5)
+
+    IntroFrame:Destroy()
+    Blur:Destroy()
+
+    -- Revela a UI após a Intro
+    FloatBtn.Visible = true
+    Main.Visible = true
+    Animar(FloatBtn, {Size = UDim2.new(0, 45, 0, 45)}, 0.3, Enum.EasingStyle.Back)
+    Animar(Main, {GroupTransparency = 0}, 0.3, Enum.EasingStyle.Sine)
 end
 
--- 1. X-Ray (ESP)
+-- ==================== LÓGICA DOS CHEATS ====================
+
+-- 1. X-Ray (ESP Inteligente)
+local function GetOreInfo(name)
+    name = name:lower()
+    if name:find("stone") or name:find("pedra") then return nil end -- Ignora Stone
+    
+    for key, info in pairs(ORES_CONFIG) do
+        if name:find(key) then return info end
+    end
+    return nil
+end
+
 local function UpdateESP()
-    -- Função genérica de busca (varre o Workspace em busca de objetos extraíveis)
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("Model") or obj:IsA("BasePart") then
-            -- Identifica minérios pelo nome ou por conter ProximityPrompts/ClickDetectors
             local isOre = obj.Name:lower():find("ore") or obj.Name:lower():find("minerio") or obj:FindFirstChildOfClass("ProximityPrompt")
 
             if isOre then
-                if flags.ESP then
+                local oreInfo = GetOreInfo(obj.Name)
+                
+                if flags.ESP and oreInfo then
                     if not espCache[obj] then
-                        local color = GetOreColor(obj.Name)
+                        local color = oreInfo.Color
                         
-                        -- Cria o Highlight (Caixa que atravessa parede)
+                        -- ESP Formato "Outline Preenchido Suave"
                         local hl = Instance.new("Highlight")
                         hl.Parent = obj
                         hl.Adornee = obj
                         hl.FillColor = color
-                        hl.FillTransparency = 0.5
+                        hl.FillTransparency = 0.85 -- Preenchimento bem fraco
                         hl.OutlineColor = color
+                        hl.OutlineTransparency = 0 -- Contorno forte
                         hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
                         
-                        -- Cria o Nome Acima (Billboard)
+                        -- Nome do Minério
                         local bgui = Instance.new("BillboardGui")
                         bgui.Parent = obj
                         bgui.Adornee = obj
@@ -243,7 +347,7 @@ local function UpdateESP()
                         local txt = Instance.new("TextLabel", bgui)
                         txt.Size = UDim2.new(1, 0, 1, 0)
                         txt.BackgroundTransparency = 1
-                        txt.Text = obj.Name
+                        txt.Text = oreInfo.Name
                         txt.TextColor3 = color
                         txt.TextStrokeTransparency = 0
                         txt.Font = Enum.Font.GothamBold
@@ -252,7 +356,6 @@ local function UpdateESP()
                         espCache[obj] = {Highlight = hl, Billboard = bgui}
                     end
                 else
-                    -- Limpa o ESP se desligado
                     if espCache[obj] then
                         espCache[obj].Highlight:Destroy()
                         espCache[obj].Billboard:Destroy()
@@ -264,54 +367,63 @@ local function UpdateESP()
     end
 end
 
--- 2. Instant Mine & 3. Speed Loops
+-- 2. Instant Mine (Zero Health/Durability Direto no Bloco)
+local function ForceBreakBlocks()
+    if not flags.InstantMine then return end
+    
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        -- Remove delay de Interações Manuais
+        if obj:IsA("ProximityPrompt") then
+            obj.HoldDuration = 0
+        end
+        
+        -- Zera atributos de vida/durabilidade do próprio bloco (Instantâneo no 1º hit)
+        if obj:IsA("BasePart") or obj:IsA("Model") then
+            -- Procura por Values dentro do minério
+            for _, v in ipairs(obj:GetChildren()) do
+                if v:IsA("NumberValue") or v:IsA("IntValue") then
+                    local n = v.Name:lower()
+                    if n == "health" or n == "hp" or n == "durability" or n == "maxhealth" then
+                        if v.Value > 1 then v.Value = 0 end
+                    end
+                end
+            end
+            
+            -- Tenta zerar via Atributos
+            if obj:GetAttribute("Health") then obj:SetAttribute("Health", 0) end
+            if obj:GetAttribute("HP") then obj:SetAttribute("HP", 0) end
+        end
+    end
+end
+
+-- 3. Loop Principal (Speed & Atualizações Rápidas)
 RunService.Heartbeat:Connect(function()
     local char = player.Character
     local hum = char and char:FindFirstChild("Humanoid")
 
-    -- Speed
+    -- Speed Control
     if hum then
         if flags.Speed then
             hum.WalkSpeed = SPEED_MULTIPLIER
         else
-            -- Previne conflitos se o jogo forçar uma velocidade específica
             if hum.WalkSpeed == SPEED_MULTIPLIER then
                 hum.WalkSpeed = DEFAULT_SPEED
             end
         end
     end
-
-    -- Instant Mine (Zera o tempo de ProximityPrompts e Cooldowns de Ferramentas)
-    if flags.InstantMine then
-        -- Remove delay de Interações
-        for _, prompt in ipairs(workspace:GetDescendants()) do
-            if prompt:IsA("ProximityPrompt") then
-                prompt.HoldDuration = 0
-            end
-        end
-
-        -- Tenta remover cooldowns locais da picareta
-        if char then
-            local tool = char:FindFirstChildOfClass("Tool")
-            if tool then
-                for _, config in ipairs(tool:GetDescendants()) do
-                    if config:IsA("NumberValue") and (config.Name:lower():find("cooldown") or config.Name:lower():find("wait")) then
-                        config.Value = 0
-                    end
-                end
-            end
-        end
-    end
+    
+    -- Aplica o Instant Mine constantemente em novos blocos renderizados
+    ForceBreakBlocks()
 end)
 
--- Loop lento para o X-Ray (para não causar travamentos no Mobile)
+-- O X-Ray roda em uma Task separada para não causar lag no Mobile
 task.spawn(function()
     while task.wait(1) do
         UpdateESP()
     end
 end)
 
--- Limpeza de memória ao desconectar objetos deletados (Minérios minerados)
+-- Limpeza de Memória (Quando o bloco é quebrado e some do mapa)
 workspace.DescendantRemoving:Connect(function(obj)
     if espCache[obj] then
         pcall(function()
@@ -321,3 +433,6 @@ workspace.DescendantRemoving:Connect(function(obj)
         espCache[obj] = nil
     end
 end)
+
+-- Inicia a Intro (Que depois revelará o Menu)
+task.spawn(ExecutarIntro)
