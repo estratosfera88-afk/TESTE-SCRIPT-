@@ -1,6 +1,6 @@
 -- [[
 --     AKAT | JULES RNG (THE MINE) - DARK RED EDITION
---     Otimizado para Delta Mobile 2026 (Fix: Perfect UI Sync & Frame Clipping)
+--     Otimizado para Delta Mobile 2026 (Premium UI Sync & Frame Clipping)
 -- ]]
 
 local Players = game:GetService("Players")
@@ -28,9 +28,9 @@ local UI_WIDTH = 370
 local HEADER_HEIGHT = 42
 local UI_HEIGHT = 200
 
--- Cores do Tema
-local DARK_RED = Color3.fromRGB(150, 10, 10)
-local AKAT_RED = Color3.fromRGB(220, 20, 20)
+-- Cores do Tema Premium
+local DARK_RED = Color3.fromRGB(139, 0, 0)
+local ALMOST_BLACK = Color3.fromRGB(8, 8, 8)
 
 -- Configurações do X-Ray V2
 local MAX_DISTANCE = 180          
@@ -69,12 +69,12 @@ local IGNORE_KEYWORDS = {
 }
 
 -- ==================== GERENCIADOR DE GRADIENTES ROTATIVOS ====================
-local function CriarGradienteRotativo(parent, speed)
+local function CriarGradienteRotativo(parent, speed, color1, color2, color3)
     local grad = Instance.new("UIGradient")
     grad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, DARK_RED),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(10, 10, 12)),
-        ColorSequenceKeypoint.new(1, DARK_RED)
+        ColorSequenceKeypoint.new(0, color1 or DARK_RED),
+        ColorSequenceKeypoint.new(0.5, color2 or Color3.fromRGB(15, 15, 15)),
+        ColorSequenceKeypoint.new(1, color3 or DARK_RED)
     })
     grad.Parent = parent
 
@@ -107,10 +107,10 @@ local function EfeitoClique(btn)
 end
 
 -- ==================== LÓGICA DO X-RAY V2 ====================
+-- (Mantida perfeitamente intacta conforme script original)
 local function ClearESP(obj)
     local data = espCache[obj]
     if not data then return end
-
     pcall(function()
         if data.Highlight and data.Highlight.Parent then data.Highlight:Destroy() end
         if data.Billboard and data.Billboard.Parent then data.Billboard:Destroy() end
@@ -119,82 +119,67 @@ local function ClearESP(obj)
 end
 
 local function ClearAllESP()
-    for obj in pairs(espCache) do
-        ClearESP(obj)
-    end
+    for obj in pairs(espCache) do ClearESP(obj) end
     table.clear(espCache)
 end
 
 local function IsIgnored(name)
     name = name:lower()
     for _, keyword in ipairs(IGNORE_KEYWORDS) do
-        if name:find(keyword) then
-            return true
-        end
+        if name:find(keyword) then return true end
     end
     return false
 end
 
 local function GetOreInfo(obj)
     if not obj or not obj.Parent then return nil end
-
     local name = obj.Name:lower()
     if IsIgnored(name) then return nil end
 
     for key, info in pairs(ORES_CONFIG) do
-        if name:find(key) then
-            return info, (RARITY_PRIORITY[key] or 1)
-        end
+        if name:find(key) then return info, (RARITY_PRIORITY[key] or 1) end
     end
 
     if name:find("ore") or name:find("minerio") or name:find("gem") or name:find("cristal") then
         return {Name = obj.Name, Color = Color3.fromRGB(255, 200, 50)}, 2
     end
-
     if obj:FindFirstChildOfClass("ProximityPrompt") then
         return {Name = obj.Name, Color = Color3.fromRGB(255, 180, 0)}, 2
     end
-
     if obj:GetAttribute("Health") or obj:GetAttribute("HP") or obj:GetAttribute("Durability") then
         return {Name = obj.Name, Color = Color3.fromRGB(200, 200, 100)}, 1
     end
-
     return nil
 end
 
 local function GetTargetPart(obj)
-    if obj:IsA("BasePart") then
-        return obj
-    elseif obj:IsA("Model") then
-        return obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart", true)
+    if obj:IsA("BasePart") then return obj
+    elseif obj:IsA("Model") then return obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart", true)
     end
     return nil
 end
 
 local function CreateESP(obj, oreInfo, priority)
     if espCache[obj] then return end
-
     local targetPart = GetTargetPart(obj)
     if not targetPart then return end
 
-    local hl = Instance.new("Highlight")
+    local hl = Instance.new("Highlight", obj)
     hl.Adornee = obj
     hl.FillColor = oreInfo.Color
     hl.FillTransparency = 0.72
     hl.OutlineColor = oreInfo.Color
     hl.OutlineTransparency = 0
     hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    hl.Parent = obj
 
-    local bgui = Instance.new("BillboardGui")
+    local bgui = Instance.new("BillboardGui", targetPart)
     bgui.Adornee = targetPart
     bgui.Size = UDim2.new(0, 110, 0, 28)
     bgui.StudsOffset = Vector3.new(0, 2.8, 0)
     bgui.AlwaysOnTop = true
     bgui.MaxDistance = MAX_DISTANCE + 20
-    bgui.Parent = targetPart
 
-    local txt = Instance.new("TextLabel")
+    local txt = Instance.new("TextLabel", bgui)
     txt.Size = UDim2.new(1, 0, 1, 0)
     txt.BackgroundTransparency = 1
     txt.Text = oreInfo.Name
@@ -203,16 +188,8 @@ local function CreateESP(obj, oreInfo, priority)
     txt.TextStrokeColor3 = Color3.new(0, 0, 0)
     txt.Font = Enum.Font.GothamBold
     txt.TextSize = 13
-    txt.Parent = bgui
 
-    espCache[obj] = {
-        Highlight = hl,
-        Billboard = bgui,
-        Label = txt,
-        Name = oreInfo.Name,
-        Priority = priority or 1,
-        Part = targetPart
-    }
+    espCache[obj] = { Highlight = hl, Billboard = bgui, Label = txt, Name = oreInfo.Name, Priority = priority or 1, Part = targetPart }
 end
 
 local function IsAlreadyTracked(obj)
@@ -235,13 +212,11 @@ local function UpdateESP()
     if not root then return end
 
     local myPos = root.Position
-    local candidates = {}
-    local candidateObjs = {}
+    local candidates, candidateObjs = {}, {}
 
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("Model") or obj:IsA("BasePart") then
             local isTracked = IsAlreadyTracked(obj) or candidateObjs[obj]
-            
             if not isTracked then
                 local p = obj.Parent
                 while p and p ~= workspace do
@@ -249,11 +224,9 @@ local function UpdateESP()
                     p = p.Parent
                 end
             end
-
             if not isTracked and obj:IsA("BasePart") and obj.Parent:IsA("Model") and obj.Parent ~= workspace then
                 if GetOreInfo(obj.Parent) then isTracked = true end
             end
-
             if not isTracked then
                 local oreInfo, priority = GetOreInfo(obj)
                 if oreInfo then
@@ -262,12 +235,7 @@ local function UpdateESP()
                         local dist = (part.Position - myPos).Magnitude
                         if dist <= MAX_DISTANCE then
                             candidateObjs[obj] = true
-                            table.insert(candidates, {
-                                Object = obj,
-                                Info = oreInfo,
-                                Priority = priority,
-                                Distance = dist
-                            })
+                            table.insert(candidates, { Object = obj, Info = oreInfo, Priority = priority, Distance = dist })
                         end
                     end
                 end
@@ -294,13 +262,8 @@ local function UpdateESP()
             ClearESP(obj)
         else
             local dist = (data.Part.Position - myPos).Magnitude
-            if dist > MAX_DISTANCE + 15 then
-                ClearESP(obj)
-            else
-                if data.Label then
-                    data.Label.Text = string.format("%s\n%.0fm", data.Name, dist)
-                end
-            end
+            if dist > MAX_DISTANCE + 15 then ClearESP(obj)
+            else if data.Label then data.Label.Text = string.format("%s\n%.0fm", data.Name, dist) end end
         end
     end
 end
@@ -324,7 +287,7 @@ FloatBtn.Size = UDim2.new(0, 0, 0, 0)
 FloatBtn.Position = UDim2.new(0.1, 0, 0.35, 0)
 FloatBtn.Image = "rbxthumb://type=Asset&id=99997714241420&w=150&h=150"
 FloatBtn.ImageColor3 = Color3.fromRGB(255, 255, 255)
-FloatBtn.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
+FloatBtn.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
 FloatBtn.Visible = false
 FloatBtn.ZIndex = 30
 Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(0, 8)
@@ -334,7 +297,7 @@ FloatStroke.Thickness = 1.4
 FloatStroke.Color = DARK_RED
 CriarGradienteRotativo(FloatStroke, 3)
 
--- ==================== JANELA PRINCIPAL (PRETO DARK MODERNO) ====================
+-- ==================== JANELA PRINCIPAL (REFINAMENTO PREMIUM) ====================
 local Main = Instance.new("CanvasGroup", ScreenGui)
 Main.Name = "Main"
 Main.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -352,10 +315,19 @@ local MainFrame = Instance.new("Frame", Main)
 MainFrame.Name = "MainFrame"
 MainFrame.Size = UDim2.new(1, 0, 1, 0)
 MainFrame.Position = UDim2.new(0, 0, 0, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 16) -- Preto Dark Moderno
+-- Fundo alterado para branco para o Gradiente de Profundidade funcionar perfeitamente
+MainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255) 
 MainFrame.BorderSizePixel = 0
 MainFrame.ClipsDescendants = true
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
+
+-- Gradiente de Fundo (Profundidade Premium)
+local BgGradient = Instance.new("UIGradient", MainFrame)
+BgGradient.Rotation = 90
+BgGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(15, 15, 18)), -- Topo levemente mais claro
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(6, 6, 8))     -- Base bem escura
+})
 
 local MainStroke = Instance.new("UIStroke", MainFrame)
 MainStroke.Thickness = 1.5
@@ -368,32 +340,31 @@ Header.Name = "Header"
 Header.Size = UDim2.new(1, 0, 0, HEADER_HEIGHT)
 Header.BackgroundTransparency = 1
 
--- Container do Título
 local TitleContainer = Instance.new("Frame", Header)
 TitleContainer.Size = UDim2.new(0.82, 0, 1, 0)
 TitleContainer.Position = UDim2.new(0, 12, 0, 0)
 TitleContainer.BackgroundTransparency = 1
 
--- Badge AKAT (Preto com Vermelho Escuro Neon + Altura Reduzida)
+-- Badge AKAT (Compacta e Elegante, Sem vermelho exagerado)
 local AkatBadge = Instance.new("Frame", TitleContainer)
 AkatBadge.AnchorPoint = Vector2.new(0, 0.5)
-AkatBadge.Size = UDim2.new(0, 46, 0, 15) -- Altura abaixada
+AkatBadge.Size = UDim2.new(0, 46, 0, 16) -- Altura diminuída
 AkatBadge.Position = UDim2.new(0, 0, 0.5, 0)
-AkatBadge.BackgroundColor3 = Color3.fromRGB(10, 10, 12) -- Fundo Preto
+AkatBadge.BackgroundColor3 = Color3.fromRGB(12, 12, 14) -- Predominantemente preto
 AkatBadge.BorderSizePixel = 0
 AkatBadge.ZIndex = 2
-Instance.new("UICorner", AkatBadge).CornerRadius = UDim.new(0, 4)
+Instance.new("UICorner", AkatBadge).CornerRadius = UDim.new(0, 5)
 
 local AkatBadgeStroke = Instance.new("UIStroke", AkatBadge)
-AkatBadgeStroke.Thickness = 1.2
-AkatBadgeStroke.Color = AKAT_RED -- Borda Vermelho Neon
+AkatBadgeStroke.Thickness = 1
+AkatBadgeStroke.Color = DARK_RED -- Apenas detalhe em vermelho neon
 AkatBadgeStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
 local TitleAkat = Instance.new("TextLabel", AkatBadge)
 TitleAkat.Size = UDim2.new(1, 0, 1, 0)
 TitleAkat.Text = "AKAT"
 TitleAkat.TextColor3 = Color3.fromRGB(255, 255, 255)
-TitleAkat.Font = Enum.Font.Gotham
+TitleAkat.Font = Enum.Font.GothamBold
 TitleAkat.TextSize = 10
 TitleAkat.TextXAlignment = Enum.TextXAlignment.Center
 TitleAkat.BackgroundTransparency = 1
@@ -411,18 +382,21 @@ TitleGame.TextSize = 11
 TitleGame.TextXAlignment = Enum.TextXAlignment.Left
 TitleGame.BackgroundTransparency = 1
 
--- Botão Minimizar (Traço reto fino "—", mantendo sempre "-")
+-- Botão Minimizar (Fino, elegante e fixo no "—")
 local MinimizeBtn = Instance.new("TextButton", Header)
 MinimizeBtn.Size = UDim2.new(0, 26, 0, 26)
 MinimizeBtn.Position = UDim2.new(1, -34, 0.5, -13)
-MinimizeBtn.Text = "—"
+MinimizeBtn.Text = "" -- Texto removido para usar um traço vetorial perfeito
 MinimizeBtn.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
-MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-MinimizeBtn.Font = Enum.Font.Gotham
-MinimizeBtn.TextSize = 13
-MinimizeBtn.TextXAlignment = Enum.TextXAlignment.Center
-MinimizeBtn.TextYAlignment = Enum.TextYAlignment.Center
 Instance.new("UICorner", MinimizeBtn).CornerRadius = UDim.new(0, 6)
+
+-- Traço de minimizar (muito mais limpo e fino que texto)
+local MinLine = Instance.new("Frame", MinimizeBtn)
+MinLine.Size = UDim2.new(0, 10, 0, 1) -- Linha vetorial de 1 pixel de altura
+MinLine.AnchorPoint = Vector2.new(0.5, 0.5)
+MinLine.Position = UDim2.new(0.5, 0, 0.5, 0)
+MinLine.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+MinLine.BorderSizePixel = 0
 
 local MinStroke = Instance.new("UIStroke", MinimizeBtn)
 MinStroke.Color = DARK_RED
@@ -432,10 +406,9 @@ CriarGradienteRotativo(MinStroke, 3)
 local Separator = Instance.new("Frame", MainFrame)
 Separator.Size = UDim2.new(0.94, 0, 0, 1)
 Separator.Position = UDim2.new(0.03, 0, 0, HEADER_HEIGHT)
-Separator.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
+Separator.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 Separator.BorderSizePixel = 0
 
--- Container de Conteúdo
 local ContentFrame = Instance.new("Frame", MainFrame)
 ContentFrame.Name = "ContentFrame"
 ContentFrame.Size = UDim2.new(1, 0, 1, -(HEADER_HEIGHT + 1))
@@ -444,17 +417,17 @@ ContentFrame.BackgroundTransparency = 1
 ContentFrame.BorderSizePixel = 0
 ContentFrame.ClipsDescendants = true
 
--- ==================== CONSTRUTOR DE TOGGLES (GRADIENTE INTERNO) ====================
+-- ==================== CONSTRUTOR DE TOGGLES (REFINAMENTO PREMIUM) ====================
 local function CriarToggle(yPos, texto, flagName)
     local row = Instance.new("Frame", ContentFrame)
     row.Size = UDim2.new(0.94, 0, 0, 40)
     row.Position = UDim2.new(0.03, 0, 0, yPos)
-    row.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+    row.BackgroundColor3 = Color3.fromRGB(16, 16, 20)
     row.BorderSizePixel = 0
     Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
 
     local rowStroke = Instance.new("UIStroke", row)
-    rowStroke.Color = Color3.fromRGB(28, 28, 34)
+    rowStroke.Color = Color3.fromRGB(30, 30, 35)
     rowStroke.Thickness = 1
 
     local lbl = Instance.new("TextLabel", row)
@@ -462,56 +435,59 @@ local function CriarToggle(yPos, texto, flagName)
     lbl.Position = UDim2.new(0, 10, 0, 0)
     lbl.Text = texto
     lbl.TextColor3 = Color3.fromRGB(230, 230, 230)
-    lbl.Font = Enum.Font.Gotham
+    lbl.Font = Enum.Font.GothamBold
     lbl.TextSize = 11
     lbl.TextXAlignment = Enum.TextXAlignment.Center
     lbl.BackgroundTransparency = 1
 
+    -- Container do botão 
     local btn = Instance.new("TextButton", row)
     btn.Size = UDim2.new(0, 52, 0, 24)
     btn.Position = UDim2.new(1, -58, 0.5, -12)
-    btn.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-    btn.Text = "OFF"
-    btn.TextColor3 = Color3.fromRGB(150, 150, 150)
-    btn.Font = Enum.Font.Gotham -- Fonte Normal
-    btn.TextSize = 10
-    btn.ClipsDescendants = true
+    btn.BackgroundColor3 = Color3.fromRGB(22, 22, 26) -- Fundo escuro normal (OFF)
+    btn.Text = "" -- Texto tratado separadamente para fluidez
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
 
     local btnStroke = Instance.new("UIStroke", btn)
-    btnStroke.Color = Color3.fromRGB(40, 40, 48)
+    btnStroke.Color = Color3.fromRGB(35, 35, 40) -- Borda discreta padrão
     btnStroke.Thickness = 1
 
-    -- Gradiente no fundo do botão ON (Vermelho Escuro + Preto)
-    local btnGradient = Instance.new("UIGradient")
-    btnGradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(140, 0, 0)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(8, 8, 12)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(140, 0, 0))
-    })
-    btnGradient.Enabled = false
-    btnGradient.Parent = btn
+    -- Fundo Gradiente Animado (ON)
+    local gradFrame = Instance.new("Frame", btn)
+    gradFrame.Size = UDim2.new(1, 0, 1, 0)
+    gradFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    gradFrame.BackgroundTransparency = 1 -- Invisível no estado OFF
+    Instance.new("UICorner", gradFrame).CornerRadius = UDim.new(0, 5)
 
-    -- Animação infinita do gradiente no botão
-    TweenService:Create(btnGradient, TweenInfo.new(3, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), {Rotation = 360}):Play()
+    -- Rotação Contínua dentro do botão
+    CriarGradienteRotativo(gradFrame, 2.5, ALMOST_BLACK, DARK_RED, ALMOST_BLACK)
+
+    -- Texto do Botão (Sobreposto para não ser afetado pelo gradiente)
+    local btnText = Instance.new("TextLabel", btn)
+    btnText.Size = UDim2.new(1, 0, 1, 0)
+    btnText.BackgroundTransparency = 1
+    btnText.Text = "OFF"
+    btnText.TextColor3 = Color3.fromRGB(150, 150, 150)
+    btnText.Font = Enum.Font.GothamBold -- Mesma fonte/espessura para ambos
+    btnText.TextSize = 10
+    btnText.ZIndex = 2
 
     btn.MouseButton1Click:Connect(function()
         EfeitoClique(btn)
         flags[flagName] = not flags[flagName]
+        
         if flags[flagName] then
-            btn.Text = "ON"
-            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            btn.Font = Enum.Font.Gotham -- Mantém normal
-            btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255) -- Permite a visibilidade do UIGradient
-            btnGradient.Enabled = true
-            btnStroke.Color = DARK_RED
+            btnText.Text = "ON"
+            -- Transição fluida de cores
+            Animar(btnText, {TextColor3 = Color3.fromRGB(255, 255, 255)}, 0.2)
+            Animar(gradFrame, {BackgroundTransparency = 0}, 0.2)
+            Animar(btnStroke, {Color = Color3.fromRGB(80, 20, 20)}, 0.2)
         else
-            btn.Text = "OFF"
-            btn.TextColor3 = Color3.fromRGB(150, 150, 150)
-            btn.Font = Enum.Font.Gotham -- Mantém normal
-            btn.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-            btnGradient.Enabled = false
-            btnStroke.Color = Color3.fromRGB(40, 40, 48)
+            btnText.Text = "OFF"
+            -- Retorno fluido ao estado original
+            Animar(btnText, {TextColor3 = Color3.fromRGB(150, 150, 150)}, 0.2)
+            Animar(gradFrame, {BackgroundTransparency = 1}, 0.2)
+            Animar(btnStroke, {Color = Color3.fromRGB(35, 35, 40)}, 0.2)
             
             if flagName == "ESP" then ClearAllESP() end
         end
@@ -522,7 +498,7 @@ CriarToggle(8, "X RAY MINES", "ESP")
 CriarToggle(54, "INSTANT MINE", "InstantMine")
 CriarToggle(100, "SPEED MOD", "Speed")
 
--- ==================== CONTROLES DA UI ====================
+-- ==================== CONTROLES DA UI E ANIMAÇÕES DE ENTRADA/SAÍDA ====================
 local menuAberto = true
 local isMinimized = false
 local fadeTween = nil
@@ -531,12 +507,7 @@ local expandedPos = Main.Position
 
 local function ToggleMenu(open)
     menuAberto = open
-    
-    if fadeTween then 
-        fadeTween:Cancel() 
-        fadeTween = nil
-    end
-
+    if fadeTween then fadeTween:Cancel(); fadeTween = nil end
     local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
 
     if open then
@@ -577,26 +548,20 @@ MinimizeBtn.MouseButton1Click:Connect(function()
     if not isMinimized then
         expandedPos = Main.Position
         isMinimized = true
-        MinimizeBtn.Text = "—" -- Sempre traço reto
+        -- O Texto permanece uma linha limpa. Não alteramos para "+" mais.
         targetHeight = HEADER_HEIGHT
         targetPos = UDim2.new(expandedPos.X.Scale, expandedPos.X.Offset, expandedPos.Y.Scale, expandedPos.Y.Offset - (heightDiff / 2))
     else
         isMinimized = false
-        MinimizeBtn.Text = "—" -- Sempre traço reto
         targetHeight = UI_HEIGHT
         targetPos = expandedPos
     end
 
     local targetSize = UDim2.new(0, UI_WIDTH, 0, targetHeight)
 
-    if resizeTween then 
-        resizeTween:Cancel() 
-        resizeTween = nil
-    end
+    if resizeTween then resizeTween:Cancel(); resizeTween = nil end
 
-    local tweenInfo = TweenInfo.new(0.18, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-
-    resizeTween = TweenService:Create(Main, tweenInfo, {
+    resizeTween = TweenService:Create(Main, TweenInfo.new(0.18, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
         Size = targetSize,
         Position = targetPos
     })
@@ -628,11 +593,10 @@ end
 ConfigurarArrastar(Main)
 ConfigurarArrastar(FloatBtn)
 
--- ==================== INTRODUÇÃO ESTILO MM2 ====================
+-- ==================== INTRODUÇÃO ====================
 local function ExecutarIntro()
-    local Blur = Instance.new("BlurEffect")
+    local Blur = Instance.new("BlurEffect", Lighting)
     Blur.Size = 0
-    Blur.Parent = Lighting
 
     local IntroFrame = Instance.new("Frame", ScreenGui)
     IntroFrame.Size = UDim2.new(1, 0, 1, 0)
@@ -645,7 +609,7 @@ local function ExecutarIntro()
     Card.AnchorPoint = Vector2.new(0.5, 0.5)
     Card.Size = UDim2.new(0, 290, 0, 70)
     Card.Position = UDim2.new(0.5, 0, 0.5, 0)
-    Card.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
+    Card.BackgroundColor3 = Color3.fromRGB(12, 12, 15)
     Card.BackgroundTransparency = 1
     Card.ZIndex = 501
     Instance.new("UICorner", Card).CornerRadius = UDim.new(0, 10)
@@ -714,9 +678,7 @@ local function ForceBreakBlocks()
     if not flags.InstantMine then return end
     
     for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("ProximityPrompt") then
-            obj.HoldDuration = 0
-        end
+        if obj:IsA("ProximityPrompt") then obj.HoldDuration = 0 end
         
         if obj:IsA("BasePart") or obj:IsA("Model") then
             for _, v in ipairs(obj:GetChildren()) do
@@ -737,17 +699,10 @@ end
 -- ==================== LOOPS PRINCIPAIS ====================
 RunService.Heartbeat:Connect(function()
     local hum = character and character:FindFirstChildOfClass("Humanoid")
-
     if hum then
-        if flags.Speed then
-            hum.WalkSpeed = SPEED_MULTIPLIER
-        else
-            if hum.WalkSpeed == SPEED_MULTIPLIER then
-                hum.WalkSpeed = DEFAULT_SPEED
-            end
-        end
+        if flags.Speed then hum.WalkSpeed = SPEED_MULTIPLIER
+        else if hum.WalkSpeed == SPEED_MULTIPLIER then hum.WalkSpeed = DEFAULT_SPEED end end
     end
-    
     ForceBreakBlocks()
 end)
 
