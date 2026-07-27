@@ -1,6 +1,6 @@
 -- [[
 --     AKAT | JULES RNG (THE MINE) - DARK RED EDITION
---     Otimizado para Delta Mobile 2026 (Fix: UI Sync, Neon Bug & Clean Toggles)
+--     Otimizado para Delta Mobile 2026 (Fix: Perfect UI Sync & Frame Clipping)
 -- ]]
 
 local Players = game:GetService("Players")
@@ -334,24 +334,36 @@ FloatStroke.Thickness = 1.4
 FloatStroke.Color = DARK_RED
 CriarGradienteRotativo(FloatStroke, 3)
 
--- ==================== JANELA PRINCIPAL ====================
+-- ==================== JANELA PRINCIPAL (ESTRUTURA REFATORADA) ====================
+-- CanvasGroup: Usado EXCLUSIVAMENTE para controlar a transparência global (Fade-in / Fade-out)
 local Main = Instance.new("CanvasGroup", ScreenGui)
+Main.Name = "Main"
 Main.AnchorPoint = Vector2.new(0.5, 0.5)
 Main.Size = UDim2.new(0, UI_WIDTH, 0, UI_HEIGHT) 
 Main.Position = UDim2.new(0.5, 0, 0.45, 0)
-Main.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
+Main.BackgroundTransparency = 1
 Main.GroupTransparency = 1 
 Main.Visible = false
 Main.ClipsDescendants = true
 
-local MainStroke = Instance.new("UIStroke", Main)
+-- MainFrame: Frame interno que controla o tamanho da janela, cor de fundo e recorte dinâmico
+local MainFrame = Instance.new("Frame", Main)
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(1, 0, 1, 0)
+MainFrame.Position = UDim2.new(0, 0, 0, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
+MainFrame.BorderSizePixel = 0
+MainFrame.ClipsDescendants = true
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
+
+local MainStroke = Instance.new("UIStroke", MainFrame)
 MainStroke.Thickness = 1.5
 MainStroke.Color = DARK_RED
 CriarGradienteRotativo(MainStroke, 4)
-Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10)
 
 -- Cabeçalho
-local Header = Instance.new("Frame", Main)
+local Header = Instance.new("Frame", MainFrame)
+Header.Name = "Header"
 Header.Size = UDim2.new(1, 0, 0, HEADER_HEIGHT)
 Header.BackgroundTransparency = 1
 
@@ -361,7 +373,7 @@ TitleContainer.Size = UDim2.new(0.82, 0, 1, 0)
 TitleContainer.Position = UDim2.new(0, 12, 0, 0)
 TitleContainer.BackgroundTransparency = 1
 
--- Badge AKAT (Cor Mantida & Efeito Neon Corrigido)
+-- Badge AKAT
 local AkatBadge = Instance.new("Frame", TitleContainer)
 AkatBadge.AnchorPoint = Vector2.new(0, 0.5)
 AkatBadge.Size = UDim2.new(0, 48, 0, 18)
@@ -371,7 +383,6 @@ AkatBadge.BorderSizePixel = 0
 AkatBadge.ZIndex = 2
 Instance.new("UICorner", AkatBadge).CornerRadius = UDim.new(0, 5)
 
--- Borda Neon do Badge AKAT
 local AkatBadgeStroke = Instance.new("UIStroke", AkatBadge)
 AkatBadgeStroke.Thickness = 1.2
 AkatBadgeStroke.Color = Color3.fromRGB(255, 80, 80)
@@ -415,21 +426,22 @@ MinStroke.Color = DARK_RED
 MinStroke.Thickness = 1
 CriarGradienteRotativo(MinStroke, 3)
 
-local Separator = Instance.new("Frame", Main)
+local Separator = Instance.new("Frame", MainFrame)
 Separator.Size = UDim2.new(0.94, 0, 0, 1)
 Separator.Position = UDim2.new(0.03, 0, 0, HEADER_HEIGHT)
 Separator.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
 Separator.BorderSizePixel = 0
 
--- Container de Conteúdo
-local ContentFrame = Instance.new("Frame", Main)
-ContentFrame.Size = UDim2.new(1, 0, 0, UI_HEIGHT - HEADER_HEIGHT - 1)
+-- Container de Conteúdo (Acompanha o tamanho do MainFrame dinamicamente)
+local ContentFrame = Instance.new("Frame", MainFrame)
+ContentFrame.Name = "ContentFrame"
+ContentFrame.Size = UDim2.new(1, 0, 1, -(HEADER_HEIGHT + 1))
 ContentFrame.Position = UDim2.new(0, 0, 0, HEADER_HEIGHT + 1)
 ContentFrame.BackgroundTransparency = 1
 ContentFrame.BorderSizePixel = 0
 ContentFrame.ClipsDescendants = true
 
--- ==================== CONSTRUTOR DE TOGGLES (ESTILO PADRÃO MANTIDO) ====================
+-- ==================== CONSTRUTOR DE TOGGLES ====================
 local function CriarToggle(yPos, texto, flagName)
     local row = Instance.new("Frame", ContentFrame)
     row.Size = UDim2.new(0.94, 0, 0, 40)
@@ -490,22 +502,31 @@ CriarToggle(100, "SPEED MOD", "Speed")
 -- ==================== CONTROLES DA UI E ANIMAÇÕES SINCRONIZADAS ====================
 local menuAberto = true
 local isMinimized = false
-local currentMainTween = nil
+local fadeTween = nil
+local resizeTween = nil
 
 local function ToggleMenu(open)
     menuAberto = open
-    if currentMainTween then currentMainTween:Cancel() end
+    
+    if fadeTween then 
+        fadeTween:Cancel() 
+        fadeTween = nil
+    end
+
+    local tweenInfo = TweenInfo.new(0.18, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
 
     if open then
         Main.Visible = true
-        currentMainTween = Animar(Main, {GroupTransparency = 0}, 0.15)
+        fadeTween = TweenService:Create(Main, tweenInfo, {GroupTransparency = 0})
+        fadeTween:Play()
     else
-        currentMainTween = Animar(Main, {GroupTransparency = 1}, 0.15)
-        currentMainTween.Completed:Connect(function(state)
+        fadeTween = TweenService:Create(Main, tweenInfo, {GroupTransparency = 1})
+        fadeTween.Completed:Connect(function(state)
             if state == Enum.PlaybackState.Completed and not menuAberto then
                 Main.Visible = false
             end
         end)
+        fadeTween:Play()
     end
 end
 
@@ -520,7 +541,18 @@ MinimizeBtn.MouseButton1Click:Connect(function()
     MinimizeBtn.Text = isMinimized and "+" or "-"
 
     local targetHeight = isMinimized and HEADER_HEIGHT or UI_HEIGHT
-    Animar(Main, {Size = UDim2.new(0, UI_WIDTH, 0, targetHeight)}, 0.18, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+    local targetSize = UDim2.new(0, UI_WIDTH, 0, targetHeight)
+
+    if resizeTween then 
+        resizeTween:Cancel() 
+        resizeTween = nil
+    end
+
+    local tweenInfo = TweenInfo.new(0.18, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+
+    -- Redimensiona o CanvasGroup pai. Todos os filhos com ClipsDescendants encolhem em tempo real
+    resizeTween = TweenService:Create(Main, tweenInfo, {Size = targetSize})
+    resizeTween:Play()
 end)
 
 local function ConfigurarArrastar(inst)
