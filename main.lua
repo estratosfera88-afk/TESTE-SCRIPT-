@@ -9,6 +9,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
 local CoreGui = game:GetService("CoreGui")
+local ProximityPromptService = game:GetService("ProximityPromptService")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
@@ -30,6 +31,7 @@ local UI_HEIGHT = 200
 
 -- Cores do Tema Premium
 local DARK_RED = Color3.fromRGB(139, 0, 0)
+local NEON_RED = Color3.fromRGB(255, 30, 30)
 local ALMOST_BLACK = Color3.fromRGB(8, 8, 8)
 
 -- Configurações do X-Ray V2
@@ -106,8 +108,44 @@ local function EfeitoClique(btn)
     end)
 end
 
+-- ==================== LÓGICA DO INSTANT MINE (NOVO E OTIMIZADO) ====================
+local function OptimizeBlock(obj)
+    if not flags.InstantMine then return end
+    
+    if obj:IsA("ProximityPrompt") then
+        obj.HoldDuration = 0
+    end
+    
+    if obj:IsA("BasePart") or obj:IsA("Model") then
+        if obj:GetAttribute("Health") then obj:SetAttribute("Health", 0) end
+        if obj:GetAttribute("HP") then obj:SetAttribute("HP", 0) end
+        
+        for _, v in ipairs(obj:GetChildren()) do
+            if v:IsA("NumberValue") or v:IsA("IntValue") then
+                local n = v.Name:lower()
+                if n == "health" or n == "hp" or n == "durability" or n == "maxhealth" then
+                    if v.Value > 1 then v.Value = 0 end
+                end
+            end
+        end
+    end
+end
+
+-- Tornar Prompts instantâneos globais sem lag de loop
+ProximityPromptService.PromptShown:Connect(function(prompt)
+    if flags.InstantMine then
+        prompt.HoldDuration = 0
+    end
+end)
+
+-- Detectar novos blocos criados no mapa
+workspace.DescendantAdded:Connect(function(obj)
+    if flags.InstantMine then
+        pcall(OptimizeBlock, obj)
+    end
+end)
+
 -- ==================== LÓGICA DO X-RAY V2 ====================
--- (Mantida perfeitamente intacta conforme script original)
 local function ClearESP(obj)
     local data = espCache[obj]
     if not data then return end
@@ -203,7 +241,7 @@ local function IsAlreadyTracked(obj)
 end
 
 local function UpdateESP()
-    if not flags.ESP then
+    if not flags.ESP and not flags.InstantMine then
         if next(espCache) then ClearAllESP() end
         return
     end
@@ -214,56 +252,69 @@ local function UpdateESP()
     local myPos = root.Position
     local candidates, candidateObjs = {}, {}
 
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("Model") or obj:IsA("BasePart") then
-            local isTracked = IsAlreadyTracked(obj) or candidateObjs[obj]
-            if not isTracked then
-                local p = obj.Parent
-                while p and p ~= workspace do
-                    if candidateObjs[p] then isTracked = true; break end
-                    p = p.Parent
+    if flags.ESP then
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("Model") or obj:IsA("BasePart") then
+                local isTracked = IsAlreadyTracked(obj) or candidateObjs[obj]
+                if not isTracked then
+                    local p = obj.Parent
+                    while p and p ~= workspace do
+                        if candidateObjs[p] then isTracked = true; break end
+                        p = p.Parent
+                    end
                 end
-            end
-            if not isTracked and obj:IsA("BasePart") and obj.Parent:IsA("Model") and obj.Parent ~= workspace then
-                if GetOreInfo(obj.Parent) then isTracked = true end
-            end
-            if not isTracked then
-                local oreInfo, priority = GetOreInfo(obj)
-                if oreInfo then
-                    local part = GetTargetPart(obj)
-                    if part then
-                        local dist = (part.Position - myPos).Magnitude
-                        if dist <= MAX_DISTANCE then
-                            candidateObjs[obj] = true
-                            table.insert(candidates, { Object = obj, Info = oreInfo, Priority = priority, Distance = dist })
+                if not isTracked and obj:IsA("BasePart") and obj.Parent:IsA("Model") and obj.Parent ~= workspace then
+                    if GetOreInfo(obj.Parent) then isTracked = true end
+                end
+                if not isTracked then
+                    local oreInfo, priority = GetOreInfo(obj)
+                    if oreInfo then
+                        local part = GetTargetPart(obj)
+                        if part then
+                            local dist = (part.Position - myPos).Magnitude
+                            if dist <= MAX_DISTANCE then
+                                candidateObjs[obj] = true
+                                table.insert(candidates, { Object = obj, Info = oreInfo, Priority = priority, Distance = dist })
+                            end
                         end
                     end
                 end
             end
         end
-    end
 
-    table.sort(candidates, function(a, b)
-        if a.Priority ~= b.Priority then return a.Priority > b.Priority end
-        return a.Distance < b.Distance
-    end)
+        table.sort(candidates, function(a, b)
+            if a.Priority ~= b.Priority then return a.Priority > b.Priority end
+            return a.Distance < b.Distance
+        end)
 
-    local created = 0
-    for _, data in ipairs(candidates) do
-        if created >= MAX_HIGHLIGHTS then break end
-        if not espCache[data.Object] then
-            CreateESP(data.Object, data.Info, data.Priority)
-            created = created + 1
+        local created = 0
+        for _, data in ipairs(candidates) do
+            if created >= MAX_HIGHLIGHTS then break end
+            if not espCache[data.Object] then
+                CreateESP(data.Object, data.Info, data.Priority)
+                created = created + 1
+            end
         end
     end
 
+    -- Processa o cache atualizando a distância (ESP) e forçando o zero-health se InstantMine estiver ativo
     for obj, data in pairs(espCache) do
         if not obj.Parent or not data.Part or not data.Part.Parent then
             ClearESP(obj)
         else
             local dist = (data.Part.Position - myPos).Magnitude
-            if dist > MAX_DISTANCE + 15 then ClearESP(obj)
-            else if data.Label then data.Label.Text = string.format("%s\n%.0fm", data.Name, dist) end end
+            if dist > MAX_DISTANCE + 15 then 
+                ClearESP(obj)
+            else 
+                if data.Label and flags.ESP then 
+                    data.Label.Text = string.format("%s\n%.0fm", data.Name, dist) 
+                end
+                
+                -- Aplicação constante do Instant Mine nos minérios próximos (Anula resets do servidor)
+                if flags.InstantMine then
+                    pcall(OptimizeBlock, obj)
+                end
+            end
         end
     end
 end
@@ -294,8 +345,8 @@ Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(0, 8)
 
 local FloatStroke = Instance.new("UIStroke", FloatBtn)
 FloatStroke.Thickness = 1.4
-FloatStroke.Color = DARK_RED
-CriarGradienteRotativo(FloatStroke, 3)
+FloatStroke.Color = Color3.fromRGB(255, 255, 255)
+CriarGradienteRotativo(FloatStroke, 3, DARK_RED, NEON_RED, DARK_RED)
 
 -- ==================== JANELA PRINCIPAL (REFINAMENTO PREMIUM) ====================
 local Main = Instance.new("CanvasGroup", ScreenGui)
@@ -315,7 +366,6 @@ local MainFrame = Instance.new("Frame", Main)
 MainFrame.Name = "MainFrame"
 MainFrame.Size = UDim2.new(1, 0, 1, 0)
 MainFrame.Position = UDim2.new(0, 0, 0, 0)
--- Fundo alterado para branco para o Gradiente de Profundidade funcionar perfeitamente
 MainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255) 
 MainFrame.BorderSizePixel = 0
 MainFrame.ClipsDescendants = true
@@ -325,14 +375,14 @@ Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 local BgGradient = Instance.new("UIGradient", MainFrame)
 BgGradient.Rotation = 90
 BgGradient.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(15, 15, 18)), -- Topo levemente mais claro
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(6, 6, 8))     -- Base bem escura
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(15, 15, 18)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(6, 6, 8))
 })
 
 local MainStroke = Instance.new("UIStroke", MainFrame)
 MainStroke.Thickness = 1.5
-MainStroke.Color = DARK_RED
-CriarGradienteRotativo(MainStroke, 4)
+MainStroke.Color = Color3.fromRGB(255, 255, 255)
+CriarGradienteRotativo(MainStroke, 4, DARK_RED, NEON_RED, DARK_RED)
 
 -- Cabeçalho
 local Header = Instance.new("Frame", MainFrame)
@@ -345,20 +395,24 @@ TitleContainer.Size = UDim2.new(0.82, 0, 1, 0)
 TitleContainer.Position = UDim2.new(0, 12, 0, 0)
 TitleContainer.BackgroundTransparency = 1
 
--- Badge AKAT (Compacta e Elegante, Sem vermelho exagerado)
+-- Badge AKAT (Contorno Premium Animado)
 local AkatBadge = Instance.new("Frame", TitleContainer)
 AkatBadge.AnchorPoint = Vector2.new(0, 0.5)
-AkatBadge.Size = UDim2.new(0, 46, 0, 16) -- Altura diminuída
+AkatBadge.Size = UDim2.new(0, 46, 0, 16)
 AkatBadge.Position = UDim2.new(0, 0, 0.5, 0)
-AkatBadge.BackgroundColor3 = Color3.fromRGB(12, 12, 14) -- Predominantemente preto
+AkatBadge.BackgroundColor3 = Color3.fromRGB(12, 12, 14)
 AkatBadge.BorderSizePixel = 0
 AkatBadge.ZIndex = 2
 Instance.new("UICorner", AkatBadge).CornerRadius = UDim.new(0, 5)
 
+-- Borda com Gradiente Rotativo aplicado no Badge Akat
 local AkatBadgeStroke = Instance.new("UIStroke", AkatBadge)
-AkatBadgeStroke.Thickness = 1
-AkatBadgeStroke.Color = DARK_RED -- Apenas detalhe em vermelho neon
+AkatBadgeStroke.Thickness = 1.2
+AkatBadgeStroke.Color = Color3.fromRGB(255, 255, 255) -- Base branca obrigatória para UIGradient funcionar no UIStroke
 AkatBadgeStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+-- Adiciona a Animação Fluida alternando entre Dark Red e Vermelho Brilhante
+CriarGradienteRotativo(AkatBadgeStroke, 2.5, DARK_RED, NEON_RED, DARK_RED)
 
 local TitleAkat = Instance.new("TextLabel", AkatBadge)
 TitleAkat.Size = UDim2.new(1, 0, 1, 0)
@@ -382,26 +436,25 @@ TitleGame.TextSize = 11
 TitleGame.TextXAlignment = Enum.TextXAlignment.Left
 TitleGame.BackgroundTransparency = 1
 
--- Botão Minimizar (Fino, elegante e fixo no "—")
+-- Botão Minimizar
 local MinimizeBtn = Instance.new("TextButton", Header)
 MinimizeBtn.Size = UDim2.new(0, 26, 0, 26)
 MinimizeBtn.Position = UDim2.new(1, -34, 0.5, -13)
-MinimizeBtn.Text = "" -- Texto removido para usar um traço vetorial perfeito
+MinimizeBtn.Text = ""
 MinimizeBtn.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
 Instance.new("UICorner", MinimizeBtn).CornerRadius = UDim.new(0, 6)
 
--- Traço de minimizar (muito mais limpo e fino que texto)
 local MinLine = Instance.new("Frame", MinimizeBtn)
-MinLine.Size = UDim2.new(0, 10, 0, 1) -- Linha vetorial de 1 pixel de altura
+MinLine.Size = UDim2.new(0, 10, 0, 1)
 MinLine.AnchorPoint = Vector2.new(0.5, 0.5)
 MinLine.Position = UDim2.new(0.5, 0, 0.5, 0)
 MinLine.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 MinLine.BorderSizePixel = 0
 
 local MinStroke = Instance.new("UIStroke", MinimizeBtn)
-MinStroke.Color = DARK_RED
+MinStroke.Color = Color3.fromRGB(255, 255, 255)
 MinStroke.Thickness = 1
-CriarGradienteRotativo(MinStroke, 3)
+CriarGradienteRotativo(MinStroke, 3, DARK_RED, NEON_RED, DARK_RED)
 
 local Separator = Instance.new("Frame", MainFrame)
 Separator.Size = UDim2.new(0.94, 0, 0, 1)
@@ -417,7 +470,7 @@ ContentFrame.BackgroundTransparency = 1
 ContentFrame.BorderSizePixel = 0
 ContentFrame.ClipsDescendants = true
 
--- ==================== CONSTRUTOR DE TOGGLES (REFINAMENTO PREMIUM) ====================
+-- ==================== CONSTRUTOR DE TOGGLES ====================
 local function CriarToggle(yPos, texto, flagName)
     local row = Instance.new("Frame", ContentFrame)
     row.Size = UDim2.new(0.94, 0, 0, 40)
@@ -440,35 +493,31 @@ local function CriarToggle(yPos, texto, flagName)
     lbl.TextXAlignment = Enum.TextXAlignment.Center
     lbl.BackgroundTransparency = 1
 
-    -- Container do botão 
     local btn = Instance.new("TextButton", row)
     btn.Size = UDim2.new(0, 52, 0, 24)
     btn.Position = UDim2.new(1, -58, 0.5, -12)
-    btn.BackgroundColor3 = Color3.fromRGB(22, 22, 26) -- Fundo escuro normal (OFF)
-    btn.Text = "" -- Texto tratado separadamente para fluidez
+    btn.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
+    btn.Text = ""
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
 
     local btnStroke = Instance.new("UIStroke", btn)
-    btnStroke.Color = Color3.fromRGB(35, 35, 40) -- Borda discreta padrão
+    btnStroke.Color = Color3.fromRGB(35, 35, 40) 
     btnStroke.Thickness = 1
 
-    -- Fundo Gradiente Animado (ON)
     local gradFrame = Instance.new("Frame", btn)
     gradFrame.Size = UDim2.new(1, 0, 1, 0)
     gradFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    gradFrame.BackgroundTransparency = 1 -- Invisível no estado OFF
+    gradFrame.BackgroundTransparency = 1 
     Instance.new("UICorner", gradFrame).CornerRadius = UDim.new(0, 5)
 
-    -- Rotação Contínua dentro do botão
     CriarGradienteRotativo(gradFrame, 2.5, ALMOST_BLACK, DARK_RED, ALMOST_BLACK)
 
-    -- Texto do Botão (Sobreposto para não ser afetado pelo gradiente)
     local btnText = Instance.new("TextLabel", btn)
     btnText.Size = UDim2.new(1, 0, 1, 0)
     btnText.BackgroundTransparency = 1
     btnText.Text = "OFF"
     btnText.TextColor3 = Color3.fromRGB(150, 150, 150)
-    btnText.Font = Enum.Font.GothamBold -- Mesma fonte/espessura para ambos
+    btnText.Font = Enum.Font.GothamBold
     btnText.TextSize = 10
     btnText.ZIndex = 2
 
@@ -478,13 +527,20 @@ local function CriarToggle(yPos, texto, flagName)
         
         if flags[flagName] then
             btnText.Text = "ON"
-            -- Transição fluida de cores
             Animar(btnText, {TextColor3 = Color3.fromRGB(255, 255, 255)}, 0.2)
             Animar(gradFrame, {BackgroundTransparency = 0}, 0.2)
             Animar(btnStroke, {Color = Color3.fromRGB(80, 20, 20)}, 0.2)
+            
+            -- Se ligou InstantMine, força a quebra de todos os blocos renderizados na hora
+            if flagName == "InstantMine" then
+                task.spawn(function()
+                    for _, obj in ipairs(workspace:GetDescendants()) do
+                        pcall(OptimizeBlock, obj)
+                    end
+                end)
+            end
         else
             btnText.Text = "OFF"
-            -- Retorno fluido ao estado original
             Animar(btnText, {TextColor3 = Color3.fromRGB(150, 150, 150)}, 0.2)
             Animar(gradFrame, {BackgroundTransparency = 1}, 0.2)
             Animar(btnStroke, {Color = Color3.fromRGB(35, 35, 40)}, 0.2)
@@ -498,7 +554,7 @@ CriarToggle(8, "X RAY MINES", "ESP")
 CriarToggle(54, "INSTANT MINE", "InstantMine")
 CriarToggle(100, "SPEED MOD", "Speed")
 
--- ==================== CONTROLES DA UI E ANIMAÇÕES DE ENTRADA/SAÍDA ====================
+-- ==================== CONTROLES DA UI E ANIMAÇÕES ====================
 local menuAberto = true
 local isMinimized = false
 local fadeTween = nil
@@ -548,7 +604,6 @@ MinimizeBtn.MouseButton1Click:Connect(function()
     if not isMinimized then
         expandedPos = Main.Position
         isMinimized = true
-        -- O Texto permanece uma linha limpa. Não alteramos para "+" mais.
         targetHeight = HEADER_HEIGHT
         targetPos = UDim2.new(expandedPos.X.Scale, expandedPos.X.Offset, expandedPos.Y.Scale, expandedPos.Y.Offset - (heightDiff / 2))
     else
@@ -616,9 +671,9 @@ local function ExecutarIntro()
 
     local CardStroke = Instance.new("UIStroke", Card)
     CardStroke.Thickness = 1.5
-    CardStroke.Color = DARK_RED
+    CardStroke.Color = Color3.fromRGB(255, 255, 255)
     CardStroke.Transparency = 1
-    CriarGradienteRotativo(CardStroke, 2)
+    CriarGradienteRotativo(CardStroke, 2, DARK_RED, NEON_RED, DARK_RED)
 
     local IntroText = Instance.new("TextLabel", Card)
     IntroText.Size = UDim2.new(1, 0, 0, 30)
@@ -673,37 +728,14 @@ local function ExecutarIntro()
     Animar(MainScale, {Scale = 1}, 0.2)
 end
 
--- ==================== CHEATS AUXILIARES ====================
-local function ForceBreakBlocks()
-    if not flags.InstantMine then return end
-    
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("ProximityPrompt") then obj.HoldDuration = 0 end
-        
-        if obj:IsA("BasePart") or obj:IsA("Model") then
-            for _, v in ipairs(obj:GetChildren()) do
-                if v:IsA("NumberValue") or v:IsA("IntValue") then
-                    local n = v.Name:lower()
-                    if n == "health" or n == "hp" or n == "durability" or n == "maxhealth" then
-                        if v.Value > 1 then v.Value = 0 end
-                    end
-                end
-            end
-            
-            if obj:GetAttribute("Health") then obj:SetAttribute("Health", 0) end
-            if obj:GetAttribute("HP") then obj:SetAttribute("HP", 0) end
-        end
-    end
-end
-
--- ==================== LOOPS PRINCIPAIS ====================
+-- ==================== LOOPS PRINCIPAIS (AGORA SEM LAG) ====================
 RunService.Heartbeat:Connect(function()
     local hum = character and character:FindFirstChildOfClass("Humanoid")
     if hum then
         if flags.Speed then hum.WalkSpeed = SPEED_MULTIPLIER
         else if hum.WalkSpeed == SPEED_MULTIPLIER then hum.WalkSpeed = DEFAULT_SPEED end end
     end
-    ForceBreakBlocks()
+    -- Loop exaustivo de ForceBreakBlocks foi DELETADO daqui para salvar o seu FPS.
 end)
 
 task.spawn(function()
