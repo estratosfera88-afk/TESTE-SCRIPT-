@@ -29,8 +29,8 @@ local HEADER_HEIGHT = 42
 local UI_HEIGHT = 200
 
 -- Cores do Tema
-local DARK_RED = Color3.fromRGB(139, 0, 0)
-local AKAT_RED = Color3.fromRGB(255, 30, 30)
+local DARK_RED = Color3.fromRGB(150, 10, 10)
+local AKAT_RED = Color3.fromRGB(220, 20, 20)
 
 -- Configurações do X-Ray V2
 local MAX_DISTANCE = 180          
@@ -73,7 +73,7 @@ local function CriarGradienteRotativo(parent, speed)
     local grad = Instance.new("UIGradient")
     grad.Color = ColorSequence.new({
         ColorSequenceKeypoint.new(0, DARK_RED),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(15, 15, 15)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(10, 10, 12)),
         ColorSequenceKeypoint.new(1, DARK_RED)
     })
     grad.Parent = parent
@@ -324,7 +324,7 @@ FloatBtn.Size = UDim2.new(0, 0, 0, 0)
 FloatBtn.Position = UDim2.new(0.1, 0, 0.35, 0)
 FloatBtn.Image = "rbxthumb://type=Asset&id=99997714241420&w=150&h=150"
 FloatBtn.ImageColor3 = Color3.fromRGB(255, 255, 255)
-FloatBtn.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+FloatBtn.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
 FloatBtn.Visible = false
 FloatBtn.ZIndex = 30
 Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(0, 8)
@@ -334,7 +334,7 @@ FloatStroke.Thickness = 1.4
 FloatStroke.Color = DARK_RED
 CriarGradienteRotativo(FloatStroke, 3)
 
--- ==================== JANELA PRINCIPAL (ESTRUTURA REFATORADA) ====================
+-- ==================== JANELA PRINCIPAL (PRETO DARK MODERNO) ====================
 local Main = Instance.new("CanvasGroup", ScreenGui)
 Main.Name = "Main"
 Main.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -345,7 +345,6 @@ Main.GroupTransparency = 1
 Main.Visible = false
 Main.ClipsDescendants = true
 
--- Controla a animação suave de entrada/saída (Zoom/Scale)
 local MainScale = Instance.new("UIScale", Main)
 MainScale.Scale = 1
 
@@ -353,7 +352,7 @@ local MainFrame = Instance.new("Frame", Main)
 MainFrame.Name = "MainFrame"
 MainFrame.Size = UDim2.new(1, 0, 1, 0)
 MainFrame.Position = UDim2.new(0, 0, 0, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
+MainFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 16) -- Preto Dark Moderno
 MainFrame.BorderSizePixel = 0
 MainFrame.ClipsDescendants = true
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
@@ -375,34 +374,27 @@ TitleContainer.Size = UDim2.new(0.82, 0, 1, 0)
 TitleContainer.Position = UDim2.new(0, 12, 0, 0)
 TitleContainer.BackgroundTransparency = 1
 
--- Badge AKAT (Com Neon e Brilho Verdadeiro Moderno)
+-- Badge AKAT (Preto com Vermelho Escuro Neon + Altura Reduzida)
 local AkatBadge = Instance.new("Frame", TitleContainer)
 AkatBadge.AnchorPoint = Vector2.new(0, 0.5)
-AkatBadge.Size = UDim2.new(0, 48, 0, 18)
+AkatBadge.Size = UDim2.new(0, 46, 0, 15) -- Altura abaixada
 AkatBadge.Position = UDim2.new(0, 0, 0.5, 0)
-AkatBadge.BackgroundColor3 = Color3.fromRGB(255, 30, 30)
+AkatBadge.BackgroundColor3 = Color3.fromRGB(10, 10, 12) -- Fundo Preto
 AkatBadge.BorderSizePixel = 0
 AkatBadge.ZIndex = 2
-Instance.new("UICorner", AkatBadge).CornerRadius = UDim.new(0, 5)
-
-local AkatGrad = Instance.new("UIGradient", AkatBadge)
-AkatGrad.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 60, 60)),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(180, 10, 10)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 60, 60))
-})
+Instance.new("UICorner", AkatBadge).CornerRadius = UDim.new(0, 4)
 
 local AkatBadgeStroke = Instance.new("UIStroke", AkatBadge)
-AkatBadgeStroke.Thickness = 1.4
-AkatBadgeStroke.Color = Color3.fromRGB(255, 130, 130)
+AkatBadgeStroke.Thickness = 1.2
+AkatBadgeStroke.Color = AKAT_RED -- Borda Vermelho Neon
 AkatBadgeStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
 local TitleAkat = Instance.new("TextLabel", AkatBadge)
 TitleAkat.Size = UDim2.new(1, 0, 1, 0)
 TitleAkat.Text = "AKAT"
 TitleAkat.TextColor3 = Color3.fromRGB(255, 255, 255)
-TitleAkat.Font = Enum.Font.GothamBold
-TitleAkat.TextSize = 11
+TitleAkat.Font = Enum.Font.Gotham
+TitleAkat.TextSize = 10
 TitleAkat.TextXAlignment = Enum.TextXAlignment.Center
 TitleAkat.BackgroundTransparency = 1
 TitleAkat.ZIndex = 3
@@ -410,8 +402,8 @@ TitleAkat.ZIndex = 3
 -- Nome do Jogo
 local TitleGame = Instance.new("TextLabel", TitleContainer)
 TitleGame.AnchorPoint = Vector2.new(0, 0.5)
-TitleGame.Size = UDim2.new(1, -56, 1, 0)
-TitleGame.Position = UDim2.new(0, 56, 0.5, 0)
+TitleGame.Size = UDim2.new(1, -54, 1, 0)
+TitleGame.Position = UDim2.new(0, 54, 0.5, 0)
 TitleGame.Text = "JULES RNG (THE MINE)"
 TitleGame.TextColor3 = Color3.fromRGB(240, 240, 240)
 TitleGame.Font = Enum.Font.GothamBold
@@ -419,15 +411,15 @@ TitleGame.TextSize = 11
 TitleGame.TextXAlignment = Enum.TextXAlignment.Left
 TitleGame.BackgroundTransparency = 1
 
--- Botão Minimizar (Perfeitamente centralizado e traço moderno "—")
+-- Botão Minimizar (Traço reto fino "—", mantendo sempre "-")
 local MinimizeBtn = Instance.new("TextButton", Header)
 MinimizeBtn.Size = UDim2.new(0, 26, 0, 26)
 MinimizeBtn.Position = UDim2.new(1, -34, 0.5, -13)
 MinimizeBtn.Text = "—"
 MinimizeBtn.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
 MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-MinimizeBtn.Font = Enum.Font.GothamBold
-MinimizeBtn.TextSize = 14
+MinimizeBtn.Font = Enum.Font.Gotham
+MinimizeBtn.TextSize = 13
 MinimizeBtn.TextXAlignment = Enum.TextXAlignment.Center
 MinimizeBtn.TextYAlignment = Enum.TextYAlignment.Center
 Instance.new("UICorner", MinimizeBtn).CornerRadius = UDim.new(0, 6)
@@ -440,7 +432,7 @@ CriarGradienteRotativo(MinStroke, 3)
 local Separator = Instance.new("Frame", MainFrame)
 Separator.Size = UDim2.new(0.94, 0, 0, 1)
 Separator.Position = UDim2.new(0.03, 0, 0, HEADER_HEIGHT)
-Separator.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+Separator.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
 Separator.BorderSizePixel = 0
 
 -- Container de Conteúdo
@@ -452,17 +444,17 @@ ContentFrame.BackgroundTransparency = 1
 ContentFrame.BorderSizePixel = 0
 ContentFrame.ClipsDescendants = true
 
--- ==================== CONSTRUTOR DE TOGGLES ====================
+-- ==================== CONSTRUTOR DE TOGGLES (GRADIENTE INTERNO) ====================
 local function CriarToggle(yPos, texto, flagName)
     local row = Instance.new("Frame", ContentFrame)
     row.Size = UDim2.new(0.94, 0, 0, 40)
     row.Position = UDim2.new(0.03, 0, 0, yPos)
-    row.BackgroundColor3 = Color3.fromRGB(16, 16, 20)
+    row.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
     row.BorderSizePixel = 0
     Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
 
     local rowStroke = Instance.new("UIStroke", row)
-    rowStroke.Color = Color3.fromRGB(30, 30, 35)
+    rowStroke.Color = Color3.fromRGB(28, 28, 34)
     rowStroke.Thickness = 1
 
     local lbl = Instance.new("TextLabel", row)
@@ -470,7 +462,7 @@ local function CriarToggle(yPos, texto, flagName)
     lbl.Position = UDim2.new(0, 10, 0, 0)
     lbl.Text = texto
     lbl.TextColor3 = Color3.fromRGB(230, 230, 230)
-    lbl.Font = Enum.Font.GothamBold
+    lbl.Font = Enum.Font.Gotham
     lbl.TextSize = 11
     lbl.TextXAlignment = Enum.TextXAlignment.Center
     lbl.BackgroundTransparency = 1
@@ -478,18 +470,30 @@ local function CriarToggle(yPos, texto, flagName)
     local btn = Instance.new("TextButton", row)
     btn.Size = UDim2.new(0, 52, 0, 24)
     btn.Position = UDim2.new(1, -58, 0.5, -12)
-    btn.BackgroundColor3 = Color3.fromRGB(28, 28, 32)
+    btn.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
     btn.Text = "OFF"
     btn.TextColor3 = Color3.fromRGB(150, 150, 150)
-    btn.Font = Enum.Font.GothamBold
+    btn.Font = Enum.Font.Gotham -- Fonte Normal
     btn.TextSize = 10
+    btn.ClipsDescendants = true
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
 
     local btnStroke = Instance.new("UIStroke", btn)
-    btnStroke.Color = Color3.fromRGB(45, 45, 50)
+    btnStroke.Color = Color3.fromRGB(40, 40, 48)
     btnStroke.Thickness = 1
 
-    local activeGrad = nil
+    -- Gradiente no fundo do botão ON (Vermelho Escuro + Preto)
+    local btnGradient = Instance.new("UIGradient")
+    btnGradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(140, 0, 0)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(8, 8, 12)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(140, 0, 0))
+    })
+    btnGradient.Enabled = false
+    btnGradient.Parent = btn
+
+    -- Animação infinita do gradiente no botão
+    TweenService:Create(btnGradient, TweenInfo.new(3, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), {Rotation = 360}):Play()
 
     btn.MouseButton1Click:Connect(function()
         EfeitoClique(btn)
@@ -497,23 +501,17 @@ local function CriarToggle(yPos, texto, flagName)
         if flags[flagName] then
             btn.Text = "ON"
             btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            btn.Font = Enum.Font.Gotham -- Letra normal sem espessura/contorno pesado
-            btnStroke.Color = Color3.fromRGB(255, 255, 255)
-            
-            if not activeGrad then
-                activeGrad = CriarGradienteRotativo(btnStroke, 3)
-            else
-                activeGrad.Enabled = true
-            end
+            btn.Font = Enum.Font.Gotham -- Mantém normal
+            btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255) -- Permite a visibilidade do UIGradient
+            btnGradient.Enabled = true
+            btnStroke.Color = DARK_RED
         else
             btn.Text = "OFF"
             btn.TextColor3 = Color3.fromRGB(150, 150, 150)
-            btn.Font = Enum.Font.GothamBold
-            btnStroke.Color = Color3.fromRGB(45, 45, 50)
-            
-            if activeGrad then
-                activeGrad.Enabled = false
-            end
+            btn.Font = Enum.Font.Gotham -- Mantém normal
+            btn.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+            btnGradient.Enabled = false
+            btnStroke.Color = Color3.fromRGB(40, 40, 48)
             
             if flagName == "ESP" then ClearAllESP() end
         end
@@ -524,7 +522,7 @@ CriarToggle(8, "X RAY MINES", "ESP")
 CriarToggle(54, "INSTANT MINE", "InstantMine")
 CriarToggle(100, "SPEED MOD", "Speed")
 
--- ==================== CONTROLES DA UI E ANIMAÇÕES DE ENTRADA/SAÍDA ====================
+-- ==================== CONTROLES DA UI ====================
 local menuAberto = true
 local isMinimized = false
 local fadeTween = nil
@@ -570,7 +568,6 @@ FloatBtn.MouseButton1Click:Connect(function()
     ToggleMenu(not menuAberto)
 end)
 
--- Minimizar com colapso de baixo para cima (mantendo topo fixo)
 MinimizeBtn.MouseButton1Click:Connect(function()
     EfeitoClique(MinimizeBtn)
     
@@ -580,12 +577,12 @@ MinimizeBtn.MouseButton1Click:Connect(function()
     if not isMinimized then
         expandedPos = Main.Position
         isMinimized = true
-        MinimizeBtn.Text = "+"
+        MinimizeBtn.Text = "—" -- Sempre traço reto
         targetHeight = HEADER_HEIGHT
         targetPos = UDim2.new(expandedPos.X.Scale, expandedPos.X.Offset, expandedPos.Y.Scale, expandedPos.Y.Offset - (heightDiff / 2))
     else
         isMinimized = false
-        MinimizeBtn.Text = "—"
+        MinimizeBtn.Text = "—" -- Sempre traço reto
         targetHeight = UI_HEIGHT
         targetPos = expandedPos
     end
@@ -648,7 +645,7 @@ local function ExecutarIntro()
     Card.AnchorPoint = Vector2.new(0.5, 0.5)
     Card.Size = UDim2.new(0, 290, 0, 70)
     Card.Position = UDim2.new(0.5, 0, 0.5, 0)
-    Card.BackgroundColor3 = Color3.fromRGB(12, 12, 15)
+    Card.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
     Card.BackgroundTransparency = 1
     Card.ZIndex = 501
     Instance.new("UICorner", Card).CornerRadius = UDim.new(0, 10)
