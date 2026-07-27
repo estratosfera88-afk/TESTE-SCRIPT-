@@ -9,7 +9,6 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
 local CoreGui = game:GetService("CoreGui")
-local ProximityPromptService = game:GetService("ProximityPromptService")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
@@ -17,7 +16,8 @@ local character = player.Character or player.CharacterAdded:Wait()
 -- ==================== CONFIGURAÇÕES GERAIS ====================
 local flags = {
     ESP = false,
-    InstantMine = false,
+    AutoMine = false,
+    Float = false,
     Speed = false
 }
 
@@ -27,11 +27,11 @@ local DEFAULT_SPEED = 16
 -- Dimensões da UI
 local UI_WIDTH = 370
 local HEADER_HEIGHT = 42
-local UI_HEIGHT = 200
+local UI_HEIGHT = 246 -- Aumentado para acomodar os 4 Toggles
 
--- Cores do Tema Premium
-local DARK_RED = Color3.fromRGB(139, 0, 0)
-local NEON_RED = Color3.fromRGB(255, 30, 30)
+-- Cores do Tema Premium (Dark Red Edition)
+local DARK_RED = Color3.fromRGB(55, 0, 0)
+local NEON_RED = Color3.fromRGB(139, 0, 0) -- Substitui o vermelho brilhante por um escuro puro
 local ALMOST_BLACK = Color3.fromRGB(8, 8, 8)
 
 -- Configurações do X-Ray V2
@@ -108,40 +108,49 @@ local function EfeitoClique(btn)
     end)
 end
 
--- ==================== LÓGICA DO INSTANT MINE (NOVO E OTIMIZADO) ====================
-local function OptimizeBlock(obj)
-    if not flags.InstantMine then return end
-    
+-- ==================== LÓGICA DO AUTO MINE ====================
+local promptCache = {}
+
+local function TrackPrompt(obj)
     if obj:IsA("ProximityPrompt") then
-        obj.HoldDuration = 0
-    end
-    
-    if obj:IsA("BasePart") or obj:IsA("Model") then
-        if obj:GetAttribute("Health") then obj:SetAttribute("Health", 0) end
-        if obj:GetAttribute("HP") then obj:SetAttribute("HP", 0) end
-        
-        for _, v in ipairs(obj:GetChildren()) do
-            if v:IsA("NumberValue") or v:IsA("IntValue") then
-                local n = v.Name:lower()
-                if n == "health" or n == "hp" or n == "durability" or n == "maxhealth" then
-                    if v.Value > 1 then v.Value = 0 end
-                end
-            end
-        end
+        promptCache[obj] = true
     end
 end
 
--- Tornar Prompts instantâneos globais sem lag de loop
-ProximityPromptService.PromptShown:Connect(function(prompt)
-    if flags.InstantMine then
-        prompt.HoldDuration = 0
-    end
+workspace.DescendantAdded:Connect(TrackPrompt)
+workspace.DescendantRemoving:Connect(function(obj)
+    if obj:IsA("ProximityPrompt") then promptCache[obj] = nil end
 end)
 
--- Detectar novos blocos criados no mapa
-workspace.DescendantAdded:Connect(function(obj)
-    if flags.InstantMine then
-        pcall(OptimizeBlock, obj)
+for _, obj in ipairs(workspace:GetDescendants()) do
+    TrackPrompt(obj)
+end
+
+task.spawn(function()
+    while true do
+        task.wait(0.25)
+        if flags.AutoMine then
+            local root = character and character:FindFirstChild("HumanoidRootPart")
+            if root then
+                for prompt in pairs(promptCache) do
+                    if prompt.Enabled and prompt.Parent and prompt.Parent:IsA("BasePart") then
+                        local dist = (prompt.Parent.Position - root.Position).Magnitude
+                        -- Dispara automaticamente ao entrar na área de interação
+                        if dist <= (prompt.MaxActivationDistance + 2) then
+                            pcall(function()
+                                if fireproximityprompt then
+                                    fireproximityprompt(prompt, 1)
+                                else
+                                    prompt:InputHoldBegin()
+                                    task.wait(0.05)
+                                    prompt:InputHoldEnd()
+                                end
+                            end)
+                        end
+                    end
+                end
+            end
+        end
     end
 end)
 
@@ -183,9 +192,6 @@ local function GetOreInfo(obj)
     end
     if obj:FindFirstChildOfClass("ProximityPrompt") then
         return {Name = obj.Name, Color = Color3.fromRGB(255, 180, 0)}, 2
-    end
-    if obj:GetAttribute("Health") or obj:GetAttribute("HP") or obj:GetAttribute("Durability") then
-        return {Name = obj.Name, Color = Color3.fromRGB(200, 200, 100)}, 1
     end
     return nil
 end
@@ -241,7 +247,7 @@ local function IsAlreadyTracked(obj)
 end
 
 local function UpdateESP()
-    if not flags.ESP and not flags.InstantMine then
+    if not flags.ESP then
         if next(espCache) then ClearAllESP() end
         return
     end
@@ -252,52 +258,49 @@ local function UpdateESP()
     local myPos = root.Position
     local candidates, candidateObjs = {}, {}
 
-    if flags.ESP then
-        for _, obj in ipairs(workspace:GetDescendants()) do
-            if obj:IsA("Model") or obj:IsA("BasePart") then
-                local isTracked = IsAlreadyTracked(obj) or candidateObjs[obj]
-                if not isTracked then
-                    local p = obj.Parent
-                    while p and p ~= workspace do
-                        if candidateObjs[p] then isTracked = true; break end
-                        p = p.Parent
-                    end
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Model") or obj:IsA("BasePart") then
+            local isTracked = IsAlreadyTracked(obj) or candidateObjs[obj]
+            if not isTracked then
+                local p = obj.Parent
+                while p and p ~= workspace do
+                    if candidateObjs[p] then isTracked = true; break end
+                    p = p.Parent
                 end
-                if not isTracked and obj:IsA("BasePart") and obj.Parent:IsA("Model") and obj.Parent ~= workspace then
-                    if GetOreInfo(obj.Parent) then isTracked = true end
-                end
-                if not isTracked then
-                    local oreInfo, priority = GetOreInfo(obj)
-                    if oreInfo then
-                        local part = GetTargetPart(obj)
-                        if part then
-                            local dist = (part.Position - myPos).Magnitude
-                            if dist <= MAX_DISTANCE then
-                                candidateObjs[obj] = true
-                                table.insert(candidates, { Object = obj, Info = oreInfo, Priority = priority, Distance = dist })
-                            end
+            end
+            if not isTracked and obj:IsA("BasePart") and obj.Parent:IsA("Model") and obj.Parent ~= workspace then
+                if GetOreInfo(obj.Parent) then isTracked = true end
+            end
+            if not isTracked then
+                local oreInfo, priority = GetOreInfo(obj)
+                if oreInfo then
+                    local part = GetTargetPart(obj)
+                    if part then
+                        local dist = (part.Position - myPos).Magnitude
+                        if dist <= MAX_DISTANCE then
+                            candidateObjs[obj] = true
+                            table.insert(candidates, { Object = obj, Info = oreInfo, Priority = priority, Distance = dist })
                         end
                     end
                 end
             end
         end
+    end
 
-        table.sort(candidates, function(a, b)
-            if a.Priority ~= b.Priority then return a.Priority > b.Priority end
-            return a.Distance < b.Distance
-        end)
+    table.sort(candidates, function(a, b)
+        if a.Priority ~= b.Priority then return a.Priority > b.Priority end
+        return a.Distance < b.Distance
+    end)
 
-        local created = 0
-        for _, data in ipairs(candidates) do
-            if created >= MAX_HIGHLIGHTS then break end
-            if not espCache[data.Object] then
-                CreateESP(data.Object, data.Info, data.Priority)
-                created = created + 1
-            end
+    local created = 0
+    for _, data in ipairs(candidates) do
+        if created >= MAX_HIGHLIGHTS then break end
+        if not espCache[data.Object] then
+            CreateESP(data.Object, data.Info, data.Priority)
+            created = created + 1
         end
     end
 
-    -- Processa o cache atualizando a distância (ESP) e forçando o zero-health se InstantMine estiver ativo
     for obj, data in pairs(espCache) do
         if not obj.Parent or not data.Part or not data.Part.Parent then
             ClearESP(obj)
@@ -306,13 +309,8 @@ local function UpdateESP()
             if dist > MAX_DISTANCE + 15 then 
                 ClearESP(obj)
             else 
-                if data.Label and flags.ESP then 
+                if data.Label then 
                     data.Label.Text = string.format("%s\n%.0fm", data.Name, dist) 
-                end
-                
-                -- Aplicação constante do Instant Mine nos minérios próximos (Anula resets do servidor)
-                if flags.InstantMine then
-                    pcall(OptimizeBlock, obj)
                 end
             end
         end
@@ -371,7 +369,6 @@ MainFrame.BorderSizePixel = 0
 MainFrame.ClipsDescendants = true
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
--- Gradiente de Fundo (Profundidade Premium)
 local BgGradient = Instance.new("UIGradient", MainFrame)
 BgGradient.Rotation = 90
 BgGradient.Color = ColorSequence.new({
@@ -395,7 +392,6 @@ TitleContainer.Size = UDim2.new(0.82, 0, 1, 0)
 TitleContainer.Position = UDim2.new(0, 12, 0, 0)
 TitleContainer.BackgroundTransparency = 1
 
--- Badge AKAT (Contorno Premium Animado)
 local AkatBadge = Instance.new("Frame", TitleContainer)
 AkatBadge.AnchorPoint = Vector2.new(0, 0.5)
 AkatBadge.Size = UDim2.new(0, 46, 0, 16)
@@ -405,13 +401,10 @@ AkatBadge.BorderSizePixel = 0
 AkatBadge.ZIndex = 2
 Instance.new("UICorner", AkatBadge).CornerRadius = UDim.new(0, 5)
 
--- Borda com Gradiente Rotativo aplicado no Badge Akat
 local AkatBadgeStroke = Instance.new("UIStroke", AkatBadge)
 AkatBadgeStroke.Thickness = 1.2
-AkatBadgeStroke.Color = Color3.fromRGB(255, 255, 255) -- Base branca obrigatória para UIGradient funcionar no UIStroke
+AkatBadgeStroke.Color = Color3.fromRGB(255, 255, 255) 
 AkatBadgeStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-
--- Adiciona a Animação Fluida alternando entre Dark Red e Vermelho Brilhante
 CriarGradienteRotativo(AkatBadgeStroke, 2.5, DARK_RED, NEON_RED, DARK_RED)
 
 local TitleAkat = Instance.new("TextLabel", AkatBadge)
@@ -424,7 +417,6 @@ TitleAkat.TextXAlignment = Enum.TextXAlignment.Center
 TitleAkat.BackgroundTransparency = 1
 TitleAkat.ZIndex = 3
 
--- Nome do Jogo
 local TitleGame = Instance.new("TextLabel", TitleContainer)
 TitleGame.AnchorPoint = Vector2.new(0, 0.5)
 TitleGame.Size = UDim2.new(1, -54, 1, 0)
@@ -436,13 +428,19 @@ TitleGame.TextSize = 11
 TitleGame.TextXAlignment = Enum.TextXAlignment.Left
 TitleGame.BackgroundTransparency = 1
 
--- Botão Minimizar
+-- Botão Minimizar com Flash Effect
 local MinimizeBtn = Instance.new("TextButton", Header)
 MinimizeBtn.Size = UDim2.new(0, 26, 0, 26)
 MinimizeBtn.Position = UDim2.new(1, -34, 0.5, -13)
 MinimizeBtn.Text = ""
 MinimizeBtn.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
 Instance.new("UICorner", MinimizeBtn).CornerRadius = UDim.new(0, 6)
+
+local MinimizeFlash = Instance.new("Frame", MinimizeBtn)
+MinimizeFlash.Size = UDim2.new(1, 0, 1, 0)
+MinimizeFlash.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+MinimizeFlash.BackgroundTransparency = 1
+Instance.new("UICorner", MinimizeFlash).CornerRadius = UDim.new(0, 6)
 
 local MinLine = Instance.new("Frame", MinimizeBtn)
 MinLine.Size = UDim2.new(0, 10, 0, 1)
@@ -468,7 +466,6 @@ ContentFrame.Size = UDim2.new(1, 0, 1, -(HEADER_HEIGHT + 1))
 ContentFrame.Position = UDim2.new(0, 0, 0, HEADER_HEIGHT + 1)
 ContentFrame.BackgroundTransparency = 1
 ContentFrame.BorderSizePixel = 0
-ContentFrame.ClipsDescendants = true
 
 -- ==================== CONSTRUTOR DE TOGGLES ====================
 local function CriarToggle(yPos, texto, flagName)
@@ -500,17 +497,13 @@ local function CriarToggle(yPos, texto, flagName)
     btn.Text = ""
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
 
+    -- Novo sistema de Gradiente que afeta apenas a borda do botão
     local btnStroke = Instance.new("UIStroke", btn)
     btnStroke.Color = Color3.fromRGB(35, 35, 40) 
-    btnStroke.Thickness = 1
+    btnStroke.Thickness = 1.5
 
-    local gradFrame = Instance.new("Frame", btn)
-    gradFrame.Size = UDim2.new(1, 0, 1, 0)
-    gradFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    gradFrame.BackgroundTransparency = 1 
-    Instance.new("UICorner", gradFrame).CornerRadius = UDim.new(0, 5)
-
-    CriarGradienteRotativo(gradFrame, 2.5, ALMOST_BLACK, DARK_RED, ALMOST_BLACK)
+    local btnGrad = CriarGradienteRotativo(btnStroke, 2.5, DARK_RED, NEON_RED, DARK_RED)
+    btnGrad.Enabled = false -- Gradiente desligado por padrão
 
     local btnText = Instance.new("TextLabel", btn)
     btnText.Size = UDim2.new(1, 0, 1, 0)
@@ -528,31 +521,50 @@ local function CriarToggle(yPos, texto, flagName)
         if flags[flagName] then
             btnText.Text = "ON"
             Animar(btnText, {TextColor3 = Color3.fromRGB(255, 255, 255)}, 0.2)
-            Animar(gradFrame, {BackgroundTransparency = 0}, 0.2)
-            Animar(btnStroke, {Color = Color3.fromRGB(80, 20, 20)}, 0.2)
             
-            -- Se ligou InstantMine, força a quebra de todos os blocos renderizados na hora
-            if flagName == "InstantMine" then
-                task.spawn(function()
-                    for _, obj in ipairs(workspace:GetDescendants()) do
-                        pcall(OptimizeBlock, obj)
-                    end
-                end)
+            -- Liga o efeito na borda
+            btnGrad.Enabled = true
+            Animar(btnStroke, {Color = Color3.fromRGB(255, 255, 255)}, 0.2)
+
+            -- Ativação individual do Float
+            if flagName == "Float" then
+                local root = character and character:FindFirstChild("HumanoidRootPart")
+                if root and not root:FindFirstChild("AkatFloatForce") then
+                    local bv = Instance.new("BodyVelocity")
+                    bv.Name = "AkatFloatForce"
+                    bv.MaxForce = Vector3.new(0, 100000, 0)
+                    bv.Velocity = Vector3.new(0, 0, 0)
+                    bv.P = 1250
+                    bv.Parent = root
+                end
             end
         else
             btnText.Text = "OFF"
             Animar(btnText, {TextColor3 = Color3.fromRGB(150, 150, 150)}, 0.2)
-            Animar(gradFrame, {BackgroundTransparency = 1}, 0.2)
+            
+            -- Desliga o efeito na borda
             Animar(btnStroke, {Color = Color3.fromRGB(35, 35, 40)}, 0.2)
+            task.delay(0.2, function()
+                if not flags[flagName] then btnGrad.Enabled = false end
+            end)
             
             if flagName == "ESP" then ClearAllESP() end
+            
+            -- Desativação do Float
+            if flagName == "Float" then
+                local root = character and character:FindFirstChild("HumanoidRootPart")
+                if root and root:FindFirstChild("AkatFloatForce") then
+                    root.AkatFloatForce:Destroy()
+                end
+            end
         end
     end)
 end
 
 CriarToggle(8, "X RAY MINES", "ESP")
-CriarToggle(54, "INSTANT MINE", "InstantMine")
-CriarToggle(100, "SPEED MOD", "Speed")
+CriarToggle(54, "AUTO MINE", "AutoMine")
+CriarToggle(100, "FLOAT", "Float")
+CriarToggle(146, "SPEED MOD", "Speed")
 
 -- ==================== CONTROLES DA UI E ANIMAÇÕES ====================
 local menuAberto = true
@@ -596,6 +608,9 @@ FloatBtn.MouseButton1Click:Connect(function()
 end)
 
 MinimizeBtn.MouseButton1Click:Connect(function()
+    -- Efeito de Flash modernizado
+    MinimizeFlash.BackgroundTransparency = 0
+    Animar(MinimizeFlash, {BackgroundTransparency = 1}, 0.2)
     EfeitoClique(MinimizeBtn)
     
     local heightDiff = UI_HEIGHT - HEADER_HEIGHT
@@ -616,7 +631,8 @@ MinimizeBtn.MouseButton1Click:Connect(function()
 
     if resizeTween then resizeTween:Cancel(); resizeTween = nil end
 
-    resizeTween = TweenService:Create(Main, TweenInfo.new(0.18, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+    -- Animação 60FPS extremamente fluida sem delay (Quint Easing)
+    resizeTween = TweenService:Create(Main, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
         Size = targetSize,
         Position = targetPos
     })
@@ -648,7 +664,7 @@ end
 ConfigurarArrastar(Main)
 ConfigurarArrastar(FloatBtn)
 
--- ==================== INTRODUÇÃO ====================
+-- ==================== INTRODUÇÃO (AGORA 5 SEGUNDOS) ====================
 local function ExecutarIntro()
     local Blur = Instance.new("BlurEffect", Lighting)
     Blur.Size = 0
@@ -705,7 +721,9 @@ local function ExecutarIntro()
     Animar(CardStroke, {Transparency = 0}, 0.3)
     Animar(IntroText, {TextTransparency = 0}, 0.3)
     Animar(SubText, {TextTransparency = 0}, 0.3)
-    task.wait(1.5) 
+    
+    -- Duração estendida da introdução
+    task.wait(5) 
 
     Animar(IntroText, {TextTransparency = 1}, 0.25)
     Animar(SubText, {TextTransparency = 1}, 0.25)
@@ -728,14 +746,13 @@ local function ExecutarIntro()
     Animar(MainScale, {Scale = 1}, 0.2)
 end
 
--- ==================== LOOPS PRINCIPAIS (AGORA SEM LAG) ====================
+-- ==================== LOOPS DE OTMIZAÇÃO E EVENTOS ====================
 RunService.Heartbeat:Connect(function()
     local hum = character and character:FindFirstChildOfClass("Humanoid")
     if hum then
         if flags.Speed then hum.WalkSpeed = SPEED_MULTIPLIER
         else if hum.WalkSpeed == SPEED_MULTIPLIER then hum.WalkSpeed = DEFAULT_SPEED end end
     end
-    -- Loop exaustivo de ForceBreakBlocks foi DELETADO daqui para salvar o seu FPS.
 end)
 
 task.spawn(function()
@@ -745,13 +762,23 @@ task.spawn(function()
     end
 end)
 
-workspace.DescendantRemoving:Connect(function(obj)
-    if espCache[obj] then ClearESP(obj) end
-end)
-
 player.CharacterAdded:Connect(function(char)
     character = char
     ClearAllESP()
+    
+    -- Reaplicar o Float caso o player dê respawn e a função esteja ativada
+    if flags.Float then
+        task.wait(0.5)
+        local root = char:WaitForChild("HumanoidRootPart", 3)
+        if root and not root:FindFirstChild("AkatFloatForce") then
+            local bv = Instance.new("BodyVelocity")
+            bv.Name = "AkatFloatForce"
+            bv.MaxForce = Vector3.new(0, 100000, 0)
+            bv.Velocity = Vector3.new(0, 0, 0)
+            bv.P = 1250
+            bv.Parent = root
+        end
+    end
 end)
 
 -- Inicialização
