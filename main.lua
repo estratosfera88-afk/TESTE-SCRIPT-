@@ -30,7 +30,7 @@ local UI_HEIGHT = 200
 
 -- Cores do Tema
 local DARK_RED = Color3.fromRGB(139, 0, 0)
-local AKAT_RED = Color3.fromRGB(220, 30, 30)
+local AKAT_RED = Color3.fromRGB(255, 30, 30)
 
 -- Configurações do X-Ray V2
 local MAX_DISTANCE = 180          
@@ -335,7 +335,6 @@ FloatStroke.Color = DARK_RED
 CriarGradienteRotativo(FloatStroke, 3)
 
 -- ==================== JANELA PRINCIPAL (ESTRUTURA REFATORADA) ====================
--- CanvasGroup: Usado EXCLUSIVAMENTE para controlar a transparência global (Fade-in / Fade-out)
 local Main = Instance.new("CanvasGroup", ScreenGui)
 Main.Name = "Main"
 Main.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -346,7 +345,10 @@ Main.GroupTransparency = 1
 Main.Visible = false
 Main.ClipsDescendants = true
 
--- MainFrame: Frame interno que controla o tamanho da janela, cor de fundo e recorte dinâmico
+-- Controla a animação suave de entrada/saída (Zoom/Scale)
+local MainScale = Instance.new("UIScale", Main)
+MainScale.Scale = 1
+
 local MainFrame = Instance.new("Frame", Main)
 MainFrame.Name = "MainFrame"
 MainFrame.Size = UDim2.new(1, 0, 1, 0)
@@ -373,19 +375,26 @@ TitleContainer.Size = UDim2.new(0.82, 0, 1, 0)
 TitleContainer.Position = UDim2.new(0, 12, 0, 0)
 TitleContainer.BackgroundTransparency = 1
 
--- Badge AKAT
+-- Badge AKAT (Com Neon e Brilho Verdadeiro Moderno)
 local AkatBadge = Instance.new("Frame", TitleContainer)
 AkatBadge.AnchorPoint = Vector2.new(0, 0.5)
 AkatBadge.Size = UDim2.new(0, 48, 0, 18)
 AkatBadge.Position = UDim2.new(0, 0, 0.5, 0)
-AkatBadge.BackgroundColor3 = AKAT_RED
+AkatBadge.BackgroundColor3 = Color3.fromRGB(255, 30, 30)
 AkatBadge.BorderSizePixel = 0
 AkatBadge.ZIndex = 2
 Instance.new("UICorner", AkatBadge).CornerRadius = UDim.new(0, 5)
 
+local AkatGrad = Instance.new("UIGradient", AkatBadge)
+AkatGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 60, 60)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(180, 10, 10)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 60, 60))
+})
+
 local AkatBadgeStroke = Instance.new("UIStroke", AkatBadge)
-AkatBadgeStroke.Thickness = 1.2
-AkatBadgeStroke.Color = Color3.fromRGB(255, 80, 80)
+AkatBadgeStroke.Thickness = 1.4
+AkatBadgeStroke.Color = Color3.fromRGB(255, 130, 130)
 AkatBadgeStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
 local TitleAkat = Instance.new("TextLabel", AkatBadge)
@@ -410,15 +419,17 @@ TitleGame.TextSize = 11
 TitleGame.TextXAlignment = Enum.TextXAlignment.Left
 TitleGame.BackgroundTransparency = 1
 
--- Botão Minimizar
+-- Botão Minimizar (Perfeitamente centralizado e traço moderno "—")
 local MinimizeBtn = Instance.new("TextButton", Header)
 MinimizeBtn.Size = UDim2.new(0, 26, 0, 26)
 MinimizeBtn.Position = UDim2.new(1, -34, 0.5, -13)
-MinimizeBtn.Text = "-"
+MinimizeBtn.Text = "—"
 MinimizeBtn.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
 MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 MinimizeBtn.Font = Enum.Font.GothamBold
 MinimizeBtn.TextSize = 14
+MinimizeBtn.TextXAlignment = Enum.TextXAlignment.Center
+MinimizeBtn.TextYAlignment = Enum.TextYAlignment.Center
 Instance.new("UICorner", MinimizeBtn).CornerRadius = UDim.new(0, 6)
 
 local MinStroke = Instance.new("UIStroke", MinimizeBtn)
@@ -432,7 +443,7 @@ Separator.Position = UDim2.new(0.03, 0, 0, HEADER_HEIGHT)
 Separator.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
 Separator.BorderSizePixel = 0
 
--- Container de Conteúdo (Acompanha o tamanho do MainFrame dinamicamente)
+-- Container de Conteúdo
 local ContentFrame = Instance.new("Frame", MainFrame)
 ContentFrame.Name = "ContentFrame"
 ContentFrame.Size = UDim2.new(1, 0, 1, -(HEADER_HEIGHT + 1))
@@ -478,17 +489,31 @@ local function CriarToggle(yPos, texto, flagName)
     btnStroke.Color = Color3.fromRGB(45, 45, 50)
     btnStroke.Thickness = 1
 
+    local activeGrad = nil
+
     btn.MouseButton1Click:Connect(function()
         EfeitoClique(btn)
         flags[flagName] = not flags[flagName]
         if flags[flagName] then
             btn.Text = "ON"
             btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            btnStroke.Color = DARK_RED
+            btn.Font = Enum.Font.Gotham -- Letra normal sem espessura/contorno pesado
+            btnStroke.Color = Color3.fromRGB(255, 255, 255)
+            
+            if not activeGrad then
+                activeGrad = CriarGradienteRotativo(btnStroke, 3)
+            else
+                activeGrad.Enabled = true
+            end
         else
             btn.Text = "OFF"
             btn.TextColor3 = Color3.fromRGB(150, 150, 150)
+            btn.Font = Enum.Font.GothamBold
             btnStroke.Color = Color3.fromRGB(45, 45, 50)
+            
+            if activeGrad then
+                activeGrad.Enabled = false
+            end
             
             if flagName == "ESP" then ClearAllESP() end
         end
@@ -499,11 +524,12 @@ CriarToggle(8, "X RAY MINES", "ESP")
 CriarToggle(54, "INSTANT MINE", "InstantMine")
 CriarToggle(100, "SPEED MOD", "Speed")
 
--- ==================== CONTROLES DA UI E ANIMAÇÕES SINCRONIZADAS ====================
+-- ==================== CONTROLES DA UI E ANIMAÇÕES DE ENTRADA/SAÍDA ====================
 local menuAberto = true
 local isMinimized = false
 local fadeTween = nil
 local resizeTween = nil
+local expandedPos = Main.Position
 
 local function ToggleMenu(open)
     menuAberto = open
@@ -513,20 +539,29 @@ local function ToggleMenu(open)
         fadeTween = nil
     end
 
-    local tweenInfo = TweenInfo.new(0.18, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+    local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
 
     if open then
         Main.Visible = true
+        MainScale.Scale = 0.85
+        Main.GroupTransparency = 1
+        
         fadeTween = TweenService:Create(Main, tweenInfo, {GroupTransparency = 0})
+        local scaleTween = TweenService:Create(MainScale, tweenInfo, {Scale = 1})
         fadeTween:Play()
+        scaleTween:Play()
     else
         fadeTween = TweenService:Create(Main, tweenInfo, {GroupTransparency = 1})
+        local scaleTween = TweenService:Create(MainScale, tweenInfo, {Scale = 0.85})
+        
         fadeTween.Completed:Connect(function(state)
             if state == Enum.PlaybackState.Completed and not menuAberto then
                 Main.Visible = false
             end
         end)
+        
         fadeTween:Play()
+        scaleTween:Play()
     end
 end
 
@@ -535,12 +570,26 @@ FloatBtn.MouseButton1Click:Connect(function()
     ToggleMenu(not menuAberto)
 end)
 
+-- Minimizar com colapso de baixo para cima (mantendo topo fixo)
 MinimizeBtn.MouseButton1Click:Connect(function()
     EfeitoClique(MinimizeBtn)
-    isMinimized = not isMinimized
-    MinimizeBtn.Text = isMinimized and "+" or "-"
+    
+    local heightDiff = UI_HEIGHT - HEADER_HEIGHT
+    local targetHeight, targetPos
 
-    local targetHeight = isMinimized and HEADER_HEIGHT or UI_HEIGHT
+    if not isMinimized then
+        expandedPos = Main.Position
+        isMinimized = true
+        MinimizeBtn.Text = "+"
+        targetHeight = HEADER_HEIGHT
+        targetPos = UDim2.new(expandedPos.X.Scale, expandedPos.X.Offset, expandedPos.Y.Scale, expandedPos.Y.Offset - (heightDiff / 2))
+    else
+        isMinimized = false
+        MinimizeBtn.Text = "—"
+        targetHeight = UI_HEIGHT
+        targetPos = expandedPos
+    end
+
     local targetSize = UDim2.new(0, UI_WIDTH, 0, targetHeight)
 
     if resizeTween then 
@@ -550,8 +599,10 @@ MinimizeBtn.MouseButton1Click:Connect(function()
 
     local tweenInfo = TweenInfo.new(0.18, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
 
-    -- Redimensiona o CanvasGroup pai. Todos os filhos com ClipsDescendants encolhem em tempo real
-    resizeTween = TweenService:Create(Main, tweenInfo, {Size = targetSize})
+    resizeTween = TweenService:Create(Main, tweenInfo, {
+        Size = targetSize,
+        Position = targetPos
+    })
     resizeTween:Play()
 end)
 
@@ -567,6 +618,9 @@ local function ConfigurarArrastar(inst)
         if drag and input == dragInput and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             local delta = input.Position - dragStart
             inst.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            if inst == Main and not isMinimized then
+                expandedPos = Main.Position
+            end
         end
     end)
     UserInputService.InputEnded:Connect(function(input)
@@ -651,9 +705,11 @@ local function ExecutarIntro()
     FloatBtn.Visible = true
     Main.Visible = true
     Main.GroupTransparency = 1
+    MainScale.Scale = 0.85
 
     Animar(FloatBtn, {Size = UDim2.new(0, 46, 0, 46)}, 0.2)
     Animar(Main, {GroupTransparency = 0}, 0.2)
+    Animar(MainScale, {Scale = 1}, 0.2)
 end
 
 -- ==================== CHEATS AUXILIARES ====================
