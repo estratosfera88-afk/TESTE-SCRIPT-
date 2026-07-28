@@ -155,7 +155,7 @@ local function CreateESP(obj, oreInfo, priority)
     local txt = Instance.new("TextLabel", bgui)
     txt.Size = UDim2.new(1, 0, 1, 0); txt.BackgroundTransparency = 1; txt.Text = oreInfo.Name; txt.TextColor3 = oreInfo.Color; txt.TextStrokeTransparency = 0.3; txt.Font = Enum.Font.GothamBold; txt.TextSize = 13
 
-    espCache[obj] = { Highlight = hl, Billboard = bgui, Label = txt, Name = oreInfo.Name, Priority = priority or 1, Part = targetPart }
+    espCache[obj] = { Highlight = hl, Billboard = bgui, Label = txt, Name = oreInfo.Name, Priority = priority or 1, Part = targetPart, Color = oreInfo.Color }
 end
 
 local function UpdateESP()
@@ -288,8 +288,13 @@ local RefreshStroke = Instance.new("UIStroke", RefreshBtn); RefreshStroke.Color 
 local function PopuleOreList()
     for _, child in ipairs(OreScroll:GetChildren()) do if child:IsA("TextButton") then child:Destroy() end end
     local uniqueOres = {}
-    for obj, data in pairs(espCache) do
-        if data.Name and not uniqueOres[data.Name] then uniqueOres[data.Name] = data.Color end
+    
+    -- Busca globalmente no workspace caso o ESP esteja desligado ou vazio no momento
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        local oreInfo = GetOreInfo(obj)
+        if oreInfo and not uniqueOres[oreInfo.Name] then
+            uniqueOres[oreInfo.Name] = oreInfo.Color
+        end
     end
     
     for oreName, oreColor in pairs(uniqueOres) do
@@ -301,7 +306,7 @@ local function PopuleOreList()
             EfeitoClique(btn); selectedOreForAutoMine = oreName
             PanelHeader.Text = "ALVO ATUAL: " .. string.upper(oreName)
             for _, b in ipairs(OreScroll:GetChildren()) do
-                if b:IsA("TextButton") then b:FindFirstChild("UIStroke").Color = Color3.fromRGB(30, 30, 35) end
+                if b:IsA("TextButton") then local s = b:FindFirstChildOfClass("UIStroke"); if s then s.Color = Color3.fromRGB(30, 30, 35) end end
             end
             bStroke.Color = Color3.fromRGB(255, 255, 255)
         end)
@@ -324,10 +329,10 @@ local function CriarToggle(texto, flagName)
     local btn = Instance.new("TextButton", row)
     btn.Size = UDim2.new(0, 52, 0, 24); btn.Position = UDim2.new(1, -58, 0.5, -12); btn.BackgroundColor3 = Color3.fromRGB(22, 22, 26); btn.Text = ""; Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
 
-    -- Efeito do botão: Gradiente EXCLUSIVO na borda (Preto e Cinza Escuro)
+    -- Efeito do botão: Gradiente EXCLUSIVO no UIStroke do BOTÃO (Sem mexer no texto)
     local btnStroke = Instance.new("UIStroke", btn)
     btnStroke.Color = Color3.fromRGB(35, 35, 40); btnStroke.Thickness = 1.5
-    local btnGrad = CriarGradienteRotativo(btnStroke, 1.8, BLACK_GRADIENT, DARK_GRAY_GRADIENT, BLACK_GRADIENT)
+    local btnGrad = CriarGradienteRotativo(btnStroke, 1.8, DARK_RED, NEON_RED, DARK_RED)
     btnGrad.Enabled = false 
 
     local btnText = Instance.new("TextLabel", btn)
@@ -344,6 +349,16 @@ local function CriarToggle(texto, flagName)
             Animar(btnStroke, {Color = Color3.fromRGB(255, 255, 255)}, 0.2)
 
             if flagName == "AutoMine" then AutoMinePanel.Visible = true; PopuleOreList() end
+            if flagName == "Float" and character then
+                local root = character:FindFirstChild("HumanoidRootPart")
+                if root and not root:FindFirstChild("AkatFloatForce") then
+                    local bv = Instance.new("BodyVelocity")
+                    bv.Name = "AkatFloatForce"
+                    bv.MaxForce = Vector3.new(0, 100000, 0)
+                    bv.Velocity = Vector3.new(0, 0, 0)
+                    bv.Parent = root
+                end
+            end
         else
             btnText.Text = "OFF"
             Animar(btnText, {TextColor3 = Color3.fromRGB(150, 150, 150)}, 0.2)
@@ -370,46 +385,52 @@ CriarToggle("SPEED MOD", "Speed")
 local floatJumpConnection
 
 local function UpdateAbilities()
-    -- Lógica do Instant Mine (Melhoria Global da Picareta/Mãos)
-    if flags.InstantMine and character then
-        local tool = character:FindFirstChildOfClass("Tool")
-        if tool then
-            -- Modifica os atributos da ferramenta sem quebrar o script original
-            for _, v in ipairs(tool:GetDescendants()) do
-                if v:IsA("NumberValue") or v:IsA("IntValue") then
-                    local name = v.Name:lower()
-                    if name:find("speed") or name:find("cooldown") or name:find("wait") or name:find("delay") then v.Value = 0.05
-                    elseif name:find("damage") or name:find("efficiency") or name:find("power") then v.Value = 99999 end
+    -- Lógica do Instant Mine
+    if flags.InstantMine then
+        if character then
+            local tool = character:FindFirstChildOfClass("Tool")
+            if tool then
+                for _, v in ipairs(tool:GetDescendants()) do
+                    if v:IsA("NumberValue") or v:IsA("IntValue") then
+                        local name = v.Name:lower()
+                        if name:find("speed") or name:find("cooldown") or name:find("wait") or name:find("delay") then v.Value = 0.01
+                        elseif name:find("damage") or name:find("efficiency") or name:find("power") then v.Value = 99999 end
+                    end
                 end
             end
         end
-        -- Acelera a quebra de todos os minérios/blocos
         for prompt in pairs(promptCache) do
-            if prompt.Parent and prompt.Parent:IsA("BasePart") then prompt.HoldDuration = 0 end
+            if prompt and prompt.Parent then
+                pcall(function() prompt.HoldDuration = 0 end)
+            end
         end
     end
 
-    -- Lógica do Auto Mine Otimizado (Ficar Parado + Minerar Automático)
+    -- Lógica do Auto Mine Otimizado
     if flags.AutoMine and selectedOreForAutoMine and character then
         local root = character:FindFirstChild("HumanoidRootPart")
         if root then
-            root.Anchored = true -- Fixa o personagem no lugar para mineração remota segura
+            root.Anchored = true 
             
             local targetObj, targetDist = nil, math.huge
-            for obj, data in pairs(espCache) do
-                if data.Name == selectedOreForAutoMine and data.Part and data.Part.Parent then
-                    local dist = (data.Part.Position - root.Position).Magnitude
-                    if dist < targetDist then targetDist = dist; targetObj = obj end
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                local oreInfo = GetOreInfo(obj)
+                if oreInfo and oreInfo.Name == selectedOreForAutoMine then
+                    local part = GetTargetPart(obj)
+                    if part then
+                        local dist = (part.Position - root.Position).Magnitude
+                        if dist < targetDist then targetDist = dist; targetObj = obj end
+                    end
                 end
             end
             
             if targetObj then
-                local prompt = targetObj:FindFirstChildOfClass("ProximityPrompt")
+                local prompt = targetObj:FindFirstChildOfClass("ProximityPrompt") or targetObj:FindFirstChildWhichIsA("ProximityPrompt", true)
                 if prompt then
                     prompt.MaxActivationDistance = 99999
                     prompt.RequiresLineOfSight = false
                     pcall(function()
-                        if fireproximityprompt then fireproximityprompt(prompt, 1)
+                        if fireproximityprompt then fireproximityprompt(prompt)
                         else prompt:InputHoldBegin(); task.wait(0.01); prompt:InputHoldEnd() end
                     end)
                 end
@@ -445,9 +466,15 @@ if floatJumpConnection then floatJumpConnection:Disconnect() end
 floatJumpConnection = UserInputService.JumpRequest:Connect(function()
     if flags.Float and character then
         local root = character:FindFirstChild("HumanoidRootPart")
-        if root and root:FindFirstChild("AkatFloatForce") then
-            local force = root.AkatFloatForce
-            -- Movimento suave e sem tremores para cima a cada pulo
+        if root then
+            local force = root:FindFirstChild("AkatFloatForce")
+            if not force then
+                force = Instance.new("BodyVelocity")
+                force.Name = "AkatFloatForce"
+                force.MaxForce = Vector3.new(0, 100000, 0)
+                force.Velocity = Vector3.new(0, 0, 0)
+                force.Parent = root
+            end
             TweenService:Create(force, TweenInfo.new(0.15, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Velocity = Vector3.new(0, 22, 0)}):Play()
             task.delay(0.15, function()
                 if force and force.Parent then
