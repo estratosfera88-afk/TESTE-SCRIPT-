@@ -605,11 +605,10 @@ local UI_TEXT = {
 local activeTab = "Player"
 local tabButtons = {}
 local menuAberto = true
-local isMinimized = false
 local originalTrans = {}
 local confirmBlur = nil
 local isConfirmOpen = false
-local wasMinimizedBeforeConfirm = false
+local isExpanded = false
 local searchOpen = false
 
 local screenGui = Instance.new("ScreenGui")
@@ -856,12 +855,13 @@ Sharingan.Size = UDim2.new(2.5, 0, 2.5, 0)
 Sharingan.Position = UDim2.new(0.5, 0, 0.5, 0)
 Sharingan.AnchorPoint = Vector2.new(0.5, 0.5)
 Sharingan.BackgroundTransparency = 1
-Sharingan.Image = "rbxassetid://100882509796042"
-Sharingan.ZIndex = 31 -- Ajustado para renderizar acima da imagem base do botão
+-- CORREÇÃO: Forçando renderização pelo rbxthumb com resolução apropriada para imagens persistentes.
+Sharingan.Image = "rbxthumb://type=Asset&id=100882509796042&w=150&h=150" 
+Sharingan.ZIndex = 31 
 
 local SharinganSound = Instance.new("Sound", FloatBtn)
 SharinganSound.SoundId = "rbxassetid://6310837681"
-SharinganSound.Volume = 0.35 -- Volume reduzido
+SharinganSound.Volume = 0.35 
 
 local RotateTween = TweenService:Create(Sharingan, TweenInfo.new(8, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), {Rotation = 360})
 RotateTween:Play()
@@ -882,7 +882,6 @@ local FloatStroke = Instance.new("UIStroke", FloatBtn)
 FloatStroke.Thickness = 2
 FloatStroke.Color = Color3.fromRGB(255, 255, 255)
 
--- Efeito Gradient Vermelho Escuro com Preto no contorno
 local floatStrokeGradient = Instance.new("UIGradient", FloatStroke)
 floatStrokeGradient.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(0, Color3.fromRGB(139, 0, 0)),
@@ -890,7 +889,6 @@ floatStrokeGradient.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(1, Color3.fromRGB(139, 0, 0))
 })
 
--- Animação do gradient dando voltas no contorno
 local StrokeRotateTween = TweenService:Create(floatStrokeGradient, TweenInfo.new(3, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), {Rotation = 360})
 StrokeRotateTween:Play()
 
@@ -929,14 +927,29 @@ shadow3D.Parent = mainWrapper
 local mainFrame = Instance.new("CanvasGroup")
 mainFrame.Name = "MainFrame"
 mainFrame.Size = UDim2.new(1, 0, 1, 0)
-mainFrame.BackgroundColor3 = Color3.fromHex("#0A0A0A")
-mainFrame.BackgroundTransparency = 0.22
+mainFrame.BackgroundColor3 = Color3.fromHex("#080808")
 mainFrame.BorderSizePixel = 0
 mainFrame.ZIndex = 5
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 9)
 
+-- Gradient Dinâmico no Fundo
+local mainBgGradient = Instance.new("UIGradient", mainFrame)
+mainBgGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromHex("#040000")),
+    ColorSequenceKeypoint.new(0.35, Color3.fromHex("#170000")), 
+    ColorSequenceKeypoint.new(0.65, Color3.fromHex("#040000")),
+    ColorSequenceKeypoint.new(1, Color3.fromHex("#170000"))
+})
+mainBgGradient.Offset = Vector2.new(-0.5, 0)
+mainBgGradient.Rotation = 30
+
+-- Animação Suave e Lenta do Gradient
+task.spawn(function()
+    TweenService:Create(mainBgGradient, TweenInfo.new(8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {Offset = Vector2.new(0.5, 0)}):Play()
+end)
+
 local frameStroke = Instance.new("UIStroke", mainFrame)
-frameStroke.Color = Color3.fromHex("#161616")
+frameStroke.Color = Color3.fromHex("#181818")
 frameStroke.Thickness = 1.2
 frameStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border 
 mainFrame.Parent = mainWrapper
@@ -950,22 +963,49 @@ topBar.ClipsDescendants = true
 
 local title = Instance.new("TextLabel", topBar)
 title.Name = "Title"
-title.Size = UDim2.new(0, 200, 0, 22)
+title.Size = UDim2.new(0, 150, 0, 22)
 title.Position = UDim2.new(0, 16, 0, 10)
 title.BackgroundTransparency = 1
-title.Text = "AKAT SCRIPTS"
+title.Text = "AKATSUKI SCRIPTS"
 title.TextColor3 = Color3.fromHex("#8B0000")
 title.TextSize = 16
 title.Font = Enum.Font.GothamBold
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.ZIndex = 6
 
+-- Novo Badge da Versão
+local VersionBadge = Instance.new("Frame", topBar)
+VersionBadge.Size = UDim2.new(0, 66, 0, 14)
+VersionBadge.Position = UDim2.new(0, 172, 0, 15)
+VersionBadge.BackgroundColor3 = Color3.fromRGB(15, 0, 0)
+VersionBadge.ZIndex = 6
+Instance.new("UICorner", VersionBadge).CornerRadius = UDim.new(0, 4)
+
+local badgeGradient = Instance.new("UIGradient", VersionBadge)
+badgeGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromHex("#8B0000")),
+    ColorSequenceKeypoint.new(1, Color3.fromHex("#400000"))
+})
+
+local badgeStroke = Instance.new("UIStroke", VersionBadge)
+badgeStroke.Color = Color3.fromHex("#8B0000")
+badgeStroke.Thickness = 1
+
+local badgeText = Instance.new("TextLabel", VersionBadge)
+badgeText.Size = UDim2.new(1, 0, 1, 0)
+badgeText.BackgroundTransparency = 1
+badgeText.Text = "[BETA v3.6]"
+badgeText.TextColor3 = Color3.fromRGB(255, 255, 255)
+badgeText.Font = Enum.Font.GothamBold
+badgeText.TextSize = 9
+badgeText.ZIndex = 7
+
 local subtitle = Instance.new("TextLabel", topBar)
 subtitle.Name = "Subtitle"
 subtitle.Size = UDim2.new(0, 200, 0, 14)
 subtitle.Position = UDim2.new(0, 16, 0, 28)
 subtitle.BackgroundTransparency = 1
-subtitle.Text = "MM2 SCRIPT [BETA v3.6]"
+subtitle.Text = "MM2 SCRIPT | by zeni <3"
 subtitle.TextColor3 = Color3.fromHex("#8B0000")
 subtitle.TextSize = 10
 subtitle.Font = Enum.Font.Gotham
@@ -974,7 +1014,7 @@ subtitle.ZIndex = 6
 
 local topButtons = Instance.new("Frame", topBar)
 topButtons.Name = "TopButtons"
-topButtons.Size = UDim2.new(0, 94, 0, 26)
+topButtons.Size = UDim2.new(0, 150, 0, 26)
 topButtons.AnchorPoint = Vector2.new(1, 0.5)
 topButtons.Position = UDim2.new(1, -16, 0.5, 0)
 topButtons.BackgroundTransparency = 1
@@ -987,53 +1027,34 @@ UIListTop.VerticalAlignment = Enum.VerticalAlignment.Center
 UIListTop.Padding = UDim.new(0, 8)
 UIListTop.SortOrder = Enum.SortOrder.LayoutOrder
 
-local searchBarFrame = Instance.new("Frame", topBar)
-searchBarFrame.Name = "SearchBarFrame"
-searchBarFrame.AnchorPoint = Vector2.new(1, 0.5)
-searchBarFrame.Position = UDim2.new(1, -130, 0.5, 0)
-searchBarFrame.Size = UDim2.new(0, 0, 0, 26)
-searchBarFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-searchBarFrame.ClipsDescendants = true
-searchBarFrame.Visible = false
-searchBarFrame.ZIndex = 7
-Instance.new("UICorner", searchBarFrame).CornerRadius = UDim.new(0, 13)
-local searchStroke = Instance.new("UIStroke", searchBarFrame)
-searchStroke.Color = Color3.fromHex("#1F1F1F")
-searchStroke.Thickness = 1
+-- NOVO SEARCH INTEGRADO
+local SearchContainer = Instance.new("Frame", topButtons)
+SearchContainer.Name = "SearchContainer"
+SearchContainer.LayoutOrder = 1
+SearchContainer.Size = UDim2.new(0, 26, 0, 26)
+SearchContainer.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+SearchContainer.BackgroundTransparency = 0.5
+SearchContainer.ClipsDescendants = true
+SearchContainer.ZIndex = 7
+Instance.new("UICorner", SearchContainer).CornerRadius = UDim.new(0, 5)
 
-local searchTextBox = Instance.new("TextBox", searchBarFrame)
-searchTextBox.Name = "SearchTextBox"
-searchTextBox.Size = UDim2.new(1, -20, 1, 0)
-searchTextBox.Position = UDim2.new(0, 12, 0, 0)
-searchTextBox.BackgroundTransparency = 1
-searchTextBox.PlaceholderText = UI_TEXT.SearchPlaceholder
-searchTextBox.PlaceholderColor3 = Color3.fromRGB(100, 100, 100)
-searchTextBox.Text = ""
-searchTextBox.TextColor3 = Color3.fromRGB(230, 230, 230)
-searchTextBox.Font = Enum.Font.Gotham
-searchTextBox.TextSize = 11
-searchTextBox.TextXAlignment = Enum.TextXAlignment.Left
-searchTextBox.ZIndex = 8
+local SearchIconBtn = Instance.new("TextButton", SearchContainer)
+SearchIconBtn.Name = "SearchBtnIcon"
+SearchIconBtn.Size = UDim2.new(0, 26, 0, 26)
+SearchIconBtn.Position = UDim2.new(0, 0, 0, 0)
+SearchIconBtn.BackgroundTransparency = 1
+SearchIconBtn.Text = ""
+SearchIconBtn.ZIndex = 8
 
-local SearchBtn = Instance.new("TextButton", topButtons)
-SearchBtn.Name = "SearchBtn"
-SearchBtn.LayoutOrder = 1
-SearchBtn.Size = UDim2.new(0, 26, 0, 26)
-SearchBtn.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
-SearchBtn.BackgroundTransparency = 0.5
-SearchBtn.Text = ""
-SearchBtn.ZIndex = 7
-Instance.new("UICorner", SearchBtn).CornerRadius = UDim.new(0, 5)
+local SearchIconObj = Instance.new("Frame", SearchIconBtn)
+SearchIconObj.Name = "Icon"
+SearchIconObj.Size = UDim2.new(0, 14, 0, 14)
+SearchIconObj.AnchorPoint = Vector2.new(0.5, 0.5)
+SearchIconObj.Position = UDim2.new(0.5, 0, 0.5, 0)
+SearchIconObj.BackgroundTransparency = 1
+SearchIconObj.ZIndex = 8
 
-local SearchIcon = Instance.new("Frame", SearchBtn)
-SearchIcon.Name = "Icon"
-SearchIcon.Size = UDim2.new(0, 14, 0, 14)
-SearchIcon.AnchorPoint = Vector2.new(0.5, 0.5)
-SearchIcon.Position = UDim2.new(0.5, 0, 0.5, 0)
-SearchIcon.BackgroundTransparency = 1
-SearchIcon.ZIndex = 8
-
-local SearchCircle = Instance.new("Frame", SearchIcon)
+local SearchCircle = Instance.new("Frame", SearchIconObj)
 SearchCircle.Name = "Circle"
 SearchCircle.Size = UDim2.new(0, 8, 0, 8)
 SearchCircle.Position = UDim2.new(0, 1, 0, 1)
@@ -1044,7 +1065,7 @@ local circleStroke = Instance.new("UIStroke", SearchCircle)
 circleStroke.Color = Color3.fromHex("#A0A0A0")
 circleStroke.Thickness = 1
 
-local SearchHandle = Instance.new("Frame", SearchIcon)
+local SearchHandle = Instance.new("Frame", SearchIconObj)
 SearchHandle.Name = "Handle"
 SearchHandle.Size = UDim2.new(0, 1, 0, 5)
 SearchHandle.Position = UDim2.new(0, 9, 0, 8)
@@ -1053,9 +1074,46 @@ SearchHandle.BackgroundColor3 = Color3.fromHex("#A0A0A0")
 SearchHandle.BorderSizePixel = 0
 SearchHandle.ZIndex = 8
 
+local searchTextBox = Instance.new("TextBox", SearchContainer)
+searchTextBox.Name = "SearchTextBox"
+searchTextBox.Size = UDim2.new(1, -26, 1, 0)
+searchTextBox.Position = UDim2.new(0, 26, 0, 0)
+searchTextBox.BackgroundTransparency = 1
+searchTextBox.PlaceholderText = UI_TEXT.SearchPlaceholder
+searchTextBox.PlaceholderColor3 = Color3.fromRGB(100, 100, 100)
+searchTextBox.Text = ""
+searchTextBox.TextColor3 = Color3.fromRGB(230, 230, 230)
+searchTextBox.Font = Enum.Font.Gotham
+searchTextBox.TextSize = 11
+searchTextBox.TextXAlignment = Enum.TextXAlignment.Left
+searchTextBox.ZIndex = 8
+
+-- NOVO BOTÃO DE EXPANDIR
+local ExpandBtn = Instance.new("TextButton", topButtons)
+ExpandBtn.Name = "ExpandBtn"
+ExpandBtn.LayoutOrder = 2
+ExpandBtn.Size = UDim2.new(0, 26, 0, 26)
+ExpandBtn.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+ExpandBtn.BackgroundTransparency = 0.5
+ExpandBtn.Text = ""
+ExpandBtn.ZIndex = 7
+Instance.new("UICorner", ExpandBtn).CornerRadius = UDim.new(0, 5)
+
+local ExpandSquare = Instance.new("Frame", ExpandBtn)
+ExpandSquare.Name = "Square"
+ExpandSquare.Size = UDim2.new(0, 10, 0, 10)
+ExpandSquare.AnchorPoint = Vector2.new(0.5, 0.5)
+ExpandSquare.Position = UDim2.new(0.5, 0, 0.5, 0)
+ExpandSquare.BackgroundTransparency = 1
+ExpandSquare.ZIndex = 8
+local ESStroke = Instance.new("UIStroke", ExpandSquare)
+ESStroke.Color = Color3.fromHex("#A0A0A0")
+ESStroke.Thickness = 1
+
+-- BOTÃO MINIMIZAR (Agora oculta inteiramente)
 local MinimizeBtn = Instance.new("TextButton", topButtons)
 MinimizeBtn.Name = "MinimizeBtn"
-MinimizeBtn.LayoutOrder = 2
+MinimizeBtn.LayoutOrder = 3
 MinimizeBtn.Size = UDim2.new(0, 26, 0, 26)
 MinimizeBtn.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
 MinimizeBtn.BackgroundTransparency = 0.5
@@ -1074,7 +1132,7 @@ MinimizeLine.ZIndex = 8
 
 local CloseBtn = Instance.new("TextButton", topButtons)
 CloseBtn.Name = "CloseBtn"
-CloseBtn.LayoutOrder = 3
+CloseBtn.LayoutOrder = 4
 CloseBtn.Size = UDim2.new(0, 26, 0, 26)
 CloseBtn.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
 CloseBtn.BackgroundTransparency = 0.5
@@ -1102,41 +1160,22 @@ CloseLine2.BackgroundColor3 = Color3.fromHex("#A0A0A0")
 CloseLine2.BorderSizePixel = 0
 CloseLine2.ZIndex = 8
 
-local div = Instance.new("Frame", mainFrame)
-div.Name = "Div"
-div.Size = UDim2.new(1, -152, 0, 1)
-div.Position = UDim2.new(0, 140, 0, 52)
-div.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-div.BorderSizePixel = 0
-div.ZIndex = 6
+-- ==================== PAINÉIS SEPARADOS (SIDEBAR E TOGGLES) ====================
 
+-- Sidebar Visualmente Separada
 local SidebarFrame = Instance.new("Frame", mainFrame)
 SidebarFrame.Name = "SidebarFrame"
-SidebarFrame.Size = UDim2.new(0, 140, 1, -52)
-SidebarFrame.Position = UDim2.new(0, 0, 0, 52)
-SidebarFrame.BackgroundTransparency = 1
+SidebarFrame.Size = UDim2.new(0, 135, 1, -64)
+SidebarFrame.Position = UDim2.new(0, 10, 0, 54)
+SidebarFrame.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
+SidebarFrame.BackgroundTransparency = 0.35
 SidebarFrame.BorderSizePixel = 0
 SidebarFrame.ZIndex = 6
-SidebarFrame.ClipsDescendants = true
+Instance.new("UICorner", SidebarFrame).CornerRadius = UDim.new(0, 9)
 
-local SidebarBgContainer = Instance.new("Frame", SidebarFrame)
-SidebarBgContainer.Name = "SidebarBgContainer"
-SidebarBgContainer.Size = UDim2.new(1, 0, 1, 0)
-SidebarBgContainer.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
-SidebarBgContainer.BackgroundTransparency = 0.35
-SidebarBgContainer.BorderSizePixel = 0
-SidebarBgContainer.ZIndex = 6
-
-local SidebarCorner = Instance.new("UICorner")
-SidebarCorner.CornerRadius = UDim.new(0, 9)
-SidebarCorner.Parent = SidebarBgContainer
-
-local SidebarSeparator = Instance.new("Frame", SidebarFrame)
-SidebarSeparator.Size = UDim2.new(0, 1, 1, 0)
-SidebarSeparator.Position = UDim2.new(1, -1, 0, 0)
-SidebarSeparator.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-SidebarSeparator.BorderSizePixel = 0
-SidebarSeparator.ZIndex = 6
+local SidebarStroke = Instance.new("UIStroke", SidebarFrame)
+SidebarStroke.Color = Color3.fromHex("#1F1F1F")
+SidebarStroke.Thickness = 1
 
 local TabsContainer = Instance.new("ScrollingFrame", SidebarFrame)
 TabsContainer.Name = "TabsContainer"
@@ -1205,10 +1244,71 @@ UsernameLabel.TextXAlignment = Enum.TextXAlignment.Left
 UsernameLabel.TextTruncate = Enum.TextTruncate.AtEnd
 UsernameLabel.ZIndex = 8
 
-local togglesContainer = Instance.new("ScrollingFrame", mainFrame)
+-- SISTEMA DE PRIVACIDADE DO USUÁRIO
+local PrivacyBtn = Instance.new("TextButton", UserProfileFrame)
+PrivacyBtn.Name = "PrivacyBtn"
+PrivacyBtn.Size = UDim2.new(0, 18, 0, 18)
+PrivacyBtn.Position = UDim2.new(1, -22, 0, 6)
+PrivacyBtn.BackgroundTransparency = 1
+PrivacyBtn.Text = ""
+PrivacyBtn.ZIndex = 9
+
+local EyeIcon = Instance.new("Frame", PrivacyBtn)
+EyeIcon.Size = UDim2.new(0, 12, 0, 8)
+EyeIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+EyeIcon.Position = UDim2.new(0.5, 0, 0.5, 0)
+EyeIcon.BackgroundTransparency = 1
+EyeIcon.ZIndex = 10
+Instance.new("UICorner", EyeIcon).CornerRadius = UDim.new(1, 0)
+local EyeStroke = Instance.new("UIStroke", EyeIcon)
+EyeStroke.Color = Color3.fromRGB(180, 180, 180)
+EyeStroke.Thickness = 1.2
+
+local EyePupil = Instance.new("Frame", EyeIcon)
+EyePupil.Size = UDim2.new(0, 4, 0, 4)
+EyePupil.AnchorPoint = Vector2.new(0.5, 0.5)
+EyePupil.Position = UDim2.new(0.5, 0, 0.5, 0)
+EyePupil.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
+EyePupil.ZIndex = 10
+Instance.new("UICorner", EyePupil).CornerRadius = UDim.new(1, 0)
+
+local SlashLine = Instance.new("Frame", PrivacyBtn)
+SlashLine.Size = UDim2.new(0, 16, 0, 1.5)
+SlashLine.AnchorPoint = Vector2.new(0.5, 0.5)
+SlashLine.Position = UDim2.new(0.5, 0, 0.5, 0)
+SlashLine.Rotation = -45
+SlashLine.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+SlashLine.BorderSizePixel = 0
+SlashLine.Visible = false
+SlashLine.ZIndex = 11
+
+local isHidden = false
+PrivacyBtn.MouseButton1Click:Connect(function()
+    isHidden = not isHidden
+    SlashLine.Visible = isHidden
+    DisplayNameLabel.Text = isHidden and "---" or player.DisplayName
+    UsernameLabel.Text = isHidden and "---" or "@" .. player.Name
+end)
+
+-- Área Principal de Toggles Separada
+local TogglesBgContainer = Instance.new("Frame", mainFrame)
+TogglesBgContainer.Name = "TogglesBgContainer"
+TogglesBgContainer.Size = UDim2.new(1, -160, 1, -64)
+TogglesBgContainer.Position = UDim2.new(0, 150, 0, 54)
+TogglesBgContainer.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
+TogglesBgContainer.BackgroundTransparency = 0.35
+TogglesBgContainer.BorderSizePixel = 0
+TogglesBgContainer.ZIndex = 6
+Instance.new("UICorner", TogglesBgContainer).CornerRadius = UDim.new(0, 9)
+
+local TogglesStroke = Instance.new("UIStroke", TogglesBgContainer)
+TogglesStroke.Color = Color3.fromHex("#1F1F1F")
+TogglesStroke.Thickness = 1
+
+local togglesContainer = Instance.new("ScrollingFrame", TogglesBgContainer)
 togglesContainer.Name = "TogglesContainer"
-togglesContainer.Size = UDim2.new(1, -152, 1, -62)
-togglesContainer.Position = UDim2.new(0, 146, 0, 58)
+togglesContainer.Size = UDim2.new(1, 0, 1, 0)
+togglesContainer.Position = UDim2.new(0, 0, 0, 0)
 togglesContainer.BackgroundTransparency = 1
 togglesContainer.BorderSizePixel = 0
 togglesContainer.ScrollBarThickness = 3
@@ -1224,6 +1324,7 @@ containerLayout.Padding = UDim.new(0, 6)
 containerLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
 local uiPadding = Instance.new("UIPadding", togglesContainer)
+uiPadding.PaddingTop = UDim.new(0, 8)
 uiPadding.PaddingBottom = UDim.new(0, 8)
 uiPadding.PaddingRight = UDim.new(0, 4)
 
@@ -1549,19 +1650,6 @@ local function AlternarConfirmacao(exibir)
                 end
             end)
         end
-        if wasMinimizedBeforeConfirm then
-            AplicarFadeSincronizado(SidebarFrame, true, 0.15)
-            AplicarFadeSincronizado(togglesContainer, true, 0.15)
-            isMinimized = true
-            TweenService:Create(mainWrapper, TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 520, 0, 52)}):Play()
-            task.delay(0.15, function()
-                if isMinimized then
-                    togglesContainer.Visible = false
-                    SidebarFrame.Visible = false
-                    div.Visible = false
-                end
-            end)
-        end
         task.delay(tempoAnim, function()
             if not isConfirmOpen then
                 confirmFrame.Visible = false
@@ -1570,93 +1658,32 @@ local function AlternarConfirmacao(exibir)
     end
 end
 
-local function executarMinimizacao()
-    if isConfirmOpen then return end
-    isMinimized = not isMinimized
-    local windowAnim = TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-    
-    if isMinimized then
-        searchOpen = false
-        searchTextBox.Text = ""
-        local tween = TweenService:Create(searchBarFrame, windowAnim, {Size = UDim2.new(0, 0, 0, 26), Position = UDim2.new(1, -130, 0.5, 0)})
-        tween:Play()
-        tween.Completed:Connect(function()
-            if isMinimized then searchBarFrame.Visible = false end
-        end)
-        searchTextBox:ReleaseFocus()
-        filterToggles(activeTab, "")
-
-        TweenService:Create(SearchBtn, windowAnim, {Size = UDim2.new(0, 0, 0, 26), BackgroundTransparency = 1}):Play()
-        TweenService:Create(circleStroke, windowAnim, {Transparency = 1}):Play()
-        TweenService:Create(SearchHandle, windowAnim, {BackgroundTransparency = 1}):Play()
-
-        AplicarFadeSincronizado(SidebarFrame, true, 0.1)
-        AplicarFadeSincronizado(togglesContainer, true, 0.1)
-        TweenService:Create(mainWrapper, windowAnim, {Size = UDim2.new(0, 520, 0, 52)}):Play()
-        
-        task.delay(0.1, function()
-            if isMinimized then
-                togglesContainer.Visible = false
-                SidebarFrame.Visible = false
-                div.Visible = false
-                SearchBtn.Visible = false
-            end
-        end)
-    else
-        div.Visible = true
-        SidebarFrame.Visible = true
-        togglesContainer.Visible = true
-        SearchBtn.Visible = true
-        searchBarFrame.Visible = searchOpen
-
-        TweenService:Create(searchBarFrame, windowAnim, {Size = searchOpen and UDim2.new(0, 160, 0, 26) or UDim2.new(0, 0, 0, 26), Position = UDim2.new(1, -130, 0.5, 0)}):Play()
-        TweenService:Create(SearchBtn, windowAnim, {Size = UDim2.new(0, 26, 0, 26), BackgroundTransparency = 0.5}):Play()
-        TweenService:Create(circleStroke, windowAnim, {Transparency = 0}):Play()
-        TweenService:Create(SearchHandle, windowAnim, {BackgroundTransparency = 0}):Play()
-
-        AplicarFadeSincronizado(SidebarFrame, true, 0)
-        AplicarFadeSincronizado(togglesContainer, true, 0)
-        TweenService:Create(mainWrapper, windowAnim, {Size = UDim2.new(0, 520, 0, 300)}):Play()
-        AplicarFadeSincronizado(SidebarFrame, false, 0.22)
-        AplicarFadeSincronizado(togglesContainer, false, 0.22)
-        filterToggles(activeTab, searchTextBox.Text)
-    end
-end
-
+-- SISTEMA DE VISIBILIDADE / MINIMIZAR GERAL
 local function alternarVisibilidadeMenu()
-    if isConfirmOpen then
-        AlternarConfirmacao(false)
-    end
-
+    if isConfirmOpen then AlternarConfirmacao(false) end
     menuAberto = not menuAberto
-    local tempoAnim = 0.14
+    local tempoAnim = 0.2
     local windowAnim = TweenInfo.new(tempoAnim, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out)
+    
+    local targetW = isExpanded and 650 or 520
+    local targetH = isExpanded and 400 or 300
+    
     if menuAberto then
         mainWrapper.Visible = true
-        togglesContainer.Visible = false
-        SidebarFrame.Visible = false
-        div.Visible = false
-        mainWrapper.Size = UDim2.new(0, 520, 0, isMinimized and 52 or 300)
+        mainWrapper.Size = UDim2.new(0, targetW, 0, targetH)
         AplicarFadeSincronizado(mainWrapper, true, 0)
         AplicarFadeSincronizado(mainWrapper, false, tempoAnim)
-        local pop = TweenService:Create(mainWrapper, windowAnim, {Size = UDim2.new(0, 520, 0, isMinimized and 52 or 300)})
+        
+        local pop = TweenService:Create(mainWrapper, windowAnim, {Size = UDim2.new(0, targetW, 0, targetH)})
         pop:Play()
         pop.Completed:Connect(function()
-            if menuAberto and not isMinimized and not isConfirmOpen then
-                SidebarFrame.Visible = true
-                togglesContainer.Visible = true
-                div.Visible = true
-                AplicarFadeSincronizado(SidebarFrame, true, 0)
-                AplicarFadeSincronizado(SidebarFrame, false, 0.08)
+            if menuAberto and not isConfirmOpen then
                 filterToggles(activeTab, searchTextBox.Text)
             end
         end)
     else
-        togglesContainer.Visible = false
-        SidebarFrame.Visible = false
-        div.Visible = false
         AplicarFadeSincronizado(mainWrapper, true, tempoAnim)
-        local hide = TweenService:Create(mainWrapper, windowAnim, {Size = UDim2.new(0, 520, 0, isMinimized and 52 or 300)})
+        local hide = TweenService:Create(mainWrapper, windowAnim, {Size = UDim2.new(0, targetW - 40, 0, targetH - 20)})
         hide:Play()
         hide.Completed:Connect(function()
             if not menuAberto then mainWrapper.Visible = false end
@@ -1751,34 +1778,40 @@ local function ExecutarIntroAkat()
     end)
 end
 
-local function AplicarEfeitoFisicoBotao(btn, hoverColor)
-    btn.MouseEnter:Connect(function()
+local function AplicarEfeitoFisicoBotao(btn, hoverColor, isContainer)
+    local target = isContainer or btn
+    target.MouseEnter:Connect(function()
         TweenService:Create(btn, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = Color3.fromRGB(36, 36, 36), BackgroundTransparency = 0.3}):Play()
         if btn.Name == "MinimizeBtn" then
-            TweenService:Create(btn.Line, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = hoverColor}):Play()
-        elseif btn.Name == "SearchBtn" then
+            TweenService:Create(MinimizeLine, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = hoverColor}):Play()
+        elseif btn.Name == "SearchContainer" then
             TweenService:Create(circleStroke, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {Color = hoverColor}):Play()
             TweenService:Create(SearchHandle, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = hoverColor}):Play()
+        elseif btn.Name == "ExpandBtn" then
+            TweenService:Create(ESStroke, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {Color = hoverColor}):Play()
         elseif btn.Name == "CloseBtn" then
-            TweenService:Create(btn.Line1, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = hoverColor}):Play()
-            TweenService:Create(btn.Line2, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = hoverColor}):Play()
+            TweenService:Create(CloseLine1, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = hoverColor}):Play()
+            TweenService:Create(CloseLine2, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = hoverColor}):Play()
         end
     end)
-    btn.MouseLeave:Connect(function()
+    target.MouseLeave:Connect(function()
         TweenService:Create(btn, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = Color3.fromRGB(10, 10, 10), BackgroundTransparency = 0.5}):Play()
         if btn.Name == "MinimizeBtn" then
-            TweenService:Create(btn.Line, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play()
-        elseif btn.Name == "SearchBtn" then
+            TweenService:Create(MinimizeLine, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play()
+        elseif btn.Name == "SearchContainer" then
             TweenService:Create(circleStroke, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {Color = Color3.fromHex("#A0A0A0")}):Play()
             TweenService:Create(SearchHandle, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play()
+        elseif btn.Name == "ExpandBtn" then
+            TweenService:Create(ESStroke, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {Color = Color3.fromHex("#A0A0A0")}):Play()
         elseif btn.Name == "CloseBtn" then
-            TweenService:Create(btn.Line1, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play()
-            TweenService:Create(btn.Line2, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play()
+            TweenService:Create(CloseLine1, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play()
+            TweenService:Create(CloseLine2, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play()
         end
     end)
 end
 
-AplicarEfeitoFisicoBotao(SearchBtn, Color3.fromRGB(255, 255, 255))
+AplicarEfeitoFisicoBotao(SearchContainer, Color3.fromRGB(255, 255, 255), SearchIconBtn)
+AplicarEfeitoFisicoBotao(ExpandBtn, Color3.fromRGB(255, 255, 255))
 AplicarEfeitoFisicoBotao(MinimizeBtn, Color3.fromRGB(255, 255, 255))
 AplicarEfeitoFisicoBotao(CloseBtn, Color3.fromRGB(255, 60, 60))
 
@@ -1798,25 +1831,18 @@ createToggle(togglesContainer, "SafeSpot",    "Teleports")
 createToggle(togglesContainer, "AutoCollect", "Misc")
 createToggle(togglesContainer, "ChatRoles",   "Misc")
 
-SearchBtn.MouseButton1Click:Connect(function()
-    if isMinimized then return end
+-- INTERAÇÃO DE PESQUISA EXPANSÍVEL
+SearchIconBtn.MouseButton1Click:Connect(function()
     searchOpen = not searchOpen
-    local info = TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    local info = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
     if searchOpen then
-        searchBarFrame.Visible = true
-        TweenService:Create(searchBarFrame, info, {Size = UDim2.new(0, 160, 0, 26)}):Play()
+        TweenService:Create(SearchContainer, info, {Size = UDim2.new(0, 160, 0, 26)}):Play()
         searchTextBox:CaptureFocus()
     else
         searchTextBox.Text = ""
-        local tween = TweenService:Create(searchBarFrame, info, {Size = UDim2.new(0, 0, 0, 26)})
-        tween:Play()
+        TweenService:Create(SearchContainer, info, {Size = UDim2.new(0, 26, 0, 26)}):Play()
         searchTextBox:ReleaseFocus()
         filterToggles(activeTab, "")
-        tween.Completed:Connect(function()
-            if not searchOpen then
-                searchBarFrame.Visible = false
-            end
-        end)
     end
 end)
 
@@ -1824,21 +1850,16 @@ searchTextBox:GetPropertyChangedSignal("Text"):Connect(function()
     filterToggles(activeTab, searchTextBox.Text)
 end)
 
+-- EXPANDIR JANELA
+ExpandBtn.MouseButton1Click:Connect(function()
+    isExpanded = not isExpanded
+    local newWidth = isExpanded and 650 or 520
+    local newHeight = isExpanded and 400 or 300
+    TweenService:Create(mainWrapper, TweenInfo.new(0.25, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {Size = UDim2.new(0, newWidth, 0, newHeight)}):Play()
+end)
+
 CloseBtn.MouseButton1Click:Connect(function()
-    wasMinimizedBeforeConfirm = isMinimized
-    if isMinimized then
-        isMinimized = false
-        div.Visible = true
-        SidebarFrame.Visible = true
-        togglesContainer.Visible = true
-        searchBarFrame.Visible = searchOpen
-        AplicarFadeSincronizado(SidebarFrame, false, 0.15)
-        AplicarFadeSincronizado(togglesContainer, false, 0.15)
-        TweenService:Create(mainWrapper, TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 520, 0, 300)}):Play()
-        AlternarConfirmacao(true)
-    else
-        AlternarConfirmacao(true)
-    end
+    AlternarConfirmacao(true)
 end)
 
 btnNo.MouseButton1Click:Connect(function() AlternarConfirmacao(false) end)
@@ -1858,17 +1879,15 @@ btnYes.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
--- Clique no botão flutuante ajustado
 FloatBtn.MouseButton1Click:Connect(function()
     AnimarCliqueFloatBtn()
-    -- Toca o som apenas quando o menu estiver fechado (ou seja, quando estiver abrindo)
-    if not menuAberto then
-        SharinganSound:Play()
-    end
+    if not menuAberto then SharinganSound:Play() end
     alternarVisibilidadeMenu()
 end)
 
-MinimizeBtn.MouseButton1Click:Connect(executarMinimizacao)
+MinimizeBtn.MouseButton1Click:Connect(function()
+    alternarVisibilidadeMenu()
+end)
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if not gameProcessed and (input.KeyCode == Enum.KeyCode.Insert or input.KeyCode == Enum.KeyCode.RightShift) then
