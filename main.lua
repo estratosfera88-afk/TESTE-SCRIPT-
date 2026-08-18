@@ -1,6 +1,6 @@
 -- [[
---     AKAT MM2 MAIN LOGIC & UI - FULLY INTEGRATED [v5.7 + UI v3.8]
---     Compatível com Delta Mobile & PC | MM2
+--     AKAT MM2 MAIN LOGIC - FULLY UPDATED & OPTIMIZED [v5.7 - PERFECT AIM 2026]
+--     Compatível com Delta Mobile & PC | MM2 (2026)
 -- ]]
 
 local Players = game:GetService("Players")
@@ -13,7 +13,14 @@ local player = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local mouse = player:GetMouse()
 
--- ==================== CONFIGURAÇÕES & ESTADO GLOBAL ====================
+-- Estado dinâmico da rodada
+local gunDroppedThisRound = false
+local lastPositionBeforeTpToGun = nil 
+local trackingTpToGun = false
+local autoCollectTemporarilyDisabled = false 
+local aimbotConnection = nil
+
+-- Configurações expostas de forma Global
 local Configs = {
     ESP = false,
     Aimbot = false, 
@@ -27,39 +34,23 @@ local Configs = {
 }
 _G.Configs = Configs
 
+-- ==================== CAMADA DE CACHE CENTRALIZADO (PREVINE CRASH) ====================
 local CachedState = {
     HasGun = false,
     Murderer = nil,
     Coins = {}
 }
 
-local gunDroppedThisRound = false
-local lastPositionBeforeTpToGun = nil 
-local trackingTpToGun = false
-local autoCollectTemporarilyDisabled = false 
-local aimbotConnection = nil
+local function PlayerTemArma()
+    return CachedState.HasGun
+end
 
-local PlayerRoles = {}
-local ESPHighlights = {}
-local espEventConnections = {}
-local espPlayerAddedConn = nil
-local espPlayerRemovingConn = nil
-local hbConnection = nil
-local steppedConnection = nil
-local safePlatform = nil
-local lastPositionBeforeSafeSpot = nil
-local announcedThisRound = false
-local currentCollectTarget = nil
-local autoCollectTween = nil
+local function AS_GetMurderer()
+    return CachedState.Murderer
+end
+_G.AS_GetMurderer = AS_GetMurderer
 
-local ROLE_COLORS = {
-    Murderer  = Color3.fromRGB(220, 0,   0),    
-    Sheriff   = Color3.fromRGB(0,   120, 255),  
-    Hero      = Color3.fromRGB(255, 220, 0),    
-    Innocent  = Color3.fromRGB(0,   200, 80),   
-}
-
--- ==================== ANTI-BAN & HOOKS ====================
+-- ==================== ANTI-BAN / ANTI-KICK & METAMETHOD HOOKS ====================
 local oldIndex = nil
 local oldNamecall = nil
 
@@ -86,6 +77,7 @@ task.spawn(function()
                 end)
             end
             
+            -- SILENT AIM PRECISÃO ABSOLUTA (APENAS NO DISPARO)
             if Configs.Aimbot and CachedState.HasGun and self == mouse then
                 if key == "Hit" or key == "hit" then
                     local murderer = CachedState.Murderer
@@ -93,10 +85,13 @@ task.spawn(function()
                         local head = murderer.Character:FindFirstChild("Head")
                         local root = murderer.Character:FindFirstChild("HumanoidRootPart")
                         if head and root then
+                            -- Predição linear pura ajustada para o ping da rede (sem gravidade/curva)
                             local velocity = root.AssemblyLinearVelocity or root.Velocity or Vector3.zero
-                            if velocity.Magnitude > 80 then velocity = Vector3.zero end
+                            if velocity.Magnitude > 80 then velocity = Vector3.zero end -- Filtro anti-bug
+                            
                             local pingCompensation = 0.045
                             local targetPosition = head.Position + (velocity * pingCompensation)
+                            
                             return CFrame.new(targetPosition)
                         end
                     end
@@ -114,7 +109,29 @@ task.spawn(function()
     end
 end)
 
--- ==================== FUNÇÕES AUXILIARES ESP & ROLES ====================
+-- ==================== VARIÁVEIS DE ESTADO INTERNAS ====================
+local PlayerRoles = {}
+local ESPHighlights = {}
+local espEventConnections = {}
+local espPlayerAddedConn = nil
+local espPlayerRemovingConn = nil
+local ESP_UpdatePlayer 
+local hbConnection = nil
+local steppedConnection = nil
+local safePlatform = nil
+local lastPositionBeforeSafeSpot = nil
+local announcedThisRound = false
+local currentCollectTarget = nil
+local autoCollectTween = nil
+
+local ROLE_COLORS = {
+    Murderer  = Color3.fromRGB(220, 0,   0),    
+    Sheriff   = Color3.fromRGB(0,   120, 255),  
+    Hero      = Color3.fromRGB(255, 220, 0),    
+    Innocent  = Color3.fromRGB(0,   200, 80),   
+}
+
+-- ==================== SISTEMAS AUXILIARES E DETECÇÕES ====================
 local function ESP_DetectRole(p)
     if not p or not p.Parent then return "Innocent" end
     
@@ -156,7 +173,7 @@ local function ESP_DetectRole(p)
     return scanTools(p.Character) or scanTools(p:FindFirstChild("Backpack")) or "Innocent"
 end
 
-local function ESP_UpdatePlayer(p)
+ESP_UpdatePlayer = function(p)
     if not Configs.ESP or p == player then return end 
     if not p or not p.Character then
         if ESPHighlights[p] then
@@ -199,6 +216,7 @@ local function ESP_ConnectPlayer(p)
     if espEventConnections[p] then return end
 
     local connections = {}
+
     local c1 = p.CharacterAdded:Connect(function(char)
         task.wait(0.5)
         if Configs.ESP then
@@ -249,6 +267,7 @@ local function ESP_Enable()
     espPlayerAddedConn = Players.PlayerAdded:Connect(function(p)
         if Configs.ESP then ESP_ConnectPlayer(p) end
     end)
+    
     espPlayerRemovingConn = Players.PlayerRemoving:Connect(function(p)
         ESP_DisconnectPlayer(p)
     end)
@@ -258,11 +277,14 @@ local function ESP_Disable()
     Configs.ESP = false
     if espPlayerAddedConn then espPlayerAddedConn:Disconnect(); espPlayerAddedConn = nil end
     if espPlayerRemovingConn then espPlayerRemovingConn:Disconnect(); espPlayerRemovingConn = nil end
-    for _, p in ipairs(Players:GetPlayers()) do ESP_DisconnectPlayer(p) end
+    
+    for _, p in ipairs(Players:GetPlayers()) do
+        ESP_DisconnectPlayer(p)
+    end
     ESP_ClearAll()
 end
 
--- ==================== AIMBOT ====================
+-- ==================== LOCK DE CÂMERA INTEGRAL E FLUIDO ====================
 local function ToggleAimbot(enabled)
     if Configs.Aimbot == enabled then return end 
     Configs.Aimbot = enabled
@@ -270,7 +292,9 @@ local function ToggleAimbot(enabled)
     
     if enabled then
         aimbotConnection = RunService.RenderStepped:Connect(function()
-            if not Configs.Aimbot or not CachedState.HasGun then return end
+            if not Configs.Aimbot then return end
+            if not CachedState.HasGun then return end
+            
             local murderer = CachedState.Murderer
             if murderer and murderer.Character then
                 local head = murderer.Character:FindFirstChild("Head")
@@ -279,7 +303,10 @@ local function ToggleAimbot(enabled)
                 local hum  = char and char:FindFirstChildOfClass("Humanoid")
                 
                 if head and root and hum and hum.Health > 0 then
+                    -- Rastreia a cabeça real visualmente (acaba com a mira torta)
                     Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, head.Position)
+                    
+                    -- Alinha a orientação do corpo do personagem de forma estável
                     local targetLook = Vector3.new(head.Position.X, root.Position.Y, head.Position.Z)
                     root.CFrame = CFrame.lookAt(root.Position, targetLook)
                 end
@@ -288,7 +315,7 @@ local function ToggleAimbot(enabled)
     end
 end
 
--- ==================== ITENS & CHAT ====================
+-- ==================== LÓGICA DE PROCURA DE ITENS & SEGURANÇA ====================
 local function ObterArmaCaida(root)
     local gun = workspace:FindFirstChild("GunDrop", true)
     if gun then
@@ -330,7 +357,9 @@ local function IsBagFull()
         local amount = coinBag and coinBag:FindFirstChild("Container") and coinBag.Container:FindFirstChild("Amount")
         if amount and amount:IsA("TextLabel") then
             local current, max = amount.Text:match("(%d+)/(%d+)")
-            if current and max and tonumber(current) >= tonumber(max) then full = true end
+            if current and max and tonumber(current) >= tonumber(max) then
+                full = true
+            end
         end
     end)
     return full
@@ -351,7 +380,6 @@ local function EnviarMensagemChat(msg)
     end)
 end
 
--- ==================== CALLBACKS DO BACKEND ====================
 local function LimparEDesligarAbsolutamente()
     if hbConnection then hbConnection:Disconnect(); hbConnection = nil end
     if steppedConnection then steppedConnection:Disconnect(); steppedConnection = nil end
@@ -372,8 +400,11 @@ local function LimparEDesligarAbsolutamente()
     end)
 end
 
+-- ==================== PONTE DE COMUNICAÇÃO GLOBAL (UI -> BACKEND) ====================
 _G.AkatCallbacks = {
-    ESP = function(enabled) if enabled then ESP_Enable() else ESP_Disable() end end,
+    ESP = function(enabled)
+        if enabled then ESP_Enable() else ESP_Disable() end
+    end,
     SafeSpot = function(enabled)
         Configs.SafeSpot = enabled
         local char = player.Character
@@ -405,26 +436,37 @@ _G.AkatCallbacks = {
         Configs.AutoCollect = enabled
         if not enabled then 
             currentCollectTarget = nil 
-            if autoCollectTween then autoCollectTween:Cancel(); autoCollectTween = nil end
+            if autoCollectTween then
+                autoCollectTween:Cancel()
+                autoCollectTween = nil
+            end
+            
             local char = player.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
             if root then 
                 root.Anchored = false 
                 root.AssemblyLinearVelocity = Vector3.zero
+                
                 local rayParams = RaycastParams.new()
                 rayParams.FilterDescendantsInstances = {char}
                 rayParams.FilterType = Enum.RaycastFilterType.Exclude
                 local result = workspace:Raycast(root.Position, Vector3.new(0, -1000, 0), rayParams)
-                if result then root.CFrame = CFrame.new(result.Position + Vector3.new(0, 3, 0)) end
+                if result then
+                    root.CFrame = CFrame.new(result.Position + Vector3.new(0, 3, 0))
+                end
             end
         end
     end,
+    ["Tp to gun"] = function(enabled) Configs.TpToGun = enabled end,
+    ["Tp To Gun"] = function(enabled) Configs.TpToGun = enabled end,
     TpToGun = function(enabled) Configs.TpToGun = enabled end,
+    ["Shoot murder"] = function(enabled) ToggleAimbot(enabled) end,
+    ["Shoot Murderer"] = function(enabled) ToggleAimbot(enabled) end,
     AutoShoot = function(enabled) ToggleAimbot(enabled) end,
     ShutdownAll = function() LimparEDesligarAbsolutamente() end
 }
 
--- ==================== THREADS SECUNDÁRIAS ====================
+-- ==================== THREAD DO AUTO COLLECT COLETANDO IMEDIATAMENTE ====================
 task.spawn(function()
     while true do
         task.wait(0.005)
@@ -446,16 +488,20 @@ task.spawn(function()
                     if currentCollectTarget ~= target then
                         currentCollectTarget = target
                         if autoCollectTween then autoCollectTween:Cancel() end
+                        
                         local goalCFrame = CFrame.new(target.Position)
                         local dist = (root.Position - target.Position).Magnitude
                         local timeToReach = dist / 37
+                        
                         autoCollectTween = TweenService:Create(root, TweenInfo.new(timeToReach, Enum.EasingStyle.Linear), {CFrame = goalCFrame})
                         autoCollectTween:Play()
                         autoCollectTween.Completed:Wait() 
                     end
+                    
                     pcall(function()
                         firetouchinterest(root, target, 0)
                         firetouchinterest(root, target, 1)
+                        
                         for _, part in ipairs(char:GetChildren()) do
                             if part:IsA("BasePart") and (part.Name:find("Foot") or part.Name:find("Leg") or part.Name:find("Torso")) then
                                 firetouchinterest(part, target, 0)
@@ -472,6 +518,7 @@ task.spawn(function()
     end
 end)
 
+-- ==================== THREAD TELEPORT TO GUN ====================
 task.spawn(function()
     while true do
         task.wait(0.05)
@@ -487,7 +534,10 @@ task.spawn(function()
                 if isMurdererRole or hasKnife then
                     trackingTpToGun = false
                     lastPositionBeforeTpToGun = nil
-                    if autoCollectTemporarilyDisabled then autoCollectTemporarilyDisabled = false; Configs.AutoCollect = true end
+                    if autoCollectTemporarilyDisabled then
+                        autoCollectTemporarilyDisabled = false
+                        Configs.AutoCollect = true
+                    end
                     continue
                 end
                 
@@ -496,6 +546,7 @@ task.spawn(function()
                     if not trackingTpToGun then
                         lastPositionBeforeTpToGun = root.CFrame
                         trackingTpToGun = true
+                        
                         if Configs.AutoCollect then
                             autoCollectTemporarilyDisabled = true
                             Configs.AutoCollect = false
@@ -506,10 +557,16 @@ task.spawn(function()
                     root.CFrame = gunPart.CFrame * CFrame.new(0, 3, 0)
                 else
                     if trackingTpToGun then
-                        if lastPositionBeforeTpToGun then root.CFrame = lastPositionBeforeTpToGun end
+                        if lastPositionBeforeTpToGun then
+                            root.CFrame = lastPositionBeforeTpToGun
+                        end
                         lastPositionBeforeTpToGun = nil
                         trackingTpToGun = false
-                        if autoCollectTemporarilyDisabled then autoCollectTemporarilyDisabled = false; Configs.AutoCollect = true end
+                        
+                        if autoCollectTemporarilyDisabled then
+                            autoCollectTemporarilyDisabled = false
+                            Configs.AutoCollect = true
+                        end
                     end
                 end
             end
@@ -517,34 +574,47 @@ task.spawn(function()
             if trackingTpToGun then
                 local char = player.Character
                 local root = char and char:FindFirstChild("HumanoidRootPart")
-                if root and lastPositionBeforeTpToGun then root.CFrame = lastPositionBeforeTpToGun end
+                if root and lastPositionBeforeTpToGun then
+                    root.CFrame = lastPositionBeforeTpToGun
+                end
                 lastPositionBeforeTpToGun = nil
                 trackingTpToGun = false
-                if autoCollectTemporarilyDisabled then autoCollectTemporarilyDisabled = false; Configs.AutoCollect = true end
+                
+                if autoCollectTemporarilyDisabled then
+                    autoCollectTemporarilyDisabled = false
+                    Configs.AutoCollect = true
+                end
             end
         end
     end
 end)
 
+-- ==================== NOCLIP SEGURO ====================
 steppedConnection = RunService.Stepped:Connect(function()
     if Configs.AutoCollect or Configs.SafeSpot or trackingTpToGun then
         local char = player.Character
         if char then
             for _, part in ipairs(char:GetChildren()) do
-                if part:IsA("BasePart") then part.CanCollide = false end
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
             end
         end
     end
 end)
 
-hbConnection = RunService.Heartbeat:Connect(function()
+-- ==================== LOOP PRINCIPAL (HEARTBEAT) ====================
+hbConnection = RunService.Heartbeat:Connect(function(dt)
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     local hum  = char and char:FindFirstChildOfClass("Humanoid")
+
     if not root or not hum then return end
 
+    -- WALK SPEED
     hum.WalkSpeed = Configs.Speed and 23 or 16
 
+    -- KNIFE REACH
     if Configs.Reach then
         local myKnife = char:FindFirstChild("Knife") or char:FindFirstChild("Faca")
         local handle = myKnife and myKnife:FindFirstChild("Handle")
@@ -567,6 +637,7 @@ hbConnection = RunService.Heartbeat:Connect(function()
         end
     end
 
+    -- ANTI FLING
     if Configs.AntiFling then
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= player and p.Character then
@@ -582,6 +653,7 @@ hbConnection = RunService.Heartbeat:Connect(function()
     end
 end)
 
+-- ==================== THREAD CENTRAL DE SCANNER E CACHE COLETOR ====================
 task.spawn(function()
     local tempoUltimoScanMoedas = 0
     local tempoUltimoScanESP = 0
@@ -594,10 +666,15 @@ task.spawn(function()
         
         local agora = tick()
         local atualizarESP = Configs.ESP and (agora - tempoUltimoScanESP > 1.0)
-        if atualizarESP then tempoUltimoScanESP = agora end
+        if atualizarESP then
+            tempoUltimoScanESP = agora
+        end
 
         for _, p in ipairs(Players:GetPlayers()) do
-            if atualizarESP and p ~= player then ESP_UpdatePlayer(p) end
+            if atualizarESP and p ~= player then
+                ESP_UpdatePlayer(p)
+            end
+
             local role = PlayerRoles[p]
             if role == "Murderer" then currentMurderer = p end
             if role == "Sheriff"  then currentSheriff  = p end
@@ -620,6 +697,7 @@ task.spawn(function()
         if Configs.AutoCollect and (tick() - tempoUltimoScanMoedas > 0.3) then
             tempoUltimoScanMoedas = tick()
             local moedasEncontradas = {}
+            
             for _, d in ipairs(workspace:GetDescendants()) do
                 if d:IsA("BasePart") and d.Transparency < 1 then
                     local name = d.Name:lower()
@@ -645,712 +723,106 @@ task.spawn(function()
         elseif Configs.ChatRoles and (currentMurderer or currentSheriff) and not announcedThisRound then
             announcedThisRound = true
             local msg = "[AKAT] "
-            if currentMurderer then msg = msg .. "Murderer: " .. currentMurderer.DisplayName .. " (@" .. currentMurderer.Name .. ") " end
-            if currentSheriff then msg = msg .. "| Sheriff: " .. currentSheriff.DisplayName .. " (@" .. currentSheriff.Name .. ")" end
+            if currentMurderer then
+                msg = msg .. "Murderer: " .. currentMurderer.DisplayName .. " (@" .. currentMurderer.Name .. ") "
+            end
+            if currentSheriff then
+                msg = msg .. "| Sheriff: " .. currentSheriff.DisplayName .. " (@" .. currentSheriff.Name .. ")"
+            end
             EnviarMensagemChat(msg)
         end
         task.wait(0.2)
     end
 end)
 
--- ==================== CONSTRUÇÃO DA INTERFACE (NOVA UI) ====================
-local UI_TEXT = {
-    SearchPlaceholder = "Buscar...",
-    ConfirmCloseTitle = "Deseja fechar o script?",
-    ConfirmBtn = "Confirmar",
-    CancelBtn = "Cancelar",
-    Intro = '<font color="#FFFFFF">Scripts por | </font><font color="#8B0000">AKAT Community</font>',
-    Tabs = {
-        Player = "Jogador",
-        Combat = "Combate",
-        Visuals = "Visuals",
-        Teleports = "Teleports",
-        Misc = "Outros"
-    },
-    Options = {
-        AutoShoot = { Title = "Aimbot Murderer", Desc = "Trava a mira na cabeça do Murderer automaticamente." },
-        Reach = { Title = "Knife Reach", Desc = "Aumenta o alcance de ataque da sua faca (18 studs)." },
-        ESP = { Title = "Player ESP", Desc = "Destaca os jogadores através das paredes." },
-        Speed = { Title = "Velocidade", Desc = "Aumenta suavemente a velocidade de caminhada para 23." },
-        AntiFling = { Title = "Anti-Fling", Desc = "Desativa colisões para evitar ser jogado para longe." },
-        TpToGun = { Title = "TP para Arma", Desc = "Teleporta até a arma caída no chão." },
-        SafeSpot = { Title = "Safe Spot", Desc = "Teleporta você para uma plataforma segura no céu." },
-        AutoCollect = { Title = "Coleta Automática", Desc = "Coleta moedas continuadamente pelo mapa." },
-        ChatRoles = { Title = "Revelar Cargos", Desc = "Envia mensagens no chat revelando quem é o Murderer/Xerife." }
-    }
-}
+-- ==================== CARGA DINÂMICA DA INTERFACE ====================
+local Link_Da_UI = "https://raw.githubusercontent.com/estratosfera88-afk/Ui-script-teste/refs/heads/main/Lua"
 
-local activeTab = "Player"
-local tabButtons = {}
-local menuAberto = true
-local isMinimized = false
-local originalTrans = {}
-local confirmBlur = nil
-local isConfirmOpen = false
-local wasMinimizedBeforeConfirm = false
-local searchOpen = false
+local Sucesso, Erro = pcall(function()
+    loadstring(game:HttpGet(Link_Da_UI))()
+end)
 
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DeltaAkatUniversalUI"
-screenGui.ResetOnSpawn = false
-screenGui.IgnoreGuiInset = true
-
-local uiParent = player:FindFirstChild("PlayerGui")
-if gethui then 
-    uiParent = gethui()
-else
-    local ok, cg = pcall(function() return game:GetService("CoreGui") end)
-    if ok and cg then uiParent = cg end
-end
-
-if uiParent:FindFirstChild("DeltaAkatUniversalUI") then
-    pcall(function() uiParent.DeltaAkatUniversalUI:Destroy() end)
-end
-screenGui.Parent = uiParent
-
-local function RegistrarTransparencias(objeto)
-    if originalTrans[objeto] then return end
-    if objeto:IsA("Frame") or objeto:IsA("ScrollingFrame") or objeto:IsA("CanvasGroup") then
-        originalTrans[objeto] = { BackgroundTransparency = objeto.BackgroundTransparency }
-    elseif objeto:IsA("TextLabel") or objeto:IsA("TextButton") or objeto:IsA("TextBox") then
-        originalTrans[objeto] = {
-            TextTransparency = objeto.TextTransparency,
-            BackgroundTransparency = objeto.BackgroundTransparency,
-            TextStrokeTransparency = objeto.TextStrokeTransparency or 1
-        }
-    elseif objeto:IsA("ImageLabel") or objeto:IsA("ImageButton") then
-        originalTrans[objeto] = {
-            ImageTransparency = objeto.ImageTransparency,
-            BackgroundTransparency = objeto.BackgroundTransparency
-        }
-    elseif objeto:IsA("UIStroke") then
-        originalTrans[objeto] = { Transparency = objeto.Transparency }
-    end
-end
-
-local function AplicarFadeSincronizado(raiz, fadeOut, duracao)
-    local info = TweenInfo.new(duracao, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out)
-    local function tratarObjeto(obj)
-        RegistrarTransparencias(obj)
-        local orig = originalTrans[obj]
-        if not orig then return end
-        if orig.BackgroundTransparency then
-            local t = fadeOut and 1 or orig.BackgroundTransparency
-            if obj.BackgroundTransparency ~= t then
-                if duracao == 0 then obj.BackgroundTransparency = t else TweenService:Create(obj, info, {BackgroundTransparency = t}):Play() end
-            end
-        end
-        if orig.TextTransparency then
-            local t = fadeOut and 1 or orig.TextTransparency
-            if obj.TextTransparency ~= t then
-                if duracao == 0 then obj.TextTransparency = t else TweenService:Create(obj, info, {TextTransparency = t}):Play() end
-            end
-        end
-        if orig.TextStrokeTransparency then
-            local t = fadeOut and 1 or orig.TextStrokeTransparency
-            if obj.TextStrokeTransparency ~= t then
-                if duracao == 0 then obj.TextStrokeTransparency = t else TweenService:Create(obj, info, {TextStrokeTransparency = t}):Play() end
-            end
-        end
-        if orig.ImageTransparency then
-            local t = fadeOut and 1 or (obj.Name == "Shadow3D" and 0.5 or orig.ImageTransparency)
-            if obj.ImageTransparency ~= t then
-                if duracao == 0 then obj.ImageTransparency = t else TweenService:Create(obj, info, {ImageTransparency = t}):Play() end
-            end
-        end
-        if orig.Transparency then
-            local t = fadeOut and 1 or orig.Transparency
-            if obj.Transparency ~= t then
-                if duracao == 0 then obj.Transparency = t else TweenService:Create(obj, info, {Transparency = t}):Play() end
-            end
-        end
-    end
-    tratarObjeto(raiz)
-    for _, desc in ipairs(raiz:GetDescendants()) do tratarObjeto(desc) end
-end
-
--- ==================== DRAG & BOTÃO FLUTUANTE ====================
-local function ConfigurarArrastarAkat(inst, trigger)
-    trigger = trigger or inst
-    local dragging = false
-    local dragStart, startPos, currentInput
+if not Sucesso then
+    warn("[AKAT LOADER ERROR] Falha ao carregar a UI: ", Erro)
+endar:FindFirstChildOfClass("Humanoid")
     
-    trigger.InputBegan:Connect(function(input)
-        if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and not dragging then
-            dragging = true
-            currentInput = input
-            dragStart = input.Position
-            startPos = inst.Position
-            
-            local dragConnection, endConnection
-            dragConnection = UserInputService.InputChanged:Connect(function(changedInput)
-                if changedInput == currentInput or (currentInput.UserInputType == Enum.UserInputType.MouseButton1 and changedInput.UserInputType == Enum.UserInputType.MouseMovement) then
-                    local delta = changedInput.Position - dragStart
-                    inst.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    if char and root and hum then
+        local velocidadeAlvo = Configs.Speed and 23 or 16
+        if hum.WalkSpeed ~= velocidadeAlvo then
+            hum.WalkSpeed = velocidadeAlvo
+        end
+
+        local knife = char:FindFirstChild("Knife")
+        if knife and knife:IsA("Tool") then
+            local handle = knife:FindFirstChild("Handle")
+            if handle then
+                local reachPart = handle:FindFirstChild("AkatReachPart")
+                if Configs.Reach then
+                    if not reachPart then
+                        reachPart = Instance.new("Part")
+                        reachPart.Name = "AkatReachPart"
+                        reachPart.Size = Vector3.new(25, 25, 25) 
+                        reachPart.Transparency = 1
+                        reachPart.CanCollide = false
+                        reachPart.Massless = true
+                        reachPart.CFrame = handle.CFrame
+                        reachPart.Parent = handle
+                        
+                        local weld = Instance.new("WeldConstraint")
+                        weld.Part0 = handle
+                        weld.Part1 = reachPart
+                        weld.Parent = reachPart 
+                    end
+                    if firetouchinterest then
+                        for _, p in ipairs(Players:GetPlayers()) do
+                            if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                                local targetRoot = p.Character.HumanoidRootPart
+                                if (root.Position - targetRoot.Position).Magnitude <= 25 then
+                                    firetouchinterest(handle, targetRoot, 0)
+                                    firetouchinterest(handle, targetRoot, 1)
+                                end
+                            end
+                        end
+                    end
+                else
+                    if reachPart then reachPart:Destroy() end
                 end
-            end)
-            
-            endConnection = currentInput.Changed:Connect(function()
-                if currentInput.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                    if dragConnection then dragConnection:Disconnect() end
-                    if endConnection then endConnection:Disconnect() end
-                end
-            end)
-        end
-    end)
-end
-
-local FloatBtn = Instance.new("ImageButton", screenGui)
-FloatBtn.Name = "FloatBtn"
-FloatBtn.AnchorPoint = Vector2.new(0.5, 0.5)
-FloatBtn.Size = UDim2.new(0, 44, 0, 44)
-FloatBtn.Position = UDim2.new(0.12, 0, 0.4, 0)
-FloatBtn.Image = "rbxthumb://type=Asset&id=99997714241420&w=150&h=150"
-FloatBtn.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
-FloatBtn.Visible = false
-FloatBtn.ZIndex = 30
-
-local Sharingan = Instance.new("ImageLabel", FloatBtn)
-Sharingan.Name = "SharinganEffect"
-Sharingan.Size = UDim2.new(2.5, 0, 2.5, 0)
-Sharingan.Position = UDim2.new(0.5, 0, 0.5, 0)
-Sharingan.AnchorPoint = Vector2.new(0.5, 0.5)
-Sharingan.BackgroundTransparency = 1
-Sharingan.Image = "rbxassetid://100882509796042"
-Sharingan.ZIndex = 29
-
-local RotateTween = TweenService:Create(Sharingan, TweenInfo.new(8, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), {Rotation = 360})
-RotateTween:Play()
-
-Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(0, 8)
-local FloatStroke = Instance.new("UIStroke", FloatBtn)
-FloatStroke.Thickness = 1
-FloatStroke.Color = Color3.fromRGB(139, 0, 0)
-
-ConfigurarArrastarAkat(FloatBtn)
-
--- ==================== ESTRUTURA DA INTERFACE PRINCIPAL ====================
-local mainWrapper = Instance.new("Frame")
-mainWrapper.Name = "MainWrapper"
-mainWrapper.AnchorPoint = Vector2.new(0.5, 0.5)
-mainWrapper.Size = UDim2.new(0, 520, 0, 300)
-mainWrapper.Position = UDim2.new(0.5, 0, 0.5, 0)
-mainWrapper.BackgroundTransparency = 1
-mainWrapper.Visible = false
-mainWrapper.Parent = screenGui
-
-local shadow3D = Instance.new("ImageLabel")
-shadow3D.Name = "Shadow3D"
-shadow3D.AnchorPoint = Vector2.new(0.5, 0.5)
-shadow3D.Position = UDim2.new(0.5, 0, 0.5, 4)
-shadow3D.Size = UDim2.new(1, 40, 1, 40)
-shadow3D.BackgroundTransparency = 1
-shadow3D.Image = "rbxassetid://6014261993"
-shadow3D.ImageColor3 = Color3.fromRGB(0, 0, 0)
-shadow3D.ImageTransparency = 0.5
-shadow3D.ScaleType = Enum.ScaleType.Slice
-shadow3D.SliceCenter = Rect.new(49, 49, 450, 450)
-shadow3D.ZIndex = 1
-shadow3D.Parent = mainWrapper
-
-local mainFrame = Instance.new("CanvasGroup")
-mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(1, 0, 1, 0)
-mainFrame.BackgroundColor3 = Color3.fromHex("#0A0A0A")
-mainFrame.BackgroundTransparency = 0.22
-mainFrame.BorderSizePixel = 0
-mainFrame.ZIndex = 5
-Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 9)
-
-local frameStroke = Instance.new("UIStroke", mainFrame)
-frameStroke.Color = Color3.fromHex("#161616")
-frameStroke.Thickness = 1.2
-frameStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border 
-mainFrame.Parent = mainWrapper
-
-local topBar = Instance.new("Frame", mainFrame)
-topBar.Name = "TopBar"
-topBar.Size = UDim2.new(1, 0, 0, 52)
-topBar.BackgroundTransparency = 1
-topBar.ZIndex = 6
-
-ConfigurarArrastarAkat(mainWrapper, topBar)
-
-local title = Instance.new("TextLabel", topBar)
-title.Name = "Title"
-title.Size = UDim2.new(0, 200, 0, 22)
-title.Position = UDim2.new(0, 16, 0, 10)
-title.BackgroundTransparency = 1
-title.Text = "AKAT SCRIPTS"
-title.TextColor3 = Color3.fromHex("#8B0000")
-title.TextSize = 16
-title.Font = Enum.Font.GothamBold
-title.TextXAlignment = Enum.TextXAlignment.Left
-title.ZIndex = 6
-
-local subtitle = Instance.new("TextLabel", topBar)
-subtitle.Name = "Subtitle"
-subtitle.Size = UDim2.new(0, 200, 0, 14)
-subtitle.Position = UDim2.new(0, 16, 0, 28)
-subtitle.BackgroundTransparency = 1
-subtitle.Text = "MM2 SCRIPT [v5.7 PERFECT AIM]"
-subtitle.TextColor3 = Color3.fromHex("#8B0000")
-subtitle.TextSize = 10
-subtitle.Font = Enum.Font.Gotham
-subtitle.TextXAlignment = Enum.TextXAlignment.Left
-subtitle.ZIndex = 6
-
-local topButtons = Instance.new("Frame", topBar)
-topButtons.Name = "TopButtons"
-topButtons.Size = UDim2.new(0, 94, 0, 26)
-topButtons.AnchorPoint = Vector2.new(1, 0.5)
-topButtons.Position = UDim2.new(1, -16, 0.5, 0)
-topButtons.BackgroundTransparency = 1
-topButtons.ZIndex = 6
-
-local UIListTop = Instance.new("UIListLayout", topButtons)
-UIListTop.FillDirection = Enum.FillDirection.Horizontal
-UIListTop.HorizontalAlignment = Enum.HorizontalAlignment.Right
-UIListTop.VerticalAlignment = Enum.VerticalAlignment.Center
-UIListTop.Padding = UDim.new(0, 8)
-UIListTop.SortOrder = Enum.SortOrder.LayoutOrder
-
-local searchBarFrame = Instance.new("Frame", topBar)
-searchBarFrame.Name = "SearchBarFrame"
-searchBarFrame.AnchorPoint = Vector2.new(1, 0.5)
-searchBarFrame.Position = UDim2.new(1, -130, 0.5, 0)
-searchBarFrame.Size = UDim2.new(0, 0, 0, 26)
-searchBarFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-searchBarFrame.ClipsDescendants = true
-searchBarFrame.Visible = false
-searchBarFrame.ZIndex = 7
-Instance.new("UICorner", searchBarFrame).CornerRadius = UDim.new(0, 13)
-
-local searchTextBox = Instance.new("TextBox", searchBarFrame)
-searchTextBox.Name = "SearchTextBox"
-searchTextBox.Size = UDim2.new(1, -20, 1, 0)
-searchTextBox.Position = UDim2.new(0, 12, 0, 0)
-searchTextBox.BackgroundTransparency = 1
-searchTextBox.PlaceholderText = UI_TEXT.SearchPlaceholder
-searchTextBox.PlaceholderColor3 = Color3.fromRGB(100, 100, 100)
-searchTextBox.Text = ""
-searchTextBox.TextColor3 = Color3.fromRGB(230, 230, 230)
-searchTextBox.Font = Enum.Font.Gotham
-searchTextBox.TextSize = 11
-searchTextBox.TextXAlignment = Enum.TextXAlignment.Left
-searchTextBox.ZIndex = 8
-
-local SearchBtn = Instance.new("TextButton", topButtons)
-SearchBtn.Name = "SearchBtn"
-SearchBtn.LayoutOrder = 1
-SearchBtn.Size = UDim2.new(0, 26, 0, 26)
-SearchBtn.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
-SearchBtn.BackgroundTransparency = 0.5
-SearchBtn.Text = ""
-SearchBtn.ZIndex = 7
-Instance.new("UICorner", SearchBtn).CornerRadius = UDim.new(0, 5)
-
-local MinimizeBtn = Instance.new("TextButton", topButtons)
-MinimizeBtn.Name = "MinimizeBtn"
-MinimizeBtn.LayoutOrder = 2
-MinimizeBtn.Size = UDim2.new(0, 26, 0, 26)
-MinimizeBtn.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
-MinimizeBtn.BackgroundTransparency = 0.5
-MinimizeBtn.Text = ""
-MinimizeBtn.ZIndex = 7
-Instance.new("UICorner", MinimizeBtn).CornerRadius = UDim.new(0, 5)
-
-local MinimizeLine = Instance.new("Frame", MinimizeBtn)
-MinimizeLine.AnchorPoint = Vector2.new(0.5, 0.5)
-MinimizeLine.Position = UDim2.new(0.5, 0, 0.5, 0)
-MinimizeLine.Size = UDim2.new(0, 10, 0, 1)
-MinimizeLine.BackgroundColor3 = Color3.fromHex("#A0A0A0")
-MinimizeLine.BorderSizePixel = 0
-
-local CloseBtn = Instance.new("TextButton", topButtons)
-CloseBtn.Name = "CloseBtn"
-CloseBtn.LayoutOrder = 3
-CloseBtn.Size = UDim2.new(0, 26, 0, 26)
-CloseBtn.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
-CloseBtn.BackgroundTransparency = 0.5
-CloseBtn.Text = ""
-CloseBtn.ZIndex = 7
-Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 5)
-
-local CloseLine1 = Instance.new("Frame", CloseBtn)
-CloseLine1.AnchorPoint = Vector2.new(0.5, 0.5)
-CloseLine1.Position = UDim2.new(0.5, 0, 0.5, 0)
-CloseLine1.Size = UDim2.new(0, 10, 0, 1)
-CloseLine1.Rotation = 45
-CloseLine1.BackgroundColor3 = Color3.fromHex("#A0A0A0")
-CloseLine1.BorderSizePixel = 0
-
-local CloseLine2 = Instance.new("Frame", CloseBtn)
-CloseLine2.AnchorPoint = Vector2.new(0.5, 0.5)
-CloseLine2.Position = UDim2.new(0.5, 0, 0.5, 0)
-CloseLine2.Size = UDim2.new(0, 10, 0, 1)
-CloseLine2.Rotation = -45
-CloseLine2.BackgroundColor3 = Color3.fromHex("#A0A0A0")
-CloseLine2.BorderSizePixel = 0
-
-local div = Instance.new("Frame", mainFrame)
-div.Name = "Div"
-div.Size = UDim2.new(1, -152, 0, 1)
-div.Position = UDim2.new(0, 140, 0, 52)
-div.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-div.BorderSizePixel = 0
-
--- ==================== SIDEBAR & PERFIL ====================
-local SidebarFrame = Instance.new("Frame", mainFrame)
-SidebarFrame.Name = "SidebarFrame"
-SidebarFrame.Size = UDim2.new(0, 140, 1, -52)
-SidebarFrame.Position = UDim2.new(0, 0, 0, 52)
-SidebarFrame.BackgroundTransparency = 1
-SidebarFrame.ZIndex = 6
-
-local TabsContainer = Instance.new("ScrollingFrame", SidebarFrame)
-TabsContainer.Name = "TabsContainer"
-TabsContainer.Size = UDim2.new(1, 0, 1, -66)
-TabsContainer.Position = UDim2.new(0, 0, 0, 6)
-TabsContainer.BackgroundTransparency = 1
-TabsContainer.BorderSizePixel = 0
-TabsContainer.ScrollBarThickness = 2
-TabsContainer.ScrollBarImageColor3 = Color3.fromRGB(139, 0, 0)
-
-local TabsLayout = Instance.new("UIListLayout", TabsContainer)
-TabsLayout.SortOrder = Enum.SortOrder.LayoutOrder
-TabsLayout.Padding = UDim.new(0, 4)
-TabsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-
-TabsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    TabsContainer.CanvasSize = UDim2.new(0, 0, 0, TabsLayout.AbsoluteContentSize.Y + 8)
-end)
-
-local UserProfileFrame = Instance.new("Frame", SidebarFrame)
-UserProfileFrame.Size = UDim2.new(1, -16, 0, 50)
-UserProfileFrame.Position = UDim2.new(0, 8, 1, -58)
-UserProfileFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-UserProfileFrame.BackgroundTransparency = 0.2
-Instance.new("UICorner", UserProfileFrame).CornerRadius = UDim.new(0, 6)
-
-local AvatarImage = Instance.new("ImageLabel", UserProfileFrame)
-AvatarImage.Size = UDim2.new(0, 32, 0, 32)
-AvatarImage.Position = UDim2.new(0, 10, 0.5, -16)
-AvatarImage.BackgroundTransparency = 1
-AvatarImage.Image = "rbxthumb://type=AvatarHeadShot&id=" .. player.UserId .. "&w=150&h=150"
-Instance.new("UICorner", AvatarImage).CornerRadius = UDim.new(1, 0)
-
-local DisplayNameLabel = Instance.new("TextLabel", UserProfileFrame)
-DisplayNameLabel.Size = UDim2.new(1, -54, 0, 14)
-DisplayNameLabel.Position = UDim2.new(0, 48, 0.5, -14)
-DisplayNameLabel.BackgroundTransparency = 1
-DisplayNameLabel.Text = player.DisplayName
-DisplayNameLabel.TextColor3 = Color3.fromRGB(235, 235, 235)
-DisplayNameLabel.Font = Enum.Font.GothamBold
-DisplayNameLabel.TextSize = 11
-DisplayNameLabel.TextXAlignment = Enum.TextXAlignment.Left
-
-local UsernameLabel = Instance.new("TextLabel", UserProfileFrame)
-UsernameLabel.Size = UDim2.new(1, -54, 0, 12)
-UsernameLabel.Position = UDim2.new(0, 48, 0.5, 0)
-UsernameLabel.BackgroundTransparency = 1
-UsernameLabel.Text = "@" .. player.Name
-UsernameLabel.TextColor3 = Color3.fromRGB(130, 130, 130)
-UsernameLabel.Font = Enum.Font.Gotham
-UsernameLabel.TextSize = 9
-UsernameLabel.TextXAlignment = Enum.TextXAlignment.Left
-
--- ==================== TOGGLES CONTAINER ====================
-local togglesContainer = Instance.new("ScrollingFrame", mainFrame)
-togglesContainer.Name = "TogglesContainer"
-togglesContainer.Size = UDim2.new(1, -152, 1, -62)
-togglesContainer.Position = UDim2.new(0, 146, 0, 58)
-togglesContainer.BackgroundTransparency = 1
-togglesContainer.BorderSizePixel = 0
-togglesContainer.ScrollBarThickness = 3
-togglesContainer.ScrollBarImageColor3 = Color3.fromRGB(139, 0, 0)
-togglesContainer.ZIndex = 6
-
-local containerLayout = Instance.new("UIListLayout", togglesContainer)
-containerLayout.SortOrder = Enum.SortOrder.LayoutOrder
-containerLayout.Padding = UDim.new(0, 6)
-containerLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-
-containerLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    togglesContainer.CanvasSize = UDim2.new(0, 0, 0, containerLayout.AbsoluteContentSize.Y + 16)
-end)
-
--- ==================== CONFIRMAÇÃO FECHAMENTO ====================
-local confirmFrame = Instance.new("Frame", mainFrame)
-confirmFrame.Name = "ConfirmFrame"
-confirmFrame.Size = UDim2.new(1, 0, 1, 0)
-confirmFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-confirmFrame.BackgroundTransparency = 0.4
-confirmFrame.Visible = false
-confirmFrame.ZIndex = 50
-Instance.new("UICorner", confirmFrame).CornerRadius = UDim.new(0, 9)
-
-local confirmLabel = Instance.new("TextLabel", confirmFrame)
-confirmLabel.Size = UDim2.new(1, 0, 0, 30)
-confirmLabel.Position = UDim2.new(0, 0, 0.35, -10)
-confirmLabel.BackgroundTransparency = 1
-confirmLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
-confirmLabel.Font = Enum.Font.GothamBold
-confirmLabel.TextSize = 14
-confirmLabel.Text = UI_TEXT.ConfirmCloseTitle
-
-local btnYes = Instance.new("TextButton", confirmFrame)
-btnYes.Size = UDim2.new(0, 110, 0, 34)
-btnYes.Position = UDim2.new(0.5, -115, 0.55, 0)
-btnYes.BackgroundColor3 = Color3.fromHex("#8B0000")
-btnYes.TextColor3 = Color3.fromRGB(255, 255, 255)
-btnYes.Font = Enum.Font.GothamMedium
-btnYes.TextSize = 12
-btnYes.Text = UI_TEXT.ConfirmBtn
-Instance.new("UICorner", btnYes).CornerRadius = UDim.new(0, 6)
-
-local btnNo = Instance.new("TextButton", confirmFrame)
-btnNo.Size = UDim2.new(0, 110, 0, 34)
-btnNo.Position = UDim2.new(0.5, 5, 0.55, 0)
-btnNo.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
-btnNo.TextColor3 = Color3.fromRGB(180, 180, 180)
-btnNo.Font = Enum.Font.GothamMedium
-btnNo.TextSize = 12
-btnNo.Text = UI_TEXT.CancelBtn
-Instance.new("UICorner", btnNo).CornerRadius = UDim.new(0, 6)
-
--- ==================== GERENCIADOR DE ABAS & CONTROLES ====================
-local function filterToggles(currentActiveTab, query)
-    local searchQuery = (query or ""):lower()
-    for _, child in ipairs(togglesContainer:GetChildren()) do
-        if child:IsA("Frame") then
-            local itemTab = child:GetAttribute("Tab") or "Combat"
-            local shouldBeVisible = false
-            if searchQuery ~= "" then
-                local titleLabel = child:FindFirstChild("Title")
-                shouldBeVisible = titleLabel and titleLabel.Text:lower():find(searchQuery) ~= nil
-            else
-                shouldBeVisible = (itemTab == currentActiveTab)
             end
-            child.Visible = shouldBeVisible
+        end
+
+        if Configs.AutoShoot and shootCooldown <= 0 and not autoShooting then
+            local murderer, distancia = ObterMurderer()
+            if murderer and murderer.Character and distancia < 150 then
+                local tHead = murderer.Character:FindFirstChild("Head")
+                if tHead and (TemLinhaDeVisao(root.Position, tHead) or TemLinhaDeVisao(root.Position, murderer.Character.HumanoidRootPart.Position)) then
+                    
+                    local gun = player.Backpack:FindFirstChild("Gun") or player.Backpack:FindFirstChild("Sheriff") or char:FindFirstChild("Gun") or char:FindFirstChild("Sheriff")
+                    if gun then
+                        autoShooting = true
+                        shootCooldown = 3.5 
+                        
+                        task.spawn(function()
+                            if gun.Parent ~= char then
+                                hum:EquipTool(gun)
+                                task.wait(0.65) -- Tempo seguro para a arma estar pronta (saque da arma)
+                            end
+                            
+                            if gun.Parent == char then
+                                AtiraComPrecisao(gun, tHead, root)
+                                task.wait(0.2) -- Delay de segurança após o disparo
+                            end
+                            
+                            pcall(function() hum:UnequipTools() end)
+                            autoShooting = false
+                        end)
+                    end
+                end
+            end
         end
     end
-end
-
-local function selectTab(tabName)
-    activeTab = tabName
-    for name, btn in pairs(tabButtons) do
-        local label = btn:FindFirstChild("Label")
-        local activeBar = btn:FindFirstChild("ActiveBar")
-        if name == tabName then
-            btn.BackgroundColor3 = Color3.fromRGB(24, 15, 15)
-            btn.BackgroundTransparency = 0.4
-            if label then label.TextColor3 = Color3.fromRGB(255, 255, 255) end
-            if activeBar then activeBar.Visible = true end
-        else
-            btn.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
-            btn.BackgroundTransparency = 1
-            if label then label.TextColor3 = Color3.fromRGB(180, 180, 180) end
-            if activeBar then activeBar.Visible = false end
-        end
-    end
-    togglesContainer.CanvasPosition = Vector2.new(0, 0)
-    filterToggles(tabName, searchTextBox.Text)
-end
-
-local function createTabBtn(tabName)
-    local tabBtn = Instance.new("TextButton", TabsContainer)
-    tabBtn.Name = tabName .. "TabBtn"
-    tabBtn.Size = UDim2.new(1, -12, 0, 34)
-    tabBtn.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
-    tabBtn.BackgroundTransparency = 1
-    tabBtn.Text = ""
-    tabBtn.ZIndex = 8
-    Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 6)
-
-    local activeBar = Instance.new("Frame", tabBtn)
-    activeBar.Name = "ActiveBar"
-    activeBar.Size = UDim2.new(0, 3, 0, 18)
-    activeBar.Position = UDim2.new(0, 2, 0.5, -9)
-    activeBar.BackgroundColor3 = Color3.fromHex("#8B0000")
-    activeBar.BorderSizePixel = 0
-    activeBar.Visible = false
-    Instance.new("UICorner", activeBar).CornerRadius = UDim.new(1, 0)
-
-    local tabLabel = Instance.new("TextLabel", tabBtn)
-    tabLabel.Name = "Label"
-    tabLabel.Size = UDim2.new(1, -20, 1, 0)
-    tabLabel.Position = UDim2.new(0, 12, 0, 0)
-    tabLabel.BackgroundTransparency = 1
-    tabLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-    tabLabel.Font = Enum.Font.GothamMedium
-    tabLabel.TextSize = 11
-    tabLabel.TextXAlignment = Enum.TextXAlignment.Left
-    tabLabel.Text = UI_TEXT.Tabs[tabName] or tabName
-
-    tabBtn.MouseButton1Click:Connect(function() selectTab(tabName) end)
-    tabButtons[tabName] = tabBtn
-end
-
-local function createToggle(configKey, tabCategory)
-    local toggleFrame = Instance.new("Frame")
-    toggleFrame.Name = configKey
-    toggleFrame.Size = UDim2.new(1, -8, 0, 56)
-    toggleFrame.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
-    toggleFrame.BackgroundTransparency = 0.35
-    toggleFrame:SetAttribute("Tab", tabCategory)
-    toggleFrame.Parent = togglesContainer
-    Instance.new("UICorner", toggleFrame).CornerRadius = UDim.new(0, 6)
-    
-    local stroke = Instance.new("UIStroke", toggleFrame)
-    stroke.Color = Color3.fromHex("#141414")
-    stroke.Thickness = 1
-    
-    local optData = UI_TEXT.Options[configKey]
-    local titleLabel = Instance.new("TextLabel", toggleFrame)
-    titleLabel.Name = "Title"
-    titleLabel.Size = UDim2.new(0.65, 0, 0, 16)
-    titleLabel.Position = UDim2.new(0, 12, 0, 6)
-    titleLabel.BackgroundTransparency = 1
-    titleLabel.TextColor3 = Color3.fromHex("#CCCCCC")
-    titleLabel.Font = Enum.Font.GothamBold
-    titleLabel.TextSize = 11
-    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    titleLabel.Text = optData and optData.Title or configKey
-    
-    local descLabel = Instance.new("TextLabel", toggleFrame)
-    descLabel.Name = "Description"
-    descLabel.Size = UDim2.new(0.65, 0, 0, 28)
-    descLabel.Position = UDim2.new(0, 12, 0, 22)
-    descLabel.BackgroundTransparency = 1
-    descLabel.TextColor3 = Color3.fromRGB(130, 130, 130)
-    descLabel.Font = Enum.Font.Gotham
-    descLabel.TextSize = 9
-    descLabel.TextXAlignment = Enum.TextXAlignment.Left
-    descLabel.TextYAlignment = Enum.TextYAlignment.Top
-    descLabel.TextWrapped = true
-    descLabel.Text = optData and optData.Desc or ""
-    
-    local switchTrack = Instance.new("Frame", toggleFrame)
-    switchTrack.Size = UDim2.new(0, 40, 0, 20)
-    switchTrack.Position = UDim2.new(1, -52, 0.5, -10)
-    switchTrack.BackgroundColor3 = Configs[configKey] and Color3.fromHex("#8B0000") or Color3.fromRGB(30, 30, 30)
-    Instance.new("UICorner", switchTrack).CornerRadius = UDim.new(1, 0)
-    
-    local switchCircle = Instance.new("Frame", switchTrack)
-    switchCircle.Size = UDim2.new(0, 14, 0, 14)
-    switchCircle.Position = Configs[configKey] and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
-    switchCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    Instance.new("UICorner", switchCircle).CornerRadius = UDim.new(1, 0)
-    
-    local triggerBtn = Instance.new("TextButton", toggleFrame)
-    triggerBtn.Size = UDim2.new(1, 0, 1, 0)
-    triggerBtn.BackgroundTransparency = 1
-    triggerBtn.Text = ""
-    
-    triggerBtn.MouseButton1Click:Connect(function()
-        Configs[configKey] = not Configs[configKey]
-        local targetPos   = Configs[configKey] and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
-        local targetColor = Configs[configKey] and Color3.fromHex("#8B0000") or Color3.fromRGB(30, 30, 30)
-        local anim = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-        
-        TweenService:Create(switchCircle, anim, {Position = targetPos}):Play()
-        TweenService:Create(switchTrack, anim, {BackgroundColor3 = targetColor}):Play()
-        
-        if _G.AkatCallbacks and _G.AkatCallbacks[configKey] then
-            task.spawn(_G.AkatCallbacks[configKey], Configs[configKey])
-        end
-    end)
-end
-
-local function alternarVisibilidadeMenu()
-    if isConfirmOpen then return end
-    menuAberto = not menuAberto
-    if menuAberto then
-        mainWrapper.Visible = true
-        AplicarFadeSincronizado(mainWrapper, false, 0.2)
-    else
-        AplicarFadeSincronizado(mainWrapper, true, 0.2)
-        task.delay(0.2, function()
-            if not menuAberto then mainWrapper.Visible = false end
-        end)
-    end
-end
-
-FloatBtn.MouseButton1Click:Connect(function()
-    alternarVisibilidadeMenu()
 end)
 
-MinimizeBtn.MouseButton1Click:Connect(function()
-    isMinimized = not isMinimized
-    local windowAnim = TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-    if isMinimized then
-        togglesContainer.Visible = false
-        SidebarFrame.Visible = false
-        div.Visible = false
-        TweenService:Create(mainWrapper, windowAnim, {Size = UDim2.new(0, 520, 0, 52)}):Play()
-    else
-        div.Visible = true
-        SidebarFrame.Visible = true
-        togglesContainer.Visible = true
-        TweenService:Create(mainWrapper, windowAnim, {Size = UDim2.new(0, 520, 0, 300)}):Play()
-    end
-end)
-
-CloseBtn.MouseButton1Click:Connect(function()
-    isConfirmOpen = true
-    confirmFrame.Visible = true
-    AplicarFadeSincronizado(confirmFrame, false, 0.15)
-end)
-
-btnYes.MouseButton1Click:Connect(function()
-    LimparEDesligarAbsolutamente()
-    screenGui:Destroy()
-end)
-
-btnNo.MouseButton1Click:Connect(function()
-    isConfirmOpen = false
-    AplicarFadeSincronizado(confirmFrame, true, 0.15)
-    task.delay(0.15, function() confirmFrame.Visible = false end)
-end)
-
-SearchBtn.MouseButton1Click:Connect(function()
-    searchOpen = not searchOpen
-    searchBarFrame.Visible = searchOpen
-    local windowAnim = TweenInfo.new(0.2, Enum.EasingStyle.Quad)
-    TweenService:Create(searchBarFrame, windowAnim, {Size = searchOpen and UDim2.new(0, 160, 0, 26) or UDim2.new(0, 0, 0, 26)}):Play()
-    if searchOpen then searchTextBox:CaptureFocus() end
-end)
-
-searchTextBox:GetPropertyChangedSignal("Text"):Connect(function()
-    filterToggles(activeTab, searchTextBox.Text)
-end)
-
--- Initializing Tabs & Toggles
-createTabBtn("Player")
-createTabBtn("Combat")
-createTabBtn("Visuals")
-createTabBtn("Teleports")
-createTabBtn("Misc")
-
-createToggle("Speed", "Player")
-createToggle("AntiFling", "Player")
-createToggle("SafeSpot", "Player")
-
-createToggle("AutoShoot", "Combat")
-createToggle("Reach", "Combat")
-
-createToggle("ESP", "Visuals")
-
-createToggle("TpToGun", "Teleports")
-createToggle("AutoCollect", "Teleports")
-
-createToggle("ChatRoles", "Misc")
-
-selectTab("Player")
-
--- ==================== ANIMAÇÃO INTRODUÇÃO ====================
+-- ==================== ANIMAÇÃO INTRODUÇÃO (AJUSTADA) ====================
 local function ExecutarIntroAkat()
     local Blur = Instance.new("BlurEffect")
     Blur.Size = 0
@@ -1372,25 +844,50 @@ local function ExecutarIntroAkat()
     IntroText.Font = Enum.Font.GothamBold
     IntroText.TextSize = 30
     IntroText.RichText = true
-    IntroText.Text = UI_TEXT.Intro
+    IntroText.Text = '<font color="#FFFFFF">Scripts by | </font><font color="#8B0000">AKAT Community</font>'
     IntroText.TextTransparency = 1
     IntroText.ZIndex = 501
-
+    
+    -- BARRA VERMELHA: Agora um pouco mais para baixo e mais curta horizontalmente
     local IntroLine = Instance.new("Frame", IntroFrame)
     IntroLine.AnchorPoint = Vector2.new(0.5, 0.5)
-    IntroLine.Position = UDim2.new(0.5, 0, 0.5, 30)
-    IntroLine.Size = UDim2.new(0, 0, 0, 2)
+    IntroLine.Position = UDim2.new(0.5, 0, 0.5, 30) -- Deslocamento perfeito para baixo
+    IntroLine.Size = UDim2.new(0, 0, 0, 2) -- Inicia compactada
     IntroLine.BackgroundColor3 = Color3.fromHex("#8B0000")
     IntroLine.BorderSizePixel = 0
     IntroLine.BackgroundTransparency = 1
     IntroLine.ZIndex = 502
 
+    -- Executa interpolações
     TweenService:Create(IntroFrame, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0.2}):Play()
     TweenService:Create(IntroText, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {TextTransparency = 0, Position = UDim2.new(0.5, 0, 0.5, -6)}):Play()
+    -- Expande até 260px de largura e finaliza na posição vertical ideal (Y Offset 17)
     TweenService:Create(IntroLine, TweenInfo.new(0.7, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0, Size = UDim2.new(0, 260, 0, 2), Position = UDim2.new(0.5, 0, 0.5, 17)}):Play()
     TweenService:Create(Blur, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = 14}):Play()
-    task.wait(2.0)
+    task.wait(0.6)
 
+    -- Efeito Pulsante Suave
+    local correndoBrilho = true
+    task.spawn(function()
+        local infoFadeOut = TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+        local infoFadeIn = TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+        while correndoBrilho do
+            local tw1 = TweenService:Create(IntroText, infoFadeOut, {TextTransparency = 0.4})
+            local tw2 = TweenService:Create(IntroLine, infoFadeOut, {BackgroundTransparency = 0.4})
+            tw1:Play() tw2:Play()
+            tw1.Completed:Wait()
+            if not correndoBrilho then break end
+            local tw3 = TweenService:Create(IntroText, infoFadeIn, {TextTransparency = 0})
+            local tw4 = TweenService:Create(IntroLine, infoFadeIn, {BackgroundTransparency = 0})
+            tw3:Play() tw4:Play()
+            tw3.Completed:Wait()
+        end
+    end)
+
+    task.wait(2.4)
+    correndoBrilho = false
+
+    -- Fade Out da Intro
     TweenService:Create(IntroText, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {TextTransparency = 1, Position = UDim2.new(0.5, 0, 0.5, -16)}):Play()
     TweenService:Create(IntroLine, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {BackgroundTransparency = 1, Size = UDim2.new(0, 0, 0, 2)}):Play()
     TweenService:Create(IntroFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
@@ -1403,9 +900,16 @@ local function ExecutarIntroAkat()
     RegistrarTransparencias(mainFrame)
     for _, item in ipairs(mainFrame:GetDescendants()) do RegistrarTransparencias(item) end
 
+    -- Inicializa a Interface Principal
     mainWrapper.Visible = true
     FloatBtn.Visible = true
-    AplicarFadeSincronizado(mainWrapper, false, 0.2)
+    
+    AplicarFadeSincronizado(mainWrapper, true, 0)
+    mainWrapper.Size = UDim2.new(0, 385, 0, 248)
+    
+    local fastOpen = TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    AplicarFadeSincronizado(mainWrapper, false, 0.12)
+    TweenService:Create(mainWrapper, fastOpen, {Size = UDim2.new(0, 400, 0, 260)}):Play()
 end
 
 task.spawn(ExecutarIntroAkat)
