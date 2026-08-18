@@ -837,6 +837,7 @@ local function ConfigurarArrastarAkat(inst, trigger)
     end)
 end
 
+-- ==================== BOTÃO FLUTUANTE AJUSTADO ====================
 local FloatBtn = Instance.new("ImageButton", screenGui)
 FloatBtn.Name = "FloatBtn"
 FloatBtn.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -856,11 +857,11 @@ Sharingan.Position = UDim2.new(0.5, 0, 0.5, 0)
 Sharingan.AnchorPoint = Vector2.new(0.5, 0.5)
 Sharingan.BackgroundTransparency = 1
 Sharingan.Image = "rbxassetid://100882509796042"
-Sharingan.ZIndex = 29
+Sharingan.ZIndex = 31 -- Ajustado para renderizar acima da imagem base do botão
 
 local SharinganSound = Instance.new("Sound", FloatBtn)
 SharinganSound.SoundId = "rbxassetid://6310837681"
-SharinganSound.Volume = 1
+SharinganSound.Volume = 0.35 -- Volume reduzido
 
 local RotateTween = TweenService:Create(Sharingan, TweenInfo.new(8, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), {Rotation = 360})
 RotateTween:Play()
@@ -878,8 +879,20 @@ local floatCorner = Instance.new("UICorner", FloatBtn)
 floatCorner.CornerRadius = UDim.new(0, 8)
 
 local FloatStroke = Instance.new("UIStroke", FloatBtn)
-FloatStroke.Thickness = 1
-FloatStroke.Color = Color3.fromRGB(139, 0, 0)
+FloatStroke.Thickness = 2
+FloatStroke.Color = Color3.fromRGB(255, 255, 255)
+
+-- Efeito Gradient Vermelho Escuro com Preto no contorno
+local floatStrokeGradient = Instance.new("UIGradient", FloatStroke)
+floatStrokeGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(139, 0, 0)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 0, 0)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(139, 0, 0))
+})
+
+-- Animação do gradient dando voltas no contorno
+local StrokeRotateTween = TweenService:Create(floatStrokeGradient, TweenInfo.new(3, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), {Rotation = 360})
+StrokeRotateTween:Play()
 
 local function AnimarCliqueFloatBtn()
     local originalSize = UDim2.new(0, 44, 0, 44)
@@ -1845,9 +1858,13 @@ btnYes.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
+-- Clique no botão flutuante ajustado
 FloatBtn.MouseButton1Click:Connect(function()
     AnimarCliqueFloatBtn()
-    SharinganSound:Play()
+    -- Toca o som apenas quando o menu estiver fechado (ou seja, quando estiver abrindo)
+    if not menuAberto then
+        SharinganSound:Play()
+    end
     alternarVisibilidadeMenu()
 end)
 
