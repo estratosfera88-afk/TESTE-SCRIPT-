@@ -586,27 +586,27 @@ floatStrokeGradient.Color = ColorSequence.new({
 })
 TweenService:Create(floatStrokeGradient, TweenInfo.new(3, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), {Rotation = 360}):Play()
 
--- Sharingan
+-- Sharingan Ajustado & Orbitando
 local Sharingan = Instance.new("ImageLabel", FloatBtn)
 Sharingan.Name = "SharinganEffect"
-Sharingan.Size = UDim2.new(0, 22, 0, 22)
+Sharingan.Size = UDim2.new(0, 18, 0, 18) -- Tamanho Reduzido
 Sharingan.AnchorPoint = Vector2.new(0.5, 0.5)
 Sharingan.BackgroundTransparency = 1
 Sharingan.Image = "rbxassetid://100882509796042"
-Sharingan.ImageTransparency = 1 -- Inicialmente invisível (pois o menu começa aberto)
+Sharingan.ImageTransparency = 1 
 Sharingan.ZIndex = 32
 
 local SharinganSound = Instance.new("Sound", FloatBtn)
 SharinganSound.SoundId = "rbxassetid://6310837681"
-SharinganSound.Volume = 0.35
+SharinganSound.Volume = 0.4
 
--- Animação de Orbita e Giro rápido do Sharingan
+-- Animação de Órbita e Giro Rápido do Sharingan
 local orbitAngle = 0
 RunService.RenderStepped:Connect(function(dt)
-    orbitAngle = orbitAngle + dt * 3.5 -- Velocidade da órbita
-    local radiusX, radiusY = 1.3, 1.3 -- Distância do centro do botão
+    orbitAngle = orbitAngle + (dt * 3.5)
+    local radiusX, radiusY = 1.25, 1.25
     Sharingan.Position = UDim2.new(0.5 + math.cos(orbitAngle) * radiusX, 0, 0.5 + math.sin(orbitAngle) * radiusY, 0)
-    Sharingan.Rotation = Sharingan.Rotation + (dt * 400) -- Giro Rápido
+    Sharingan.Rotation = Sharingan.Rotation + (dt * 450)
 end)
 
 -- Drag do Botão Flutuante
@@ -671,7 +671,7 @@ UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragUIToggle = false end
 end)
 
--- Função para Criar as Áreas Cortadas com Efeito de Ondas Vermelhas e Pretas
+-- Função para Criar as Áreas Cortadas com Efeito de Ondas Vermelhas e Pretas na Horizontal
 local function CreatePanel(parent, size, pos, name)
     local panel = Instance.new("Frame", parent)
     panel.Name = name
@@ -686,22 +686,24 @@ local function CreatePanel(parent, size, pos, name)
     local grad = Instance.new("UIGradient", panel)
     grad.Color = ColorSequence.new({
         ColorSequenceKeypoint.new(0, Color3.fromRGB(15, 0, 0)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(100, 0, 0)), 
+        ColorSequenceKeypoint.new(0.3, Color3.fromRGB(110, 5, 5)), 
+        ColorSequenceKeypoint.new(0.7, Color3.fromRGB(160, 10, 10)), 
         ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 0, 0))
     })
-    grad.Rotation = 90
+    grad.Rotation = 0 -- Gradiente na Horizontal
     
+    -- Animação da Onda "Passando de Lado a Lado" continuamente
     RunService.RenderStepped:Connect(function()
-        grad.Offset = Vector2.new(0, math.sin(tick() * 1.5) * 0.4) 
+        grad.Offset = Vector2.new(math.sin(tick() * 1.2) * 0.45, 0)
     end)
     
     local stroke = Instance.new("UIStroke", panel)
-    stroke.Color = Color3.fromHex("#161616")
+    stroke.Color = Color3.fromRGB(35, 10, 10)
     stroke.Thickness = 1.2
     return panel
 end
 
--- Divisão da UI (Corte Transparente)
+-- Divisão da UI em Painéis Cortados com Espaço Invisível
 local LeftPanel = CreatePanel(mainFrame, UDim2.new(0, 160, 1, 0), UDim2.new(0, 0, 0, 0), "LeftPanel")
 local RightPanel = CreatePanel(mainFrame, UDim2.new(1, -170, 1, 0), UDim2.new(0, 170, 0, 0), "RightPanel")
 
@@ -712,24 +714,24 @@ titleContainer.BackgroundTransparency = 1
 titleContainer.ZIndex = 6
 
 local title = Instance.new("TextLabel", titleContainer)
-title.Size = UDim2.new(0, 110, 0, 18)
-title.Position = UDim2.new(0, 12, 0, 12)
+title.Size = UDim2.new(0, 82, 0, 18)
+title.Position = UDim2.new(0, 10, 0, 12)
 title.BackgroundTransparency = 1
 title.Text = "AKATSUKI SCRIPTS"
 title.TextColor3 = Color3.fromRGB(220, 220, 220)
-title.TextSize = 12
+title.TextSize = 10
 title.Font = Enum.Font.GothamBold
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.ZIndex = 6
 
--- Caixinha "[BETA v3.6]"
+-- Caixinha Única "[BETA v3.6]" Vermelha Sem Contorno ao lado do Título
 local BetaBox = Instance.new("Frame", titleContainer)
 BetaBox.Size = UDim2.new(0, 58, 0, 14)
-BetaBox.Position = UDim2.new(0, 12, 0, 28)
+BetaBox.Position = UDim2.new(0, 96, 0, 14)
 BetaBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 BetaBox.BorderSizePixel = 0
 BetaBox.ZIndex = 6
-Instance.new("UICorner", BetaBox).CornerRadius = UDim.new(0, 3)
+Instance.new("UICorner", BetaBox).CornerRadius = UDim.new(0, 4)
 
 local BetaGrad = Instance.new("UIGradient", BetaBox)
 BetaGrad.Color = ColorSequence.new({
@@ -742,13 +744,13 @@ BetaText.Size = UDim2.new(1, 0, 1, 0)
 BetaText.BackgroundTransparency = 1
 BetaText.Text = "[BETA v3.6]"
 BetaText.TextColor3 = Color3.fromRGB(255, 255, 255)
-BetaText.TextSize = 9
+BetaText.TextSize = 8
 BetaText.Font = Enum.Font.GothamBold
 BetaText.ZIndex = 7
 
 local subtitle = Instance.new("TextLabel", titleContainer)
-subtitle.Size = UDim2.new(1, -24, 0, 14)
-subtitle.Position = UDim2.new(0, 12, 0, 44)
+subtitle.Size = UDim2.new(1, -20, 0, 14)
+subtitle.Position = UDim2.new(0, 10, 0, 32)
 subtitle.BackgroundTransparency = 1
 subtitle.Text = "MM2 SCRIPT | by zeni <3"
 subtitle.TextColor3 = Color3.fromHex("#8B0000")
@@ -760,7 +762,7 @@ subtitle.ZIndex = 6
 local TabsContainer = Instance.new("ScrollingFrame", LeftPanel)
 TabsContainer.Name = "TabsContainer"
 TabsContainer.Size = UDim2.new(1, 0, 1, -125)
-TabsContainer.Position = UDim2.new(0, 0, 0, 65)
+TabsContainer.Position = UDim2.new(0, 0, 0, 58)
 TabsContainer.BackgroundTransparency = 1
 TabsContainer.BorderSizePixel = 0
 TabsContainer.ZIndex = 7
@@ -793,19 +795,19 @@ AvatarImage.ZIndex = 8
 Instance.new("UICorner", AvatarImage).CornerRadius = UDim.new(1, 0)
 
 local DisplayNameLabel = Instance.new("TextLabel", UserProfileFrame)
-DisplayNameLabel.Size = UDim2.new(1, -66, 0, 14)
+DisplayNameLabel.Size = UDim2.new(1, -68, 0, 14)
 DisplayNameLabel.Position = UDim2.new(0, 44, 0.5, -14)
 DisplayNameLabel.BackgroundTransparency = 1
 DisplayNameLabel.Text = player.DisplayName
 DisplayNameLabel.TextColor3 = Color3.fromRGB(235, 235, 235)
 DisplayNameLabel.Font = Enum.Font.GothamBold
-DisplayNameLabel.TextSize = 11
+DisplayNameLabel.TextSize = 10
 DisplayNameLabel.TextXAlignment = Enum.TextXAlignment.Left
 DisplayNameLabel.TextTruncate = Enum.TextTruncate.AtEnd
 DisplayNameLabel.ZIndex = 8
 
 local UsernameLabel = Instance.new("TextLabel", UserProfileFrame)
-UsernameLabel.Size = UDim2.new(1, -66, 0, 12)
+UsernameLabel.Size = UDim2.new(1, -68, 0, 12)
 UsernameLabel.Position = UDim2.new(0, 44, 0.5, 0)
 UsernameLabel.BackgroundTransparency = 1
 UsernameLabel.Text = "@" .. player.Name
@@ -816,17 +818,17 @@ UsernameLabel.TextXAlignment = Enum.TextXAlignment.Left
 UsernameLabel.TextTruncate = Enum.TextTruncate.AtEnd
 UsernameLabel.ZIndex = 8
 
--- Botão de Privacidade (Olho)
+-- Botão de Privacidade no Card do Usuário (Ícone Olho da Tab Visuals)
 local PrivacyBtn = Instance.new("ImageButton", UserProfileFrame)
-PrivacyBtn.Size = UDim2.new(0, 16, 0, 16)
-PrivacyBtn.Position = UDim2.new(1, -22, 0, 6)
+PrivacyBtn.Size = UDim2.new(0, 15, 0, 15)
+PrivacyBtn.Position = UDim2.new(1, -21, 0, 6)
 PrivacyBtn.BackgroundTransparency = 1
 PrivacyBtn.Image = "rbxthumb://type=Asset&id=135604583195835&w=150&h=150"
 PrivacyBtn.ImageColor3 = Color3.fromRGB(255, 255, 255)
 PrivacyBtn.ZIndex = 9
 
 local PrivacySlash = Instance.new("Frame", PrivacyBtn)
-PrivacySlash.Size = UDim2.new(0, 16, 0, 2)
+PrivacySlash.Size = UDim2.new(0, 15, 0, 1.8)
 PrivacySlash.AnchorPoint = Vector2.new(0.5, 0.5)
 PrivacySlash.Position = UDim2.new(0.5, 0, 0.5, 0)
 PrivacySlash.Rotation = -45
@@ -840,8 +842,8 @@ PrivacyBtn.MouseButton1Click:Connect(function()
     isPrivate = not isPrivate
     PrivacySlash.Visible = isPrivate
     if isPrivate then
-        DisplayNameLabel.Text = "*******"
-        UsernameLabel.Text = "@*******"
+        DisplayNameLabel.Text = string.rep("*", #player.DisplayName)
+        UsernameLabel.Text = "@" .. string.rep("*", #player.Name)
     else
         DisplayNameLabel.Text = player.DisplayName
         UsernameLabel.Text = "@" .. player.Name
@@ -862,7 +864,7 @@ UIListTop.VerticalAlignment = Enum.VerticalAlignment.Center
 UIListTop.Padding = UDim.new(0, 8)
 UIListTop.SortOrder = Enum.SortOrder.LayoutOrder
 
--- Search Dinâmico (dentro da lupa)
+-- Search Dinâmico (Expansão dentro da Lupa)
 local SearchBtn = Instance.new("TextButton", topButtons)
 SearchBtn.Name = "SearchBtn"
 SearchBtn.LayoutOrder = 1
@@ -1257,7 +1259,7 @@ SearchBtn.MouseButton1Click:Connect(function()
         searchTextBox:CaptureFocus()
     else
         TweenService:Create(SearchBtn, info, {Size = UDim2.new(0, 26, 0, 26)}):Play()
-        TweenService:Create(SearchIcon, info, {Position = UDim2.new(0.5, 0, 0.5, 0)}):Play()
+        TweenService:Create(SearchIcon, info, {Position = UDim2.new(0, 6, 0.5, 0)}):Play()
         searchTextBox:ReleaseFocus()
         searchTextBox.Text = ""
         task.delay(0.2, function() if not searchExpanded then searchTextBox.Visible = false end end)
@@ -1289,13 +1291,17 @@ local function alternarVisibilidadeMenu(abrir)
     else
         AplicarFadeSincronizado(mainWrapper, true, tempoAnim)
         TweenService:Create(mainWrapper, windowAnim, {Size = UDim2.new(0, 480, 0, 260)}):Play()
+        
+        -- Som e Desaparecimento do Sharingan
+        SharinganSound:Play()
+        TweenService:Create(Sharingan, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {ImageTransparency = 1}):Play()
+        
         task.delay(tempoAnim, function()
             if not menuAberto then 
                 mainWrapper.Visible = false 
                 FloatBtn.Visible = true
-                -- Animação do Sharingan aparecer no FloatBtn
-                SharinganSound:Play()
-                TweenService:Create(Sharingan, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {ImageTransparency = 0}):Play()
+                -- Animação rápida do Sharingan aparecer no Botão Flutuante
+                TweenService:Create(Sharingan, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {ImageTransparency = 0}):Play()
             end
         end)
     end
@@ -1304,8 +1310,7 @@ end
 MinimizeBtn.MouseButton1Click:Connect(function() alternarVisibilidadeMenu(false) end)
 
 FloatBtn.MouseButton1Click:Connect(function()
-    -- Sharingan Desaparece
-    TweenService:Create(Sharingan, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {ImageTransparency = 1}):Play()
+    TweenService:Create(Sharingan, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {ImageTransparency = 1}):Play()
     alternarVisibilidadeMenu(true)
 end)
 
