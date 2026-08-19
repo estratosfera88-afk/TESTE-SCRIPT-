@@ -1,4 +1,4 @@
--- [[ AKATSUKI UI ONLY [v3.8] ]]
+-- [[ AKATSUKI UI ONLY [v3.8] - FIXED & IMPROVED ]]
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -86,7 +86,7 @@ local function AplicarFadeSincronizado(raiz, fadeOut, duracao)
         end
         if orig.ImageTransparency then
             local baseTransparency = orig.ImageTransparency
-            if obj.Name == "Shadow3D" then baseTransparency = 0.5 end
+            if obj.Name == "Shadow3D" then baseTransparency = 0.6 end
             local t = fadeOut and 1 or baseTransparency
             if obj.ImageTransparency ~= t then if duracao == 0 then obj.ImageTransparency = t else TweenService:Create(obj, info, {ImageTransparency = t}):Play() end end
         end
@@ -105,7 +105,6 @@ FloatBtn.Name = "FloatBtn"
 FloatBtn.AnchorPoint = Vector2.new(0.5, 0.5)
 FloatBtn.Size = UDim2.new(0, 44, 0, 44)
 FloatBtn.Position = UDim2.new(0.12, 0, 0.4, 0)
--- Utilizando rbxthumb para garantir o carregamento correto mesmo se o ID for de uma Decal
 FloatBtn.Image = "rbxthumb://type=Asset&id=139044062702391&w=150&h=150"
 FloatBtn.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
 FloatBtn.Visible = true
@@ -113,14 +112,17 @@ FloatBtn.ZIndex = 100
 FloatBtn.ClipsDescendants = false
 if not FloatBtn:FindFirstChildOfClass("UICorner") then Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(0, 8) end
 
+-- Contorno Gradiente (Vermelho escuro com preto)
 local FloatStroke = FloatBtn:FindFirstChild("FloatStroke") or Instance.new("UIStroke", FloatBtn)
 FloatStroke.Name = "FloatStroke"
-FloatStroke.Thickness = 2
+FloatStroke.Thickness = 2.5
+FloatStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 local floatStrokeGradient = FloatStroke:FindFirstChildOfClass("UIGradient") or Instance.new("UIGradient", FloatStroke)
+floatStrokeGradient.Rotation = 45
 floatStrokeGradient.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(139, 0, 0)),
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(160, 0, 0)),
     ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 0, 0)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(139, 0, 0))
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(160, 0, 0))
 })
 
 local Sharingan = FloatBtn:FindFirstChild("SharinganEffect") or Instance.new("ImageLabel", FloatBtn)
@@ -134,35 +136,61 @@ Sharingan.ImageTransparency = 0
 Sharingan.ZIndex = 105
 Sharingan.Visible = true
 
+-- Rotação do Sharingan em maior distância (raio = 38)
 local orbitAngle = 0
 RunService.RenderStepped:Connect(function(dt)
     if FloatBtn and FloatBtn.Parent and FloatBtn.Visible then
         Sharingan.Rotation = (Sharingan.Rotation + (dt * 180)) % 360
         orbitAngle = (orbitAngle + (dt * 2.2)) % (math.pi * 2)
-        local radius = 28
+        local radius = 38 -- Maior distância do botão flutuante
         Sharingan.Position = UDim2.new(0.5, math.cos(orbitAngle) * radius, 0.5, math.sin(orbitAngle) * radius)
     end
 end)
 
 local SharinganSound = FloatBtn:FindFirstChild("SharinganSound") or Instance.new("Sound", FloatBtn)
 SharinganSound.Name = "SharinganSound"
-SharinganSound.SoundId = "rbxassetid://6310837681"
-SharinganSound.Volume = 0.4
+SharinganSound.SoundId = "rbxassetid://9114223178" -- Som de acionamento otimizado
+SharinganSound.Volume = 0.5
 
-local dragToggle, dragStart, startPos
+local dragToggle = false
+local dragStart, startPos
+local isDragging = false
+
 FloatBtn.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragToggle = true; dragStart = input.Position; startPos = FloatBtn.Position
+        dragToggle = true
+        isDragging = false
+        dragStart = input.Position
+        startPos = FloatBtn.Position
     end
 end)
+
 UserInputService.InputChanged:Connect(function(input)
     if dragToggle and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
         local delta = input.Position - dragStart
+        if delta.Magnitude > 5 then
+            isDragging = true
+        end
         FloatBtn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
 end)
+
+-- Declaração antecipada da função de controle de estado
+local SetUIState
+
 UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragToggle = false end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
+        if dragToggle and not isDragging then
+            -- Clique acionado sem ter arrastado
+            pcall(function() SharinganSound:Play() end)
+            if UIState == "MINIMIZED" or UIState == "CLOSED" then
+                SetUIState("OPEN")
+            elseif UIState == "OPEN" then
+                SetUIState("MINIMIZED")
+            end
+        end
+        dragToggle = false 
+    end
 end)
 
 -- ==================== INTERFACE PRINCIPAL ====================
@@ -206,21 +234,20 @@ local function CreateGradientPanel(parent, size, pos, name)
     panel.BackgroundTransparency = 1
     panel.BorderSizePixel = 0
     panel.ZIndex = 5
-    -- Não dar clip no painel para a sombra 3D poder aparecer perfeitamente
     panel.ClipsDescendants = false
 
-    -- Sombra 3D moderna e ajustada para não vazar nas margens invisíveis
+    -- CORREÇÃO DA SOMBRA 3D: Sombra suave usando Asset 9-Slice sem vazar nos cantos
     local shadow = Instance.new("ImageLabel", panel)
     shadow.Name = "Shadow3D"
-    shadow.Size = UDim2.new(1, 12, 1, 12)
-    shadow.Position = UDim2.new(0.5, 0, 0.5, 2)
+    shadow.Size = UDim2.new(1, 16, 1, 16)
+    shadow.Position = UDim2.new(0.5, 0, 0.5, 1)
     shadow.AnchorPoint = Vector2.new(0.5, 0.5)
     shadow.BackgroundTransparency = 1
-    shadow.Image = "rbxassetid://6015897843"
+    shadow.Image = "rbxassetid://5554236805"
     shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
-    shadow.ImageTransparency = 0.5
+    shadow.ImageTransparency = 0.55
     shadow.ScaleType = Enum.ScaleType.Slice
-    shadow.SliceCenter = Rect.new(31, 31, 63, 63)
+    shadow.SliceCenter = Rect.new(23, 23, 277, 277)
     shadow.ZIndex = 4
 
     local InnerBg = Instance.new("Frame", panel)
@@ -228,7 +255,6 @@ local function CreateGradientPanel(parent, size, pos, name)
     InnerBg.Size = UDim2.new(1, 0, 1, 0)
     InnerBg.BackgroundColor3 = Color3.fromRGB(15, 8, 10)
     InnerBg.BorderSizePixel = 0
-    -- Aplicando clip e bordas modernas estritamente no container interno
     InnerBg.ClipsDescendants = true
     InnerBg.ZIndex = 5
     Instance.new("UICorner", InnerBg).CornerRadius = UDim.new(0, 10)
@@ -242,16 +268,17 @@ local function CreateGradientPanel(parent, size, pos, name)
 
     local redGrad = Instance.new("UIGradient", overlay)
     redGrad.Rotation = 90
-    -- Cores perfeitamente alinhadas nas extremidades para uma rotação limpa e suave
     redGrad.Color = ColorSequence.new({
         ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 0, 0)),
         ColorSequenceKeypoint.new(0.5, Color3.fromRGB(140, 10, 15)),
         ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 0, 0))
     })
+    
+    -- TRANSPARÊNCIA AJUSTADA: Quase invisível para rodar bem sutilmente no fundo
     redGrad.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0.7),
-        NumberSequenceKeypoint.new(0.5, 0.25),
-        NumberSequenceKeypoint.new(1, 0.7)
+        NumberSequenceKeypoint.new(0, 0.92),
+        NumberSequenceKeypoint.new(0.5, 0.70),
+        NumberSequenceKeypoint.new(1, 0.92)
     })
 
     local lightBeam = Instance.new("Frame", InnerBg)
@@ -269,16 +296,18 @@ local function CreateGradientPanel(parent, size, pos, name)
         ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 80, 80)),
         ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
     })
+    
+    -- Linha giratória extremamente sutil / transparente
     beamGrad.Transparency = NumberSequence.new({
         NumberSequenceKeypoint.new(0, 1),
-        NumberSequenceKeypoint.new(0.5, 0.93),
+        NumberSequenceKeypoint.new(0.5, 0.96),
         NumberSequenceKeypoint.new(1, 1)
     })
 
-    -- Rotação suave contínua para os gradients, sem lags
+    -- Rotação contínua e leve
     RunService.RenderStepped:Connect(function(dt)
-        redGrad.Rotation = (redGrad.Rotation + (dt * 12)) % 360
-        beamGrad.Rotation = (beamGrad.Rotation + (dt * 15)) % 360
+        redGrad.Rotation = (redGrad.Rotation + (dt * 10)) % 360
+        beamGrad.Rotation = (beamGrad.Rotation + (dt * 12)) % 360
     end)
     
     local stroke = Instance.new("UIStroke", InnerBg)
@@ -288,35 +317,10 @@ local function CreateGradientPanel(parent, size, pos, name)
     return panel
 end
 
--- Espaçamento ajustado (gap de 15px) para evitar conflitos visuais da sombra
 local LeftPanel = CreateGradientPanel(mainFrame, UDim2.new(0, 165, 1, 0), UDim2.new(0, 0, 0, 0), "LeftPanel")
 local RightPanel = CreateGradientPanel(mainFrame, UDim2.new(1, -180, 1, 0), UDim2.new(0, 180, 0, 0), "RightPanel")
 
 -- ==================== LEFT PANEL CONTENT ====================
-local BadgeFrame = Instance.new("Frame", LeftPanel.InnerBg)
-BadgeFrame.Name = "BadgeFrame"
-BadgeFrame.Size = UDim2.new(0, 56, 0, 22)
-BadgeFrame.Position = UDim2.new(0, 10, 0, 7)
-BadgeFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-BadgeFrame.ZIndex = 11
-Instance.new("UICorner", BadgeFrame).CornerRadius = UDim.new(0, 6)
-
-local badgeGrad = Instance.new("UIGradient", BadgeFrame)
-badgeGrad.Rotation = 45
-badgeGrad.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 30, 30)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(5, 5, 5))
-})
-
-local BadgeText = Instance.new("TextLabel", BadgeFrame)
-BadgeText.Size = UDim2.new(1, 0, 1, 0)
-BadgeText.BackgroundTransparency = 1
-BadgeText.Text = "UI V3.8"
-BadgeText.TextColor3 = Color3.fromRGB(220, 220, 220)
-BadgeText.Font = Enum.Font.GothamBold
-BadgeText.TextSize = 10
-BadgeText.ZIndex = 12
-
 local LeftSeparatorLine = Instance.new("Frame", LeftPanel.InnerBg)
 LeftSeparatorLine.Size = UDim2.new(1, 0, 0, 1)
 LeftSeparatorLine.Position = UDim2.new(0, 0, 0, 36)
@@ -429,40 +433,40 @@ topButtons.Position = UDim2.new(0, 0, 0, 0)
 topButtons.BackgroundTransparency = 1
 topButtons.ZIndex = 10
 
--- Área do Título e Subtítulo centralizados
-local HeaderCenter = Instance.new("Frame", topButtons)
-HeaderCenter.Size = UDim2.new(1, 0, 1, 0)
-HeaderCenter.Position = UDim2.new(0, 0, 0, 0)
-HeaderCenter.BackgroundTransparency = 1
-HeaderCenter.ZIndex = 10
+-- TÍTULO E SUBTÍTULO ALINHADOS À ESQUERDA
+local HeaderLeft = Instance.new("Frame", topButtons)
+HeaderLeft.Size = UDim2.new(1, -125, 1, 0)
+HeaderLeft.Position = UDim2.new(0, 12, 0, 0)
+HeaderLeft.BackgroundTransparency = 1
+HeaderLeft.ZIndex = 10
 
-local title = Instance.new("TextLabel", HeaderCenter)
+local title = Instance.new("TextLabel", HeaderLeft)
 title.Size = UDim2.new(1, 0, 0, 18)
 title.Position = UDim2.new(0, 0, 0, 2)
 title.BackgroundTransparency = 1
 title.Text = "AKATSUKI SCRIPTS"
 title.TextColor3 = Color3.fromRGB(245, 245, 245)
-title.TextSize = 15
+title.TextSize = 14
 title.Font = Enum.Font.GothamBold
-title.TextXAlignment = Enum.TextXAlignment.Center
+title.TextXAlignment = Enum.TextXAlignment.Left
 title.ZIndex = 11
 
-local subtitle = Instance.new("TextLabel", HeaderCenter)
+local subtitle = Instance.new("TextLabel", HeaderLeft)
 subtitle.Size = UDim2.new(1, 0, 0, 14)
-subtitle.Position = UDim2.new(0, 0, 0, 20)
+subtitle.Position = UDim2.new(0, 0, 0, 19)
 subtitle.BackgroundTransparency = 1
 subtitle.Text = "MM2 SCRIPT | by zeni <3"
 subtitle.TextColor3 = Color3.fromRGB(220, 50, 50)
 subtitle.TextTransparency = 0.2
-subtitle.TextSize = 11
+subtitle.TextSize = 10.5
 subtitle.Font = Enum.Font.Gotham
-subtitle.TextXAlignment = Enum.TextXAlignment.Center
+subtitle.TextXAlignment = Enum.TextXAlignment.Left
 subtitle.ZIndex = 11
 
--- Container isolado para os botões direitos
+-- Container para os botões da direita
 local ControlsFrame = Instance.new("Frame", topButtons)
-ControlsFrame.Size = UDim2.new(0.5, 0, 1, 0)
-ControlsFrame.Position = UDim2.new(0.5, 0, 0, 0)
+ControlsFrame.Size = UDim2.new(0, 120, 1, 0)
+ControlsFrame.Position = UDim2.new(1, -120, 0, 0)
 ControlsFrame.BackgroundTransparency = 1
 ControlsFrame.ZIndex = 11
 
@@ -470,7 +474,7 @@ local UIListTop = Instance.new("UIListLayout", ControlsFrame)
 UIListTop.FillDirection = Enum.FillDirection.Horizontal
 UIListTop.HorizontalAlignment = Enum.HorizontalAlignment.Right
 UIListTop.VerticalAlignment = Enum.VerticalAlignment.Center
-UIListTop.Padding = UDim.new(0, 6)
+UIListTop.Padding = UDim.new(0, 5)
 UIListTop.SortOrder = Enum.SortOrder.LayoutOrder
 
 local SearchBtn = Instance.new("TextButton", ControlsFrame)
@@ -597,10 +601,37 @@ RightSeparatorLine.BackgroundColor3 = Color3.fromRGB(80, 20, 25)
 RightSeparatorLine.BorderSizePixel = 0
 RightSeparatorLine.ZIndex = 10
 
+-- BADGE DA VERSÃO EM GRADIENTE SEM CONTORNO (No topo direito acima da opção Walkspeed)
+local BadgeFrame = Instance.new("Frame", RightPanel.InnerBg)
+BadgeFrame.Name = "BadgeFrame"
+BadgeFrame.AnchorPoint = Vector2.new(1, 0)
+BadgeFrame.Size = UDim2.new(0, 54, 0, 18)
+BadgeFrame.Position = UDim2.new(1, -12, 0, 42)
+BadgeFrame.BackgroundColor3 = Color3.fromRGB(25, 10, 12)
+BadgeFrame.BorderSizePixel = 0
+BadgeFrame.ZIndex = 15
+Instance.new("UICorner", BadgeFrame).CornerRadius = UDim.new(0, 5)
+
+local badgeGrad = Instance.new("UIGradient", BadgeFrame)
+badgeGrad.Rotation = 45
+badgeGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(110, 15, 20)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 5, 8))
+})
+
+local BadgeText = Instance.new("TextLabel", BadgeFrame)
+BadgeText.Size = UDim2.new(1, 0, 1, 0)
+BadgeText.BackgroundTransparency = 1
+BadgeText.Text = "UI V3.8"
+BadgeText.TextColor3 = Color3.fromRGB(235, 235, 235)
+BadgeText.Font = Enum.Font.GothamBold
+BadgeText.TextSize = 9
+BadgeText.ZIndex = 16
+
 local togglesContainer = Instance.new("ScrollingFrame", RightPanel.InnerBg)
 togglesContainer.Name = "TogglesContainer"
-togglesContainer.Size = UDim2.new(1, 0, 1, -44)
-togglesContainer.Position = UDim2.new(0, 0, 0, 44)
+togglesContainer.Size = UDim2.new(1, 0, 1, -66)
+togglesContainer.Position = UDim2.new(0, 0, 0, 64)
 togglesContainer.BackgroundTransparency = 1
 togglesContainer.BorderSizePixel = 0
 togglesContainer.ScrollBarThickness = 2
@@ -922,7 +953,7 @@ ExpandBtn.MouseButton1Click:Connect(function()
     TweenService:Create(mainWrapper, TweenInfo.new(0.3, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {Size = newSize}):Play()
 end)
 
-local function SetUIState(newState)
+SetUIState = function(newState)
     if UIState == newState or UIState == "OPENING" or UIState == "CLOSING" then return end
     
     UIState = (newState == "OPEN" and "OPENING") or (newState == "MINIMIZED" and "CLOSING") or (newState == "CLOSED" and "CLOSING") or newState
@@ -930,7 +961,6 @@ local function SetUIState(newState)
     local windowAnim = TweenInfo.new(tempoAnim, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
     if newState == "OPEN" then
-        -- O botão flutuante NÃO desaparece, ele fica constantemente visível.
         mainWrapper.Visible = true
         mainWrapper.Size = UDim2.new(0, 480, 0, 260)
         AplicarFadeSincronizado(mainWrapper, true, 0)
@@ -944,7 +974,6 @@ local function SetUIState(newState)
         end)
 
     elseif newState == "MINIMIZED" or newState == "CLOSED" then
-        -- O botão flutuante CONTINUA visível após minimizar a interface.
         AplicarFadeSincronizado(mainWrapper, true, tempoAnim)
         local closeTween = TweenService:Create(mainWrapper, windowAnim, {Size = UDim2.new(0, 480, 0, 260)})
         closeTween:Play()
@@ -958,14 +987,6 @@ end
 
 MinimizeBtn.MouseButton1Click:Connect(function() 
     SetUIState("MINIMIZED")
-end)
-
-FloatBtn.MouseButton1Click:Connect(function()
-    -- Abre somente se estiver fechado ou minimizado, e toca o som apenas nesta ação.
-    if UIState == "MINIMIZED" or UIState == "CLOSED" then
-        SharinganSound:Play()
-        SetUIState("OPEN")
-    end
 end)
 
 local function AlternarConfirmacao(exibir)
@@ -1057,7 +1078,6 @@ local function ExecutarIntroAkat()
     RegistrarTransparencias(mainFrame)
     for _, item in ipairs(mainFrame:GetDescendants()) do RegistrarTransparencias(item) end
 
-    -- Script inicia, UI aparece E o botão flutuante aparece SIMULTANEAMENTE
     mainWrapper.Visible = true
     FloatBtn.Visible = true 
     UIState = "OPEN"
@@ -1068,7 +1088,6 @@ local function ExecutarIntroAkat()
     local openScale = TweenService:Create(MainScale, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1})
     openScale:Play()
     
-    -- Animação suave para revelar o botão flutuante junto com a inicialização
     FloatBtn.Size = UDim2.new(0, 0, 0, 0)
     TweenService:Create(FloatBtn, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 44, 0, 44)}):Play()
     
