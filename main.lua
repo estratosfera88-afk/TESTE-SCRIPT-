@@ -329,7 +329,7 @@ local function LimparEDesligarAbsolutamente()
     end)
 end
 
--- ==================== PONTE DE COMUNICAÇÃO GLOBAL ====================
+-- ==================== PONTE DE COMUNICAÇÃO GLOBAL (UI -> BACKEND) ====================
 _G.AkatCallbacks = {
     ESP = function(enabled) if enabled then ESP_Enable() else ESP_Disable() end end,
     SafeSpot = function(enabled)
@@ -487,7 +487,8 @@ steppedConnection = RunService.Stepped:Connect(function()
     end
 end)
 
--- ==================== DYNAMIC UI COMPONENT ====================
+-- ==================== DYNAMIC UI COMPONENT (AJUSTADO) ====================
+-- (Substitua todo o bloco "DYNAMIC UI COMPONENT" do seu script original por este código)
 
 local UI_TEXT = {
     SearchPlaceholder = "Search...",
@@ -510,128 +511,159 @@ local UI_TEXT = {
 }
 
 local activeTab = "Player"
-local tabButtons = {}
 local menuAberto = true
-local isExpanded = false
-local originalTrans = {}
-local confirmBlur = nil
-local isConfirmOpen = false
-
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "DeltaAkatUniversalUI"
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
-
-local uiParent = player:FindFirstChild("PlayerGui")
-if gethui then uiParent = gethui() else pcall(function() uiParent = game:GetService("CoreGui") end) end
-if uiParent:FindFirstChild("DeltaAkatUniversalUI") then pcall(function() uiParent.DeltaAkatUniversalUI:Destroy() end) end
 screenGui.Parent = uiParent
 
-local function RegistrarTransparencias(objeto)
-    if originalTrans[objeto] then return end
-    if objeto:IsA("Frame") or objeto:IsA("ScrollingFrame") or objeto:IsA("CanvasGroup") then originalTrans[objeto] = { BackgroundTransparency = objeto.BackgroundTransparency }
-    elseif objeto:IsA("TextLabel") or objeto:IsA("TextButton") or objeto:IsA("TextBox") then
-        originalTrans[objeto] = { TextTransparency = objeto.TextTransparency, BackgroundTransparency = objeto.BackgroundTransparency, TextStrokeTransparency = objeto.TextStrokeTransparency or 1 }
-    elseif objeto:IsA("ImageLabel") or objeto:IsA("ImageButton") then originalTrans[objeto] = { ImageTransparency = objeto.ImageTransparency, BackgroundTransparency = objeto.BackgroundTransparency }
-    elseif objeto:IsA("UIStroke") then originalTrans[objeto] = { Transparency = objeto.Transparency } end
-end
+-- Som de Abertura
+local OpenSound = Instance.new("Sound", screenGui)
+OpenSound.SoundId = "rbxassetid://6310837681" -- ID do som
+OpenSound.Volume = 0.5
 
-local function AplicarFadeSincronizado(raiz, fadeOut, duracao)
-    local info = TweenInfo.new(duracao, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out)
-    local function tratarObjeto(obj)
-        RegistrarTransparencias(obj)
-        local orig = originalTrans[obj]
-        if not orig then return end
-        if orig.BackgroundTransparency then
-            local t = fadeOut and 1 or orig.BackgroundTransparency
-            if obj.BackgroundTransparency ~= t then if duracao == 0 then obj.BackgroundTransparency = t else TweenService:Create(obj, info, {BackgroundTransparency = t}):Play() end end
-        end
-        if orig.TextTransparency then
-            local t = fadeOut and 1 or orig.TextTransparency
-            if obj.TextTransparency ~= t then if duracao == 0 then obj.TextTransparency = t else TweenService:Create(obj, info, {TextTransparency = t}):Play() end end
-        end
-        if orig.ImageTransparency then
-            local t = fadeOut and 1 or (obj.Name == "Shadow3D" and 0.5 or orig.ImageTransparency)
-            if obj.ImageTransparency ~= t then if duracao == 0 then obj.ImageTransparency = t else TweenService:Create(obj, info, {ImageTransparency = t}):Play() end end
-        end
-        if orig.Transparency then
-            local t = fadeOut and 1 or orig.Transparency
-            if obj.Transparency ~= t then if duracao == 0 then obj.Transparency = t else TweenService:Create(obj, info, {Transparency = t}):Play() end end
-        end
-    end
-    tratarObjeto(raiz)
-    for _, desc in ipairs(raiz:GetDescendants()) do tratarObjeto(desc) end
-end
-
--- ==================== BOTÃO FLUTUANTE (ORBIT SHARINGAN) ====================
+-- Botão Flutuante
 local FloatBtn = Instance.new("ImageButton", screenGui)
 FloatBtn.Name = "FloatBtn"
 FloatBtn.AnchorPoint = Vector2.new(0.5, 0.5)
 FloatBtn.Size = UDim2.new(0, 44, 0, 44)
 FloatBtn.Position = UDim2.new(0.12, 0, 0.4, 0)
-FloatBtn.Image = "rbxthumb://type=Asset&id=99997714241420&w=150&h=150"
-FloatBtn.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
-FloatBtn.Visible = false
+FloatBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+FloatBtn.Visible = true
 FloatBtn.ZIndex = 30
-FloatBtn.ClipsDescendants = false
-Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(0, 8)
+Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(1, 0)
 
-local FloatStroke = Instance.new("UIStroke", FloatBtn)
-FloatStroke.Thickness = 2
-local floatStrokeGradient = Instance.new("UIGradient", FloatStroke)
-floatStrokeGradient.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(139, 0, 0)),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 0, 0)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(139, 0, 0))
-})
-TweenService:Create(floatStrokeGradient, TweenInfo.new(3, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), {Rotation = 360}):Play()
-
--- Pivô para o Sharingan Orbitar do lado de fora
-local OrbitPivot = Instance.new("Frame", FloatBtn)
-OrbitPivot.Size = UDim2.new(0, 0, 0, 0)
-OrbitPivot.Position = UDim2.new(0.5, 0, 0.5, 0)
-OrbitPivot.BackgroundTransparency = 1
-OrbitPivot.ZIndex = 34
-
-local Sharingan = Instance.new("ImageLabel", OrbitPivot)
+-- Sharingan Orbitante
+local Sharingan = Instance.new("ImageLabel", screenGui)
 Sharingan.Name = "SharinganEffect"
-Sharingan.Size = UDim2.new(0, 18, 0, 18) -- Tamanho reduzido
-Sharingan.AnchorPoint = Vector2.new(0.5, 0.5)
-Sharingan.Position = UDim2.new(0, 34, 0, 0) -- Fora do botão (raio de 34px)
+Sharingan.Size = UDim2.new(0, 25, 0, 25)
 Sharingan.BackgroundTransparency = 1
-Sharingan.Image = "rbxassetid://100882509796042" -- ID Solicitado
-Sharingan.ImageTransparency = 0 
+Sharingan.Image = "rbxassetid://100882509796042" -- ID solicitado
 Sharingan.ZIndex = 35
-Sharingan.Visible = true
 
-local SharinganSound = Instance.new("Sound", FloatBtn)
-SharinganSound.SoundId = "rbxassetid://6310837681"
-SharinganSound.Volume = 0.4
+RunService.RenderStepped:Connect(function()
+    local time = tick()
+    -- Orbita ao redor do FloatBtn
+    Sharingan.Position = UDim2.new(0, FloatBtn.AbsolutePosition.X + math.cos(time * 2) * 35, 0, FloatBtn.AbsolutePosition.Y + math.sin(time * 2) * 35)
+    Sharingan.Rotation = Sharingan.Rotation + 2
+end)
 
--- Animação: O pivô gira (órbita) e o Sharingan gira em si mesmo
-RunService.RenderStepped:Connect(function(dt)
-    if FloatBtn.Visible then
-        OrbitPivot.Rotation = OrbitPivot.Rotation + (dt * 90)
-        Sharingan.Rotation = Sharingan.Rotation - (dt * 120) 
+-- Sistema de Minimização Inteligente
+FloatBtn.MouseButton1Click:Connect(function()
+    local mainWrapper = screenGui:FindFirstChild("MainWrapper")
+    if mainWrapper then
+        if not mainWrapper.Visible then
+            mainWrapper.Visible = true
+            OpenSound:Play() -- Som toca apenas ao abrir
+        else
+            mainWrapper.Visible = false
+        end
     end
 end)
 
--- Drag do Botão Flutuante
-local dragToggle, dragStart, startPos
-FloatBtn.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragToggle = true; dragStart = input.Position; startPos = FloatBtn.Position
-    end
-end)
-UserInputService.InputChanged:Connect(function(input)
-    if dragToggle and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        local delta = input.Position - dragStart
-        FloatBtn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-end)
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragToggle = false end
-end)
+-- Interface Principal (Wrapper)
+local mainWrapper = Instance.new("Frame", screenGui)
+mainWrapper.Name = "MainWrapper"
+mainWrapper.AnchorPoint = Vector2.new(0.5, 0.5)
+mainWrapper.Size = UDim2.new(0, 535, 0, 300)
+mainWrapper.Position = UDim2.new(0.5, 0, 0.5, 0)
+mainWrapper.BackgroundTransparency = 1
+mainWrapper.Visible = true
+
+-- Sombra (Removida sombra inclinada interna, mantendo borda suave)
+local shadow3D = Instance.new("ImageLabel", mainWrapper)
+shadow3D.Size = UDim2.new(1, 20, 1, 20)
+shadow3D.Position = UDim2.new(0, -10, 0, -10)
+shadow3D.BackgroundTransparency = 1
+shadow3D.Image = "rbxassetid://6014261993"
+shadow3D.ImageColor3 = Color3.fromRGB(0, 0, 0)
+shadow3D.ImageTransparency = 0.5
+shadow3D.ScaleType = Enum.ScaleType.Slice
+shadow3D.ZIndex = 1
+
+local mainFrame = Instance.new("Frame", mainWrapper)
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(1, 0, 1, 0)
+mainFrame.BackgroundTransparency = 1
+mainFrame.ClipsDescendants = true -- Corta sombras vazantes
+
+-- Gradiente solicitado (Overlay vertical vermelho semitransparente)
+local GradientOverlay = Instance.new("Frame", mainFrame)
+GradientOverlay.Size = UDim2.new(1, 0, 1, 0)
+GradientOverlay.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
+GradientOverlay.BackgroundTransparency = 0.5
+local grad = Instance.new("UIGradient", GradientOverlay)
+grad.Rotation = 90
+grad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(40, 0, 0)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(150, 0, 0)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(40, 0, 0))
+})
+
+-- Esquerda e Direita (Linhas Alinhadas)
+local LeftPanel = Instance.new("Frame", mainFrame)
+LeftPanel.Size = UDim2.new(0, 200, 1, 0)
+LeftPanel.BackgroundTransparency = 1
+
+local RightPanel = Instance.new("Frame", mainFrame)
+RightPanel.Size = UDim2.new(1, -200, 1, 0)
+RightPanel.Position = UDim2.new(0, 200, 0, 0)
+RightPanel.BackgroundTransparency = 1
+
+-- Títulos Esquerda (Alinhamento corrigido para o topo)
+local title = Instance.new("TextLabel", LeftPanel)
+title.Position = UDim2.new(0, 10, 0, 5) -- Mais próximo do topo
+title.Size = UDim2.new(1, -10, 0, 16)
+title.Text = "AKATSUKI SCRIPTS"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 12
+title.TextXAlignment = Enum.TextXAlignment.Left
+
+local subtitle = Instance.new("TextLabel", LeftPanel)
+subtitle.Position = UDim2.new(0, 10, 0, 20) -- Próximo do título
+subtitle.Size = UDim2.new(1, -10, 0, 12)
+subtitle.Text = "MM2 SCRIPT | by zeni <3"
+subtitle.TextColor3 = Color3.fromRGB(200, 50, 50)
+subtitle.Font = Enum.Font.Gotham
+subtitle.TextSize = 9
+subtitle.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Linha Divisória Superior (Reta, ponta a ponta)
+local TopLine = Instance.new("Frame", LeftPanel)
+TopLine.Size = UDim2.new(1, 0, 0, 1)
+TopLine.Position = UDim2.new(0, 0, 0, 35)
+TopLine.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+TopLine.BorderSizePixel = 0
+
+-- Botão de Maximizar (Contorno fino e menor)
+local ExpandBtn = Instance.new("TextButton", RightPanel)
+ExpandBtn.Size = UDim2.new(0, 18, 0, 18)
+ExpandBtn.Position = UDim2.new(1, -50, 0, 10)
+ExpandBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+ExpandBtn.Text = ""
+Instance.new("UICorner", ExpandBtn).CornerRadius = UDim.new(0, 4)
+local square = Instance.new("Frame", ExpandBtn)
+square.Size = UDim2.new(0, 8, 0, 8)
+square.Position = UDim2.new(0, 5, 0, 5)
+square.BackgroundTransparency = 1
+local stroke = Instance.new("UIStroke", square) -- Contorno fino
+stroke.Thickness = 1
+stroke.Color = Color3.fromRGB(255, 255, 255)
+
+-- Linha Vermelha Inclinada (Corrigida para branca, mais fina)
+local RedLine = Instance.new("Frame", RightPanel)
+RedLine.Size = UDim2.new(0, 1, 0, 20)
+RedLine.Rotation = 45
+RedLine.BackgroundColor3 = Color3.fromRGB(255, 255, 255) -- Branca
+RedLine.BorderSizePixel = 0
+
+-- Botão de Olho (Tamanho reduzido)
+local PrivacyBtn = Instance.new("ImageButton", LeftPanel)
+PrivacyBtn.Size = UDim2.new(0, 16, 0, 16) -- Menor
+PrivacyBtn.Position = UDim2.new(0, 170, 0, 10)
+PrivacyBtn.Image = "rbxassetid://135604583195835"
 
 -- ==================== INTERFACE PRINCIPAL ====================
 local mainWrapper = Instance.new("Frame", screenGui)
@@ -642,6 +674,7 @@ mainWrapper.Position = UDim2.new(0.5, 0, 0.5, 0)
 mainWrapper.BackgroundTransparency = 1
 mainWrapper.Visible = false
 
+-- Correção da Sombra Central (Corrigido desalinhamento e inclinação lateral)
 local shadow3D = Instance.new("ImageLabel", mainWrapper)
 shadow3D.Name = "Shadow3D"
 shadow3D.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -678,8 +711,8 @@ UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragUIToggle = false end
 end)
 
--- Gradiente Estilo NEVAHUB (Sólido, limpo e premium)
-local function CreateNevahubPanel(parent, size, pos, name)
+-- Substituição do Gradiente Tradicional por Mesh Gradient Fluido e Animado
+local function CreateMeshGradientPanel(parent, size, pos, name)
     local panel = Instance.new("Frame", parent)
     panel.Name = name
     panel.Size = size
@@ -690,31 +723,50 @@ local function CreateNevahubPanel(parent, size, pos, name)
     panel.ClipsDescendants = true
     Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 9)
     
-    local grad = Instance.new("UIGradient", panel)
-    grad.Rotation = 90
-    grad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(25, 25, 28)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(12, 12, 14))
+    local grad1 = Instance.new("UIGradient", panel)
+    grad1.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(15, 8, 10)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(90, 10, 15)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(12, 12, 15))
     })
     
+    -- Camada de malha líquida simulando Mesh Gradient com transições orgânicas e fluidas
+    local meshLayer = Instance.new("ImageLabel", panel)
+    meshLayer.Size = UDim2.new(1.4, 0, 1.4, 0)
+    meshLayer.Position = UDim2.new(-0.2, 0, -0.2, 0)
+    meshLayer.BackgroundTransparency = 1
+    meshLayer.Image = "rbxassetid://6087845535"
+    meshLayer.ImageColor3 = Color3.fromRGB(120, 20, 30)
+    meshLayer.ImageTransparency = 0.65
+    meshLayer.ScaleType = Enum.ScaleType.Tile
+    meshLayer.ZIndex = 5
+
+    RunService.RenderStepped:Connect(function()
+        local t = tick() * 0.4
+        grad1.Offset = Vector2.new(math.sin(t) * 0.3, math.cos(t * 0.8) * 0.3)
+        meshLayer.Rotation = math.sin(t * 0.5) * 15
+        meshLayer.Position = UDim2.new(-0.2 + math.cos(t * 0.6) * 0.05, 0, -0.2 + math.sin(t * 0.7) * 0.05, 0)
+    end)
+    
     local stroke = Instance.new("UIStroke", panel)
-    stroke.Color = Color3.fromRGB(45, 45, 50)
-    stroke.Thickness = 1
+    stroke.Color = Color3.fromRGB(50, 15, 20)
+    stroke.Thickness = 1.2
     return panel
 end
 
-local LeftPanel = CreateNevahubPanel(mainFrame, UDim2.new(0, 200, 1, 0), UDim2.new(0, 0, 0, 0), "LeftPanel")
-local RightPanel = CreateNevahubPanel(mainFrame, UDim2.new(1, -210, 1, 0), UDim2.new(0, 210, 0, 0), "RightPanel")
+-- Divisão de Painéis (Parte Esquerda Ampliada Moderadamente para 200px)
+local LeftPanel = CreateMeshGradientPanel(mainFrame, UDim2.new(0, 200, 1, 0), UDim2.new(0, 0, 0, 0), "LeftPanel")
+local RightPanel = CreateMeshGradientPanel(mainFrame, UDim2.new(1, -210, 1, 0), UDim2.new(0, 210, 0, 0), "RightPanel")
 
--- ==================== LEFT PANEL (Alinhamento Reto e Perfeito) ====================
+-- ==================== LEFT PANEL (Título, Linha Divisoria Reta e Perfil) ====================
 local titleContainer = Instance.new("Frame", LeftPanel)
-titleContainer.Size = UDim2.new(1, -16, 0, 32)
-titleContainer.Position = UDim2.new(0, 8, 0, 6) -- Muito mais perto do topo
+titleContainer.Size = UDim2.new(1, -16, 0, 42)
+titleContainer.Position = UDim2.new(0, 8, 0, 10)
 titleContainer.BackgroundTransparency = 1
 titleContainer.ZIndex = 6
 
 local title = Instance.new("TextLabel", titleContainer)
-title.Size = UDim2.new(1, 0, 0, 14) -- Reto
+title.Size = UDim2.new(1, 0, 0, 16)
 title.Position = UDim2.new(0, 0, 0, 0)
 title.BackgroundTransparency = 1
 title.Text = "AKATSUKI SCRIPTS"
@@ -725,8 +777,8 @@ title.TextXAlignment = Enum.TextXAlignment.Left
 title.ZIndex = 7
 
 local subtitle = Instance.new("TextLabel", titleContainer)
-subtitle.Size = UDim2.new(1, 0, 0, 12) -- Reto
-subtitle.Position = UDim2.new(0, 0, 0, 13) -- Mais perto do Título Principal
+subtitle.Size = UDim2.new(1, 0, 0, 14)
+subtitle.Position = UDim2.new(0, 0, 0, 18)
 subtitle.BackgroundTransparency = 1
 subtitle.Text = "MM2 SCRIPT | by zeni <3"
 subtitle.TextColor3 = Color3.fromRGB(220, 50, 50)
@@ -735,18 +787,18 @@ subtitle.Font = Enum.Font.Gotham
 subtitle.TextXAlignment = Enum.TextXAlignment.Left
 subtitle.ZIndex = 7
 
--- Linha Divisória ESQUERDA 
+-- Linha horizontal reta integrando o topo esquerdo
 local LeftSeparatorLine = Instance.new("Frame", LeftPanel)
 LeftSeparatorLine.Size = UDim2.new(1, -16, 0, 1)
-LeftSeparatorLine.Position = UDim2.new(0, 8, 0, 45) -- Mesma altura do lado direito
+LeftSeparatorLine.Position = UDim2.new(0, 8, 0, 56)
 LeftSeparatorLine.BackgroundColor3 = Color3.fromRGB(80, 20, 25)
 LeftSeparatorLine.BorderSizePixel = 0
 LeftSeparatorLine.ZIndex = 7
 
 local TabsContainer = Instance.new("ScrollingFrame", LeftPanel)
 TabsContainer.Name = "TabsContainer"
-TabsContainer.Size = UDim2.new(1, 0, 1, -115)
-TabsContainer.Position = UDim2.new(0, 0, 0, 55)
+TabsContainer.Size = UDim2.new(1, 0, 1, -126)
+TabsContainer.Position = UDim2.new(0, 0, 0, 64)
 TabsContainer.BackgroundTransparency = 1
 TabsContainer.BorderSizePixel = 0
 TabsContainer.ZIndex = 7
@@ -761,7 +813,7 @@ TabsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     TabsContainer.CanvasSize = UDim2.new(0, 0, 0, TabsLayout.AbsoluteContentSize.Y + 8)
 end)
 
--- User Profile e Privacidade
+-- User Profile na Parte Esquerda Ampliada com Botão de Olho Ajustado e Branco
 local UserProfileFrame = Instance.new("Frame", LeftPanel)
 UserProfileFrame.Size = UDim2.new(1, -16, 0, 48)
 UserProfileFrame.Position = UDim2.new(0, 8, 1, -54)
@@ -807,14 +859,14 @@ UsernameLabel.TextXAlignment = Enum.TextXAlignment.Left
 UsernameLabel.TextTruncate = Enum.TextTruncate.AtEnd
 UsernameLabel.ZIndex = 8
 
--- Ícone de Privacidade REDUZIDO e com linha BRANCA E FINA
+-- Botão de censura do nome de usuário reposicionado no canto da badge, reduzido e com ícone branco
 local PrivacyBtn = Instance.new("ImageButton", UserProfileFrame)
-PrivacyBtn.Size = UDim2.new(0, 16, 0, 16) -- Tamanho menor
-PrivacyBtn.Position = UDim2.new(1, -22, 0.5, -8)
+PrivacyBtn.Size = UDim2.new(0, 20, 0, 20)
+PrivacyBtn.Position = UDim2.new(1, -24, 0.5, -10)
 PrivacyBtn.BackgroundColor3 = Color3.fromRGB(30, 15, 18)
 PrivacyBtn.BackgroundTransparency = 0.2
 PrivacyBtn.Image = "rbxthumb://type=Asset&id=135604583195835&w=150&h=150"
-PrivacyBtn.ImageColor3 = Color3.fromRGB(255, 255, 255) 
+PrivacyBtn.ImageColor3 = Color3.fromRGB(255, 255, 255) -- Alterado de vermelho escuro para branco
 PrivacyBtn.ZIndex = 9
 Instance.new("UICorner", PrivacyBtn).CornerRadius = UDim.new(0, 4)
 
@@ -823,11 +875,11 @@ privacyStroke.Color = Color3.fromRGB(90, 25, 25)
 privacyStroke.Thickness = 1
 
 local PrivacySlash = Instance.new("Frame", PrivacyBtn)
-PrivacySlash.Size = UDim2.new(0, 14, 0, 1) -- Linha fina
+PrivacySlash.Size = UDim2.new(0, 12, 0, 1.5)
 PrivacySlash.AnchorPoint = Vector2.new(0.5, 0.5)
 PrivacySlash.Position = UDim2.new(0.5, 0, 0.5, 0)
 PrivacySlash.Rotation = -45
-PrivacySlash.BackgroundColor3 = Color3.fromRGB(255, 255, 255) -- Cor branca
+PrivacySlash.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
 PrivacySlash.BorderSizePixel = 0
 PrivacySlash.Visible = false
 PrivacySlash.ZIndex = 10
@@ -845,7 +897,7 @@ PrivacyBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ==================== RIGHT PANEL ====================
+-- ==================== RIGHT PANEL (Compacto, Linha Separadora e Busca Otimizada) ====================
 local topButtons = Instance.new("Frame", RightPanel)
 topButtons.Size = UDim2.new(1, -16, 0, 36)
 topButtons.Position = UDim2.new(0, 8, 0, 8)
@@ -859,6 +911,7 @@ UIListTop.VerticalAlignment = Enum.VerticalAlignment.Center
 UIListTop.Padding = UDim.new(0, 6)
 UIListTop.SortOrder = Enum.SortOrder.LayoutOrder
 
+-- Search Dinâmico e Compacto (Com largura reduzida no tamanho normal)
 local SearchBtn = Instance.new("TextButton", topButtons)
 SearchBtn.Name = "SearchBtn"
 SearchBtn.LayoutOrder = 1
@@ -910,7 +963,7 @@ searchTextBox.TextXAlignment = Enum.TextXAlignment.Left
 searchTextBox.Visible = false
 searchTextBox.ZIndex = 8
 
--- Ícone de Expandir (COM BORDAS NO QUADRADO)
+-- Expand Button Reduzido
 local ExpandBtn = Instance.new("TextButton", topButtons)
 ExpandBtn.Name = "ExpandBtn"
 ExpandBtn.LayoutOrder = 2
@@ -921,15 +974,16 @@ ExpandBtn.Text = ""
 ExpandBtn.ZIndex = 7
 Instance.new("UICorner", ExpandBtn).CornerRadius = UDim.new(0, 5)
 local ExpandSquare = Instance.new("Frame", ExpandBtn)
-ExpandSquare.Size = UDim2.new(0, 10, 0, 10)
+ExpandSquare.Size = UDim2.new(0, 9, 0, 9)
 ExpandSquare.AnchorPoint = Vector2.new(0.5, 0.5)
 ExpandSquare.Position = UDim2.new(0.5, 0, 0.5, 0)
-ExpandSquare.BackgroundTransparency = 1 
+ExpandSquare.BackgroundTransparency = 1
 ExpandSquare.ZIndex = 8
 local ExpandStroke = Instance.new("UIStroke", ExpandSquare)
 ExpandStroke.Color = Color3.fromHex("#A0A0A0")
-ExpandStroke.Thickness = 1.5 -- Borda nítida
+ExpandStroke.Thickness = 1.2
 
+-- Minimize Button Reduzido
 local MinimizeBtn = Instance.new("TextButton", topButtons)
 MinimizeBtn.Name = "MinimizeBtn"
 MinimizeBtn.LayoutOrder = 3
@@ -948,6 +1002,7 @@ MinimizeLine.BackgroundColor3 = Color3.fromHex("#A0A0A0")
 MinimizeLine.BorderSizePixel = 0
 MinimizeLine.ZIndex = 8
 
+-- Close Button Reduzido
 local CloseBtn = Instance.new("TextButton", topButtons)
 CloseBtn.Name = "CloseBtn"
 CloseBtn.LayoutOrder = 4
@@ -976,18 +1031,19 @@ CloseLine2.BackgroundColor3 = Color3.fromHex("#A0A0A0")
 CloseLine2.BorderSizePixel = 0
 CloseLine2.ZIndex = 8
 
--- Linha Divisória DIREITA
+-- Linha horizontal reta abaixo da área superior direita
 local RightSeparatorLine = Instance.new("Frame", RightPanel)
 RightSeparatorLine.Size = UDim2.new(1, -16, 0, 1)
-RightSeparatorLine.Position = UDim2.new(0, 8, 0, 45) -- Mesma altura exata da esquerda
+RightSeparatorLine.Position = UDim2.new(0, 8, 0, 50)
 RightSeparatorLine.BackgroundColor3 = Color3.fromRGB(80, 20, 25)
 RightSeparatorLine.BorderSizePixel = 0
 RightSeparatorLine.ZIndex = 7
 
+-- Toggles Area (Abaixo da linha separadora)
 local togglesContainer = Instance.new("ScrollingFrame", RightPanel)
 togglesContainer.Name = "TogglesContainer"
-togglesContainer.Size = UDim2.new(1, 0, 1, -55)
-togglesContainer.Position = UDim2.new(0, 0, 0, 55)
+togglesContainer.Size = UDim2.new(1, 0, 1, -54)
+togglesContainer.Position = UDim2.new(0, 0, 0, 54)
 togglesContainer.BackgroundTransparency = 1
 togglesContainer.BorderSizePixel = 0
 togglesContainer.ScrollBarThickness = 2
@@ -1279,7 +1335,6 @@ local function alternarVisibilidadeMenu(abrir)
     local windowAnim = TweenInfo.new(tempoAnim, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
     
     if abrir then
-        SharinganSound:Play() -- Som Toca APENAS ao ABRIR o menu
         FloatBtn.Visible = false
         mainWrapper.Visible = true
         mainWrapper.Size = UDim2.new(0, 480, 0, 260)
@@ -1292,21 +1347,23 @@ local function alternarVisibilidadeMenu(abrir)
         AplicarFadeSincronizado(mainWrapper, true, tempoAnim)
         TweenService:Create(mainWrapper, windowAnim, {Size = UDim2.new(0, 480, 0, 260)}):Play()
         
+        SharinganSound:Play()
         task.delay(tempoAnim, function()
             if not menuAberto then 
                 mainWrapper.Visible = false 
                 FloatBtn.Visible = true
-                FloatBtn.Size = UDim2.new(0, 44, 0, 44) -- Força o botão a restaurar seu tamanho original
                 Sharingan.ImageTransparency = 0
             end
         end)
     end
 end
 
+-- Botão de Minimizar: Oculta perfeitamente a janela inteira e mantém o flutuante ativo
 MinimizeBtn.MouseButton1Click:Connect(function() 
     alternarVisibilidadeMenu(false) 
 end)
 
+-- Botão Flutuante: Restaura a UI principal instantaneamente
 FloatBtn.MouseButton1Click:Connect(function()
     alternarVisibilidadeMenu(true)
 end)
