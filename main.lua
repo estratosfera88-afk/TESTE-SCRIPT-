@@ -86,7 +86,7 @@ local function AplicarFadeSincronizado(raiz, fadeOut, duracao)
         end
         if orig.ImageTransparency then
             local baseTransparency = orig.ImageTransparency
-            if obj.Name == "Shadow3D" then baseTransparency = 0.6 end
+            if obj.Name == "Shadow3D" then baseTransparency = 0.5 end
             local t = fadeOut and 1 or baseTransparency
             if obj.ImageTransparency ~= t then if duracao == 0 then obj.ImageTransparency = t else TweenService:Create(obj, info, {ImageTransparency = t}):Play() end end
         end
@@ -112,7 +112,7 @@ FloatBtn.ZIndex = 100
 FloatBtn.ClipsDescendants = false
 if not FloatBtn:FindFirstChildOfClass("UICorner") then Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(0, 8) end
 
--- Contorno Gradiente (Vermelho escuro com preto)
+-- Contorno Gradiente Estático (Mesmas cores do gradiente principal)
 local FloatStroke = FloatBtn:FindFirstChild("FloatStroke") or Instance.new("UIStroke", FloatBtn)
 FloatStroke.Name = "FloatStroke"
 FloatStroke.Thickness = 2.5
@@ -120,9 +120,9 @@ FloatStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 local floatStrokeGradient = FloatStroke:FindFirstChildOfClass("UIGradient") or Instance.new("UIGradient", FloatStroke)
 floatStrokeGradient.Rotation = 45
 floatStrokeGradient.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(160, 0, 0)),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 0, 0)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(160, 0, 0))
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(180, 25, 30)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(110, 10, 15)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(180, 25, 30))
 })
 
 local Sharingan = FloatBtn:FindFirstChild("SharinganEffect") or Instance.new("ImageLabel", FloatBtn)
@@ -136,21 +136,21 @@ Sharingan.ImageTransparency = 0
 Sharingan.ZIndex = 105
 Sharingan.Visible = true
 
--- Rotação do Sharingan em maior distância (raio = 38)
 local orbitAngle = 0
 RunService.RenderStepped:Connect(function(dt)
     if FloatBtn and FloatBtn.Parent and FloatBtn.Visible then
         Sharingan.Rotation = (Sharingan.Rotation + (dt * 180)) % 360
         orbitAngle = (orbitAngle + (dt * 2.2)) % (math.pi * 2)
-        local radius = 38 -- Maior distância do botão flutuante
+        local radius = 38
         Sharingan.Position = UDim2.new(0.5, math.cos(orbitAngle) * radius, 0.5, math.sin(orbitAngle) * radius)
     end
 end)
 
 local SharinganSound = FloatBtn:FindFirstChild("SharinganSound") or Instance.new("Sound", FloatBtn)
 SharinganSound.Name = "SharinganSound"
-SharinganSound.SoundId = "rbxassetid://9114223178" -- Som de acionamento otimizado
-SharinganSound.Volume = 0.5
+SharinganSound.SoundId = "rbxassetid://9114223178"
+SharinganSound.Volume = 1
+SharinganSound.RollOffMaxDistance = 10000
 
 local dragToggle = false
 local dragStart, startPos
@@ -175,14 +175,15 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- Declaração antecipada da função de controle de estado
 local SetUIState
 
 UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
         if dragToggle and not isDragging then
-            -- Clique acionado sem ter arrastado
-            pcall(function() SharinganSound:Play() end)
+            pcall(function()
+                SharinganSound.TimePosition = 0
+                SharinganSound:Play()
+            end)
             if UIState == "MINIMIZED" or UIState == "CLOSED" then
                 SetUIState("OPEN")
             elseif UIState == "OPEN" then
@@ -236,24 +237,24 @@ local function CreateGradientPanel(parent, size, pos, name)
     panel.ZIndex = 5
     panel.ClipsDescendants = false
 
-    -- CORREÇÃO DA SOMBRA 3D: Sombra suave usando Asset 9-Slice sem vazar nos cantos
+    -- CORREÇÃO DA SOMBRA 3D: Sombra moderna sem pontas vazando
     local shadow = Instance.new("ImageLabel", panel)
     shadow.Name = "Shadow3D"
-    shadow.Size = UDim2.new(1, 16, 1, 16)
-    shadow.Position = UDim2.new(0.5, 0, 0.5, 1)
+    shadow.Size = UDim2.new(1, 20, 1, 20)
+    shadow.Position = UDim2.new(0.5, 0, 0.5, 2)
     shadow.AnchorPoint = Vector2.new(0.5, 0.5)
     shadow.BackgroundTransparency = 1
-    shadow.Image = "rbxassetid://5554236805"
+    shadow.Image = "rbxassetid://6015897843"
     shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
-    shadow.ImageTransparency = 0.55
+    shadow.ImageTransparency = 0.5
     shadow.ScaleType = Enum.ScaleType.Slice
-    shadow.SliceCenter = Rect.new(23, 23, 277, 277)
+    shadow.SliceCenter = Rect.new(25, 25, 225, 225)
     shadow.ZIndex = 4
 
     local InnerBg = Instance.new("Frame", panel)
     InnerBg.Name = "InnerBg"
     InnerBg.Size = UDim2.new(1, 0, 1, 0)
-    InnerBg.BackgroundColor3 = Color3.fromRGB(15, 8, 10)
+    InnerBg.BackgroundColor3 = Color3.fromRGB(20, 8, 12)
     InnerBg.BorderSizePixel = 0
     InnerBg.ClipsDescendants = true
     InnerBg.ZIndex = 5
@@ -266,19 +267,19 @@ local function CreateGradientPanel(parent, size, pos, name)
     overlay.BorderSizePixel = 0
     overlay.ZIndex = 5
 
+    -- GRADIENTE DA UI: Vermelho sutil no lugar do preto puro
     local redGrad = Instance.new("UIGradient", overlay)
     redGrad.Rotation = 90
     redGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 0, 0)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(140, 10, 15)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 0, 0))
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(180, 25, 30)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(110, 10, 15)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(180, 25, 30))
     })
     
-    -- TRANSPARÊNCIA AJUSTADA: Quase invisível para rodar bem sutilmente no fundo
     redGrad.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0.92),
-        NumberSequenceKeypoint.new(0.5, 0.70),
-        NumberSequenceKeypoint.new(1, 0.92)
+        NumberSequenceKeypoint.new(0, 0.65),
+        NumberSequenceKeypoint.new(0.5, 0.40),
+        NumberSequenceKeypoint.new(1, 0.65)
     })
 
     local lightBeam = Instance.new("Frame", InnerBg)
@@ -297,21 +298,19 @@ local function CreateGradientPanel(parent, size, pos, name)
         ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
     })
     
-    -- Linha giratória extremamente sutil / transparente
     beamGrad.Transparency = NumberSequence.new({
         NumberSequenceKeypoint.new(0, 1),
         NumberSequenceKeypoint.new(0.5, 0.96),
         NumberSequenceKeypoint.new(1, 1)
     })
 
-    -- Rotação contínua e leve
     RunService.RenderStepped:Connect(function(dt)
         redGrad.Rotation = (redGrad.Rotation + (dt * 10)) % 360
         beamGrad.Rotation = (beamGrad.Rotation + (dt * 12)) % 360
     end)
     
     local stroke = Instance.new("UIStroke", InnerBg)
-    stroke.Color = Color3.fromRGB(60, 20, 25)
+    stroke.Color = Color3.fromRGB(80, 20, 25)
     stroke.Thickness = 1.2
     
     return panel
@@ -321,13 +320,45 @@ local LeftPanel = CreateGradientPanel(mainFrame, UDim2.new(0, 165, 1, 0), UDim2.
 local RightPanel = CreateGradientPanel(mainFrame, UDim2.new(1, -180, 1, 0), UDim2.new(0, 180, 0, 0), "RightPanel")
 
 -- ==================== LEFT PANEL CONTENT ====================
+-- TÍTULO E SUBTÍTULO CENTRALIZADOS NO TOPO DO PAINEL ESQUERDO
+local LeftHeaderFrame = Instance.new("Frame", LeftPanel.InnerBg)
+LeftHeaderFrame.Name = "LeftHeaderFrame"
+LeftHeaderFrame.Size = UDim2.new(1, 0, 0, 36)
+LeftHeaderFrame.Position = UDim2.new(0, 0, 0, 0)
+LeftHeaderFrame.BackgroundTransparency = 1
+LeftHeaderFrame.ZIndex = 11
+
+local title = Instance.new("TextLabel", LeftHeaderFrame)
+title.Size = UDim2.new(1, 0, 0, 16)
+title.Position = UDim2.new(0, 0, 0, 4)
+title.BackgroundTransparency = 1
+title.Text = "AKATSUKI SCRIPTS"
+title.TextColor3 = Color3.fromRGB(245, 245, 245)
+title.TextSize = 11.5
+title.Font = Enum.Font.GothamBold
+title.TextXAlignment = Enum.TextXAlignment.Center
+title.ZIndex = 12
+
+local subtitle = Instance.new("TextLabel", LeftHeaderFrame)
+subtitle.Size = UDim2.new(1, 0, 0, 12)
+subtitle.Position = UDim2.new(0, 0, 0, 20)
+subtitle.BackgroundTransparency = 1
+subtitle.Text = "MM2 SCRIPT | by zeni <3"
+subtitle.TextColor3 = Color3.fromRGB(220, 50, 50)
+subtitle.TextTransparency = 0.2
+subtitle.TextSize = 8.5
+subtitle.Font = Enum.Font.Gotham
+subtitle.TextXAlignment = Enum.TextXAlignment.Center
+subtitle.ZIndex = 12
+
 local LeftSeparatorLine = Instance.new("Frame", LeftPanel.InnerBg)
 LeftSeparatorLine.Size = UDim2.new(1, 0, 0, 1)
 LeftSeparatorLine.Position = UDim2.new(0, 0, 0, 36)
-LeftSeparatorLine.BackgroundColor3 = Color3.fromRGB(80, 20, 25)
+LeftSeparatorLine.BackgroundColor3 = Color3.fromRGB(110, 25, 30)
 LeftSeparatorLine.BorderSizePixel = 0
 LeftSeparatorLine.ZIndex = 10
 
+-- BARRA DE ROLAGAL PAINEL ESQUERDO
 local TabsContainer = Instance.new("ScrollingFrame", LeftPanel.InnerBg)
 TabsContainer.Name = "TabsContainer"
 TabsContainer.Size = UDim2.new(1, 0, 1, -94)
@@ -336,17 +367,21 @@ TabsContainer.BackgroundTransparency = 1
 TabsContainer.BorderSizePixel = 0
 TabsContainer.ZIndex = 10
 TabsContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
-TabsContainer.ScrollBarThickness = 2
-TabsContainer.ScrollBarImageColor3 = Color3.fromRGB(139, 0, 0)
-TabsContainer.ScrollBarImageTransparency = 0.5
+TabsContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y
+TabsContainer.ScrollBarThickness = 3
+TabsContainer.ScrollBarImageColor3 = Color3.fromRGB(180, 30, 40)
+TabsContainer.ScrollBarImageTransparency = 0.4
+TabsContainer.VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar
+TabsContainer.ClipsDescendants = true
+
+local tabsPadding = Instance.new("UIPadding", TabsContainer)
+tabsPadding.PaddingRight = UDim.new(0, 4)
+tabsPadding.PaddingLeft = UDim.new(0, 4)
 
 local TabsLayout = Instance.new("UIListLayout", TabsContainer)
 TabsLayout.SortOrder = Enum.SortOrder.LayoutOrder
 TabsLayout.Padding = UDim.new(0, 6)
 TabsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-TabsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    TabsContainer.CanvasSize = UDim2.new(0, 0, 0, TabsLayout.AbsoluteContentSize.Y + 8)
-end)
 
 local UserProfileFrame = Instance.new("Frame", LeftPanel.InnerBg)
 UserProfileFrame.Size = UDim2.new(1, -12, 0, 44)
@@ -433,37 +468,33 @@ topButtons.Position = UDim2.new(0, 0, 0, 0)
 topButtons.BackgroundTransparency = 1
 topButtons.ZIndex = 10
 
--- TÍTULO E SUBTÍTULO ALINHADOS À ESQUERDA
-local HeaderLeft = Instance.new("Frame", topButtons)
-HeaderLeft.Size = UDim2.new(1, -125, 1, 0)
-HeaderLeft.Position = UDim2.new(0, 12, 0, 0)
-HeaderLeft.BackgroundTransparency = 1
-HeaderLeft.ZIndex = 10
+-- BADGE UI V3.8 REPOSICIONADA NO LADO ESQUERDO DO PAINEL DIREITO
+local BadgeFrame = Instance.new("Frame", topButtons)
+BadgeFrame.Name = "BadgeFrame"
+BadgeFrame.Size = UDim2.new(0, 56, 0, 20)
+BadgeFrame.Position = UDim2.new(0, 12, 0.5, -10)
+BadgeFrame.BackgroundColor3 = Color3.fromRGB(15, 5, 5)
+BadgeFrame.BorderSizePixel = 0
+BadgeFrame.ZIndex = 12
+Instance.new("UICorner", BadgeFrame).CornerRadius = UDim.new(0, 5)
 
-local title = Instance.new("TextLabel", HeaderLeft)
-title.Size = UDim2.new(1, 0, 0, 18)
-title.Position = UDim2.new(0, 0, 0, 2)
-title.BackgroundTransparency = 1
-title.Text = "AKATSUKI SCRIPTS"
-title.TextColor3 = Color3.fromRGB(245, 245, 245)
-title.TextSize = 14
-title.Font = Enum.Font.GothamBold
-title.TextXAlignment = Enum.TextXAlignment.Left
-title.ZIndex = 11
+local badgeGrad = Instance.new("UIGradient", BadgeFrame)
+badgeGrad.Rotation = 45
+badgeGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(140, 0, 0)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 0, 0))
+})
 
-local subtitle = Instance.new("TextLabel", HeaderLeft)
-subtitle.Size = UDim2.new(1, 0, 0, 14)
-subtitle.Position = UDim2.new(0, 0, 0, 19)
-subtitle.BackgroundTransparency = 1
-subtitle.Text = "MM2 SCRIPT | by zeni <3"
-subtitle.TextColor3 = Color3.fromRGB(220, 50, 50)
-subtitle.TextTransparency = 0.2
-subtitle.TextSize = 10.5
-subtitle.Font = Enum.Font.Gotham
-subtitle.TextXAlignment = Enum.TextXAlignment.Left
-subtitle.ZIndex = 11
+local BadgeText = Instance.new("TextLabel", BadgeFrame)
+BadgeText.Size = UDim2.new(1, 0, 1, 0)
+BadgeText.BackgroundTransparency = 1
+BadgeText.Text = "UI V3.8"
+BadgeText.TextColor3 = Color3.fromRGB(235, 235, 235)
+BadgeText.Font = Enum.Font.Gotham -- Fonte mais fina
+BadgeText.TextSize = 9.5
+BadgeText.ZIndex = 13
 
--- Container para os botões da direita
+-- Container para os botões de controle da direita
 local ControlsFrame = Instance.new("Frame", topButtons)
 ControlsFrame.Size = UDim2.new(0, 120, 1, 0)
 ControlsFrame.Position = UDim2.new(1, -120, 0, 0)
@@ -597,48 +628,25 @@ CloseLine2.ZIndex = 12
 local RightSeparatorLine = Instance.new("Frame", RightPanel.InnerBg)
 RightSeparatorLine.Size = UDim2.new(1, 0, 0, 1)
 RightSeparatorLine.Position = UDim2.new(0, 0, 0, 36)
-RightSeparatorLine.BackgroundColor3 = Color3.fromRGB(80, 20, 25)
+RightSeparatorLine.BackgroundColor3 = Color3.fromRGB(110, 25, 30)
 RightSeparatorLine.BorderSizePixel = 0
 RightSeparatorLine.ZIndex = 10
 
--- BADGE DA VERSÃO EM GRADIENTE SEM CONTORNO (No topo direito acima da opção Walkspeed)
-local BadgeFrame = Instance.new("Frame", RightPanel.InnerBg)
-BadgeFrame.Name = "BadgeFrame"
-BadgeFrame.AnchorPoint = Vector2.new(1, 0)
-BadgeFrame.Size = UDim2.new(0, 54, 0, 18)
-BadgeFrame.Position = UDim2.new(1, -12, 0, 42)
-BadgeFrame.BackgroundColor3 = Color3.fromRGB(25, 10, 12)
-BadgeFrame.BorderSizePixel = 0
-BadgeFrame.ZIndex = 15
-Instance.new("UICorner", BadgeFrame).CornerRadius = UDim.new(0, 5)
-
-local badgeGrad = Instance.new("UIGradient", BadgeFrame)
-badgeGrad.Rotation = 45
-badgeGrad.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(110, 15, 20)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 5, 8))
-})
-
-local BadgeText = Instance.new("TextLabel", BadgeFrame)
-BadgeText.Size = UDim2.new(1, 0, 1, 0)
-BadgeText.BackgroundTransparency = 1
-BadgeText.Text = "UI V3.8"
-BadgeText.TextColor3 = Color3.fromRGB(235, 235, 235)
-BadgeText.Font = Enum.Font.GothamBold
-BadgeText.TextSize = 9
-BadgeText.ZIndex = 16
-
+-- BARRA DE ROLAGEM PAINEL DIREITO
 local togglesContainer = Instance.new("ScrollingFrame", RightPanel.InnerBg)
 togglesContainer.Name = "TogglesContainer"
-togglesContainer.Size = UDim2.new(1, 0, 1, -66)
-togglesContainer.Position = UDim2.new(0, 0, 0, 64)
+togglesContainer.Size = UDim2.new(1, 0, 1, -44)
+togglesContainer.Position = UDim2.new(0, 0, 0, 40)
 togglesContainer.BackgroundTransparency = 1
 togglesContainer.BorderSizePixel = 0
-togglesContainer.ScrollBarThickness = 2
-togglesContainer.ScrollBarImageColor3 = Color3.fromRGB(139, 0, 0)
-togglesContainer.ScrollBarImageTransparency = 0.3
+togglesContainer.ScrollBarThickness = 3
+togglesContainer.ScrollBarImageColor3 = Color3.fromRGB(180, 30, 40)
+togglesContainer.ScrollBarImageTransparency = 0.4
+togglesContainer.VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar
+togglesContainer.ClipsDescendants = true
 togglesContainer.ZIndex = 10
 togglesContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
+togglesContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y
 
 local containerLayout = Instance.new("UIListLayout", togglesContainer)
 containerLayout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -646,11 +654,10 @@ containerLayout.Padding = UDim.new(0, 6)
 containerLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
 local uiPadding = Instance.new("UIPadding", togglesContainer)
+uiPadding.PaddingLeft = UDim.new(0, 8)
+uiPadding.PaddingRight = UDim.new(0, 8)
 uiPadding.PaddingBottom = UDim.new(0, 8)
-
-containerLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    togglesContainer.CanvasSize = UDim2.new(0, 0, 0, containerLayout.AbsoluteContentSize.Y + 16)
-end)
+uiPadding.PaddingTop = UDim.new(0, 2)
 
 -- Confirm Frame
 local confirmFrame = Instance.new("Frame", mainFrame)
@@ -713,7 +720,7 @@ local function filterToggles(currentActiveTab, query)
                 child.Visible = shouldBeVisible
                 if shouldBeVisible then
                     itemIndex = itemIndex + 1
-                    child.Size = UDim2.new(1, -16, 0, 0)
+                    child.Size = UDim2.new(1, 0, 0, 0)
                     child.BackgroundTransparency = 1
                     local t = child:FindFirstChild("Title")
                     local d = child:FindFirstChild("Description")
@@ -722,7 +729,7 @@ local function filterToggles(currentActiveTab, query)
                     task.delay((itemIndex - 1) * 0.02, function()
                         if not child or not child.Parent then return end
                         TweenService:Create(child, TweenInfo.new(0.2, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {
-                            Size = UDim2.new(1, -16, 0, 52), BackgroundTransparency = 0.35
+                            Size = UDim2.new(1, 0, 0, 52), BackgroundTransparency = 0.35
                         }):Play()
                         if t then TweenService:Create(t, TweenInfo.new(0.15), {TextTransparency = 0}):Play() end
                         if d then TweenService:Create(d, TweenInfo.new(0.15), {TextTransparency = 0}):Play() end
@@ -764,7 +771,7 @@ end
 local function createTabBtn(tabName)
     local tabBtn = Instance.new("TextButton", TabsContainer)
     tabBtn.Name = tabName .. "TabBtn"
-    tabBtn.Size = UDim2.new(1, -16, 0, 36)
+    tabBtn.Size = UDim2.new(1, -8, 0, 36)
     tabBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
     tabBtn.BackgroundTransparency = 1
     tabBtn.Text = ""
@@ -819,7 +826,7 @@ end
 local function createToggle(parent, configKey, tabCategory)
     local toggleFrame = Instance.new("Frame")
     toggleFrame.Name = configKey
-    toggleFrame.Size = UDim2.new(1, -16, 0, 52)
+    toggleFrame.Size = UDim2.new(1, 0, 0, 52)
     toggleFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
     toggleFrame.BackgroundTransparency = 0.35
     toggleFrame.ZIndex = 11
