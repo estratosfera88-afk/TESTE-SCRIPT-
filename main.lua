@@ -189,7 +189,7 @@ end)
 local mainWrapper = Instance.new("Frame", screenGui)
 mainWrapper.Name = "MainWrapper"
 mainWrapper.AnchorPoint = Vector2.new(0.5, 0.5)
-mainWrapper.Size = UDim2.new(0, 560, 0, 360) 
+mainWrapper.Size = UDim2.new(0, 640, 0, 360) -- Largura aumentada para dar mais espaço ao painel direito
 mainWrapper.Position = UDim2.new(0.5, 0, 0.5, 0)
 mainWrapper.BackgroundTransparency = 1
 mainWrapper.Visible = false
@@ -308,7 +308,6 @@ local function CreateGradientPanel(parent, size, pos, name)
 
     RunService.RenderStepped:Connect(function()
         local t = os.clock()
-        -- Rotação reduzida para t * 12 (muito mais suave e lenta)
         redGrad.Rotation = (t * 12) % 360
         
         for _, data in ipairs(blobs) do
@@ -329,7 +328,6 @@ local function CreateGradientPanel(parent, size, pos, name)
     return panel
 end
 
--- Painel esquerdo ampliado para 200px de largura
 local LeftPanel = CreateGradientPanel(mainFrame, UDim2.new(0, 200, 1, 0), UDim2.new(0, 0, 0, 0), "LeftPanel")
 local RightPanel = CreateGradientPanel(mainFrame, UDim2.new(1, -215, 1, 0), UDim2.new(0, 215, 0, 0), "RightPanel")
 
@@ -375,8 +373,8 @@ subtitle.ZIndex = 11
 
 local TabsContainer = Instance.new("ScrollingFrame", LeftPanel.InnerBg)
 TabsContainer.Name = "TabsContainer"
-TabsContainer.Size = UDim2.new(1, 0, 1, -130)
-TabsContainer.Position = UDim2.new(0, 0, 0, 44)
+TabsContainer.Size = UDim2.new(1, -8, 1, -130) -- Afastado da borda do painel esquerdo
+TabsContainer.Position = UDim2.new(0, 4, 0, 44)
 TabsContainer.BackgroundTransparency = 1
 TabsContainer.BorderSizePixel = 0
 TabsContainer.ZIndex = 10
@@ -388,10 +386,9 @@ TabsContainer.VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar
 
 local TabsLayout = Instance.new("UIListLayout", TabsContainer)
 TabsLayout.SortOrder = Enum.SortOrder.LayoutOrder
-TabsLayout.Padding = UDim.new(0, 6)
+TabsLayout.Padding = UDim.new(0, 2) -- Tabs mais próximas
 TabsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
--- Força a barra de rolagem do painel esquerdo a aparecer permanentemente
 local function UpdateTabsCanvas()
     local contentH = TabsLayout.AbsoluteContentSize.Y + 8
     local minH = TabsContainer.AbsoluteSize.Y + 12
@@ -449,12 +446,12 @@ UsernameLabel.TextXAlignment = Enum.TextXAlignment.Left
 UsernameLabel.TextTruncate = Enum.TextTruncate.AtEnd
 UsernameLabel.ZIndex = 11
 
--- Botão de censura com o estilo da Badge (Vermelho gradiente Akatsuki)
+-- Botão de censura (fundo transparente + efeito flash rápido)
 local PrivacyBtn = Instance.new("ImageButton", UserProfileFrame)
 PrivacyBtn.Size = UDim2.new(0, 24, 0, 24)
 PrivacyBtn.Position = UDim2.new(1, -28, 0, 4)
 PrivacyBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-PrivacyBtn.BackgroundTransparency = 0
+PrivacyBtn.BackgroundTransparency = 0.4 -- Fundo transparente
 PrivacyBtn.BorderSizePixel = 0
 PrivacyBtn.ZIndex = 12
 Instance.new("UICorner", PrivacyBtn).CornerRadius = UDim.new(0, 6)
@@ -477,6 +474,11 @@ PrivacyIcon.ZIndex = 13
 local isPrivate = false
 PrivacyBtn.MouseButton1Click:Connect(function()
     PlayUI_Click()
+    
+    -- Efeito Flash rápido no clique
+    local flashTween = TweenService:Create(PrivacyBtn, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, true), {BackgroundTransparency = 0})
+    flashTween:Play()
+
     isPrivate = not isPrivate
     if isPrivate then
         PrivacyIcon.Image = "rbxthumb://type=Asset&id=85795266774996&w=150&h=150"
@@ -635,7 +637,7 @@ RightSeparatorLine.BackgroundTransparency = 0.5
 RightSeparatorLine.BorderSizePixel = 0
 RightSeparatorLine.ZIndex = 10
 
--- Badge do usuário com largura aumentada (68px)
+-- Badge do usuário com contornos muito transparentes na cor da UI
 local BadgeFrame = Instance.new("Frame", RightPanel.InnerBg)
 BadgeFrame.Name = "BadgeFrame"
 BadgeFrame.Size = UDim2.new(0, 68, 0, 18)
@@ -660,6 +662,13 @@ BadgeText.TextColor3 = Color3.fromRGB(255, 255, 255)
 BadgeText.Font = Enum.Font.GothamBold
 BadgeText.TextSize = 9
 BadgeText.ZIndex = 16
+
+-- Contorno transparente na cor da UI
+local BadgeStroke = Instance.new("UIStroke", BadgeFrame)
+BadgeStroke.Color = Color3.fromRGB(230, 20, 25)
+BadgeStroke.Transparency = 0.7
+BadgeStroke.Thickness = 1.5
+BadgeStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
 local togglesContainer = Instance.new("ScrollingFrame", RightPanel.InnerBg)
 togglesContainer.Name = "TogglesContainer"
@@ -790,7 +799,6 @@ local function selectTab(tabName)
             if iconContainer and iconContainer:FindFirstChild("AccentImage") then
                 TweenService:Create(iconContainer.AccentImage, animSpeed, {ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
             end
-            -- Atualiza transparência registrada para não sumir ao ocultar/reabrir UI
             originalTrans[btn] = { BackgroundTransparency = 0.4, TextTransparency = 0 }
         else
             TweenService:Create(btn, animSpeed, {BackgroundColor3 = Color3.fromRGB(15, 15, 15), BackgroundTransparency = 1}):Play()
@@ -997,7 +1005,7 @@ end)
 ExpandBtn.MouseButton1Click:Connect(function()
     PlayUI_Click()
     isExpanded = not isExpanded
-    local newSize = isExpanded and UDim2.new(0, 800, 0, 480) or UDim2.new(0, 560, 0, 360)
+    local newSize = isExpanded and UDim2.new(0, 800, 0, 480) or UDim2.new(0, 640, 0, 360)
     TweenService:Create(mainWrapper, TweenInfo.new(0.3, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {Size = newSize}):Play()
 end)
 
@@ -1014,7 +1022,7 @@ SetUIState = function(newState)
         AplicarFadeSincronizado(mainWrapper, true, 0)
         AplicarFadeSincronizado(mainWrapper, false, tempoAnim)
         
-        local openTween = TweenService:Create(mainWrapper, windowAnim, {Size = isExpanded and UDim2.new(0, 800, 0, 480) or UDim2.new(0, 560, 0, 360)})
+        local openTween = TweenService:Create(mainWrapper, windowAnim, {Size = isExpanded and UDim2.new(0, 800, 0, 480) or UDim2.new(0, 640, 0, 360)})
         openTween:Play()
         openTween.Completed:Connect(function()
             UIState = "OPEN"
@@ -1035,7 +1043,6 @@ end
 
 MinimizeBtn.MouseButton1Click:Connect(function() 
     PlayUI_Click()
-    -- Reseta a cor do botão ao clicar para não ficar travado em hover
     TweenService:Create(MinimizeBtn, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = Color3.fromRGB(15, 15, 15), BackgroundTransparency = 0.3}):Play()
     TweenService:Create(MinimizeLine, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play()
     SetUIState("MINIMIZED")
