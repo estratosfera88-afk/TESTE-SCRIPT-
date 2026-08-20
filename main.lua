@@ -131,22 +131,11 @@ FloatBtn.ZIndex = 100
 FloatBtn.ClipsDescendants = false
 if not FloatBtn:FindFirstChildOfClass("UICorner") then Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(0, 8) end
 
-local FloatStroke = FloatBtn:FindFirstChild("FloatStroke") or Instance.new("UIStroke", FloatBtn)
-FloatStroke.Name = "FloatStroke"
-FloatStroke.Thickness = 3
-FloatStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-local floatStrokeGradient = FloatStroke:FindFirstChildOfClass("UIGradient") or Instance.new("UIGradient", FloatStroke)
-floatStrokeGradient.Rotation = 45
-floatStrokeGradient.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(230, 20, 25)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 0, 0))
-})
-
--- Som de Abertura pelo Botão Flutuante
+-- Som de Abertura pelo Botão Flutuante (Volume mais baixo)
 local FloatOpenSound = FloatBtn:FindFirstChild("FloatOpenSound") or Instance.new("Sound", FloatBtn)
 FloatOpenSound.Name = "FloatOpenSound"
 FloatOpenSound.SoundId = "rbxassetid://6310837681"
-FloatOpenSound.Volume = 0.6
+FloatOpenSound.Volume = 0.2 
 FloatOpenSound.Looped = false
 
 task.spawn(function()
@@ -201,7 +190,7 @@ end)
 local mainWrapper = Instance.new("Frame", screenGui)
 mainWrapper.Name = "MainWrapper"
 mainWrapper.AnchorPoint = Vector2.new(0.5, 0.5)
-mainWrapper.Size = UDim2.new(0, 560, 0, 315)
+mainWrapper.Size = UDim2.new(0, 560, 0, 360) 
 mainWrapper.Position = UDim2.new(0.5, 0, 0.5, 0)
 mainWrapper.BackgroundTransparency = 1
 mainWrapper.Visible = false
@@ -241,10 +230,8 @@ local function CreateGradientPanel(parent, size, pos, name)
     panel.ZIndex = 5
     panel.ClipsDescendants = false
 
-    -- Adiciona arredondamento no painel para que o Stroke siga a forma exata
     Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 10)
 
-    -- Novo contorno gradiente Preto -> Vermelho Escuro (substituto do antigo contorno preto grosso)
     local outerStroke = Instance.new("UIStroke", panel)
     outerStroke.Name = "OuterStroke"
     outerStroke.Thickness = 2.5
@@ -317,7 +304,6 @@ local function CreateGradientPanel(parent, size, pos, name)
         beamGrad.Rotation = (beamGrad.Rotation + (dt * 12)) % 360
     end)
     
-    -- Novo Contorno Fino Vermelho Claro e Semitransparente dos Painéis
     local stroke = Instance.new("UIStroke", InnerBg)
     stroke.Color = Color3.fromRGB(255, 80, 80)
     stroke.Thickness = 1
@@ -333,8 +319,8 @@ local RightPanel = CreateGradientPanel(mainFrame, UDim2.new(1, -190, 1, 0), UDim
 local LeftSeparatorLine = Instance.new("Frame", LeftPanel.InnerBg)
 LeftSeparatorLine.Size = UDim2.new(1, 0, 0, 1)
 LeftSeparatorLine.Position = UDim2.new(0, 0, 0, 36)
-LeftSeparatorLine.BackgroundColor3 = Color3.fromRGB(255, 80, 80) -- Vermelho claro
-LeftSeparatorLine.BackgroundTransparency = 0.5 -- Semitransparente
+LeftSeparatorLine.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+LeftSeparatorLine.BackgroundTransparency = 0.5
 LeftSeparatorLine.BorderSizePixel = 0
 LeftSeparatorLine.ZIndex = 10
 
@@ -371,7 +357,7 @@ subtitle.ZIndex = 11
 
 local TabsContainer = Instance.new("ScrollingFrame", LeftPanel.InnerBg)
 TabsContainer.Name = "TabsContainer"
-TabsContainer.Size = UDim2.new(1, 0, 1, -114)
+TabsContainer.Size = UDim2.new(1, 0, 1, -130)
 TabsContainer.Position = UDim2.new(0, 0, 0, 44)
 TabsContainer.BackgroundTransparency = 1
 TabsContainer.BorderSizePixel = 0
@@ -392,8 +378,8 @@ TabsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
 end)
 
 local UserProfileFrame = Instance.new("Frame", LeftPanel.InnerBg)
-UserProfileFrame.Size = UDim2.new(1, -12, 0, 60)
-UserProfileFrame.Position = UDim2.new(0, 6, 1, -66)
+UserProfileFrame.Size = UDim2.new(1, -12, 0, 75)
+UserProfileFrame.Position = UDim2.new(0, 6, 1, -81)
 UserProfileFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
 UserProfileFrame.BackgroundTransparency = 0.4
 UserProfileFrame.BorderSizePixel = 0
@@ -408,8 +394,8 @@ userGrad.Color = ColorSequence.new({
 })
 
 local AvatarImage = Instance.new("ImageLabel", UserProfileFrame)
-AvatarImage.Size = UDim2.new(0, 42, 0, 42)
-AvatarImage.Position = UDim2.new(0, 8, 0.5, -21)
+AvatarImage.Size = UDim2.new(0, 50, 0, 50)
+AvatarImage.Position = UDim2.new(0, 8, 0.5, -25)
 AvatarImage.BackgroundTransparency = 1
 AvatarImage.Image = "rbxthumb://type=AvatarHeadShot&id=" .. player.UserId .. "&w=150&h=150"
 AvatarImage.ZIndex = 11
@@ -417,7 +403,7 @@ Instance.new("UICorner", AvatarImage).CornerRadius = UDim.new(1, 0)
 
 local DisplayNameLabel = Instance.new("TextLabel", UserProfileFrame)
 DisplayNameLabel.Size = UDim2.new(1, -84, 0, 16)
-DisplayNameLabel.Position = UDim2.new(0, 58, 0.5, -16)
+DisplayNameLabel.Position = UDim2.new(0, 66, 0.5, -18)
 DisplayNameLabel.BackgroundTransparency = 1
 DisplayNameLabel.Text = player.DisplayName
 DisplayNameLabel.TextColor3 = Color3.fromRGB(235, 235, 235)
@@ -429,7 +415,7 @@ DisplayNameLabel.ZIndex = 11
 
 local UsernameLabel = Instance.new("TextLabel", UserProfileFrame)
 UsernameLabel.Size = UDim2.new(1, -84, 0, 14)
-UsernameLabel.Position = UDim2.new(0, 58, 0.5, 2)
+UsernameLabel.Position = UDim2.new(0, 66, 0.5, 2)
 UsernameLabel.BackgroundTransparency = 1
 UsernameLabel.Text = "@" .. player.Name
 UsernameLabel.TextColor3 = Color3.fromRGB(140, 140, 140)
@@ -440,8 +426,8 @@ UsernameLabel.TextTruncate = Enum.TextTruncate.AtEnd
 UsernameLabel.ZIndex = 11
 
 local PrivacyBtn = Instance.new("ImageButton", UserProfileFrame)
-PrivacyBtn.Size = UDim2.new(0, 20, 0, 20)
-PrivacyBtn.Position = UDim2.new(1, -26, 0.5, -10)
+PrivacyBtn.Size = UDim2.new(0, 24, 0, 24)
+PrivacyBtn.Position = UDim2.new(1, -28, 0, 4)
 PrivacyBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 PrivacyBtn.BackgroundTransparency = 0.2
 PrivacyBtn.ZIndex = 12
@@ -611,12 +597,11 @@ CloseLine2.ZIndex = 12
 local RightSeparatorLine = Instance.new("Frame", RightPanel.InnerBg)
 RightSeparatorLine.Size = UDim2.new(1, 0, 0, 1)
 RightSeparatorLine.Position = UDim2.new(0, 0, 0, 36)
-RightSeparatorLine.BackgroundColor3 = Color3.fromRGB(255, 80, 80) -- Vermelho claro
-RightSeparatorLine.BackgroundTransparency = 0.5 -- Semitransparente
+RightSeparatorLine.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+RightSeparatorLine.BackgroundTransparency = 0.5
 RightSeparatorLine.BorderSizePixel = 0
 RightSeparatorLine.ZIndex = 10
 
--- Nova Badge Menor e Esticada
 local BadgeFrame = Instance.new("Frame", RightPanel.InnerBg)
 BadgeFrame.Name = "BadgeFrame"
 BadgeFrame.Size = UDim2.new(0, 48, 0, 16)
@@ -624,7 +609,7 @@ BadgeFrame.Position = UDim2.new(0, 12, 0, 10)
 BadgeFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 BadgeFrame.BorderSizePixel = 0
 BadgeFrame.ZIndex = 15
-Instance.new("UICorner", BadgeFrame).CornerRadius = UDim.new(1, 0) -- Botão esticado
+Instance.new("UICorner", BadgeFrame).CornerRadius = UDim.new(1, 0)
 
 local badgeGrad = Instance.new("UIGradient", BadgeFrame)
 badgeGrad.Rotation = 45
@@ -675,14 +660,14 @@ end
 containerLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(UpdateCanvasSize)
 togglesContainer:GetPropertyChangedSignal("AbsoluteSize"):Connect(UpdateCanvasSize)
 
--- Novo Fundo de Confirmação Completamente Preto, Opaco e Dimensionado Perfeitamente
-local confirmFrame = Instance.new("Frame", mainFrame)
+-- Novo Fundo de Confirmação na camada superior (mainWrapper) com ZIndex 999 para barrar vazamento de contornos
+local confirmFrame = Instance.new("Frame", mainWrapper)
 confirmFrame.Name = "ConfirmFrame"
 confirmFrame.Size = UDim2.new(1, 0, 1, 0)
 confirmFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 confirmFrame.BackgroundTransparency = 0
 confirmFrame.Visible = false
-confirmFrame.ZIndex = 50
+confirmFrame.ZIndex = 999
 Instance.new("UICorner", confirmFrame).CornerRadius = UDim.new(0, 10)
 
 local confirmLabel = Instance.new("TextLabel", confirmFrame)
@@ -693,7 +678,7 @@ confirmLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
 confirmLabel.Font = Enum.Font.GothamBold
 confirmLabel.TextSize = 14
 confirmLabel.Text = UI_TEXT.ConfirmCloseTitle
-confirmLabel.ZIndex = 51
+confirmLabel.ZIndex = 1000
 
 local btnYes = Instance.new("TextButton", confirmFrame)
 btnYes.Size = UDim2.new(0, 110, 0, 34)
@@ -703,7 +688,7 @@ btnYes.TextColor3 = Color3.fromRGB(255, 255, 255)
 btnYes.Font = Enum.Font.GothamMedium
 btnYes.TextSize = 12
 btnYes.Text = UI_TEXT.ConfirmBtn
-btnYes.ZIndex = 51
+btnYes.ZIndex = 1000
 Instance.new("UICorner", btnYes).CornerRadius = UDim.new(0, 6)
 
 local btnNo = Instance.new("TextButton", confirmFrame)
@@ -714,7 +699,7 @@ btnNo.TextColor3 = Color3.fromRGB(180, 180, 180)
 btnNo.Font = Enum.Font.GothamMedium
 btnNo.TextSize = 12
 btnNo.Text = UI_TEXT.CancelBtn
-btnNo.ZIndex = 51
+btnNo.ZIndex = 1000
 Instance.new("UICorner", btnNo).CornerRadius = UDim.new(0, 6)
 
 -- ==================== FUNÇÕES DA INTERFACE ====================
@@ -975,7 +960,7 @@ end)
 ExpandBtn.MouseButton1Click:Connect(function()
     PlayUI_Click()
     isExpanded = not isExpanded
-    local newSize = isExpanded and UDim2.new(0, 800, 0, 460) or UDim2.new(0, 560, 0, 315)
+    local newSize = isExpanded and UDim2.new(0, 800, 0, 480) or UDim2.new(0, 560, 0, 360)
     TweenService:Create(mainWrapper, TweenInfo.new(0.3, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {Size = newSize}):Play()
 end)
 
@@ -992,7 +977,7 @@ SetUIState = function(newState)
         AplicarFadeSincronizado(mainWrapper, true, 0)
         AplicarFadeSincronizado(mainWrapper, false, tempoAnim)
         
-        local openTween = TweenService:Create(mainWrapper, windowAnim, {Size = isExpanded and UDim2.new(0, 800, 0, 460) or UDim2.new(0, 560, 0, 315)})
+        local openTween = TweenService:Create(mainWrapper, windowAnim, {Size = isExpanded and UDim2.new(0, 800, 0, 480) or UDim2.new(0, 560, 0, 360)})
         openTween:Play()
         openTween.Completed:Connect(function()
             UIState = "OPEN"
@@ -1108,8 +1093,8 @@ local function ExecutarIntroAkat()
     TweenService:Create(IntroFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
     TweenService:Create(Blur, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = 0}):Play(); task.wait(0.3)
 
-    RegistrarTransparencias(mainFrame)
-    for _, item in ipairs(mainFrame:GetDescendants()) do RegistrarTransparencias(item) end
+    RegistrarTransparencias(mainWrapper)
+    for _, item in ipairs(mainWrapper:GetDescendants()) do RegistrarTransparencias(item) end
 
     mainWrapper.Visible = true
     FloatBtn.Visible = true 
