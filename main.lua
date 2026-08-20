@@ -1,4 +1,4 @@
--- [[ AKATSUKI UI ONLY [v3.8] - FIXED & IMPROVED ]]
+-- [[ AKATSUKI UI ONLY [v3.8] - FIXED & IMPROVED (AURORA BACKGROUND) ]]
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -254,55 +254,49 @@ local function CreateGradientPanel(parent, size, pos, name)
     InnerBg.ZIndex = 5
     Instance.new("UICorner", InnerBg).CornerRadius = UDim.new(0, 10)
     
-    local overlay = Instance.new("Frame", InnerBg)
-    overlay.Name = "RedGradientOverlay"
-    overlay.Size = UDim2.new(1, 0, 1, 0)
-    overlay.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    overlay.BorderSizePixel = 0
-    overlay.ZIndex = 5
-    Instance.new("UICorner", overlay).CornerRadius = UDim.new(0, 10)
-
-    local redGrad = Instance.new("UIGradient", overlay)
-    redGrad.Rotation = 90
-    redGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(60, 0, 5)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(210, 10, 20)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 0, 5))
-    })
+    -- ==================== ANIMAÇÃO DE AURORA (BLOBS DE LUZ DIFUSA) ====================
+    local blob1 = Instance.new("ImageLabel", InnerBg)
+    blob1.Name = "AuroraBlob1"
+    blob1.AnchorPoint = Vector2.new(0.5, 0.5)
+    blob1.Size = UDim2.new(2, 0, 2, 0)
+    blob1.BackgroundTransparency = 1
+    blob1.Image = "rbxassetid://1868510801"
+    blob1.ImageColor3 = Color3.fromRGB(80, 0, 5)
+    blob1.ImageTransparency = 0.4
+    blob1.ZIndex = 4
     
-    redGrad.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0.35),
-        NumberSequenceKeypoint.new(0.5, 0.1),
-        NumberSequenceKeypoint.new(1, 0.35)
-    })
-
-    local lightBeam = Instance.new("Frame", InnerBg)
-    lightBeam.Name = "LightBeam"
-    lightBeam.Size = UDim2.new(2, 0, 2, 0)
-    lightBeam.AnchorPoint = Vector2.new(0.5, 0.5)
-    lightBeam.Position = UDim2.new(0.5, 0, 0.5, 0)
-    lightBeam.BackgroundTransparency = 1
-    lightBeam.ZIndex = 6
-    Instance.new("UICorner", lightBeam).CornerRadius = UDim.new(0, 10)
-
-    local beamGrad = Instance.new("UIGradient", lightBeam)
-    beamGrad.Rotation = 45
-    beamGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 80, 80)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
-    })
+    local blob2 = Instance.new("ImageLabel", InnerBg)
+    blob2.Name = "AuroraBlob2"
+    blob2.AnchorPoint = Vector2.new(0.5, 0.5)
+    blob2.Size = UDim2.new(1.8, 0, 1.8, 0)
+    blob2.BackgroundTransparency = 1
+    blob2.Image = "rbxassetid://1868510801"
+    blob2.ImageColor3 = Color3.fromRGB(150, 5, 15)
+    blob2.ImageTransparency = 0.5
+    blob2.ZIndex = 5
     
-    beamGrad.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 1),
-        NumberSequenceKeypoint.new(0.5, 0.94),
-        NumberSequenceKeypoint.new(1, 1)
-    })
-
-    RunService.RenderStepped:Connect(function(dt)
-        redGrad.Rotation = (redGrad.Rotation + (dt * 10)) % 360
-        beamGrad.Rotation = (beamGrad.Rotation + (dt * 12)) % 360
+    local blob3 = Instance.new("ImageLabel", InnerBg)
+    blob3.Name = "AuroraBlob3"
+    blob3.AnchorPoint = Vector2.new(0.5, 0.5)
+    blob3.Size = UDim2.new(1.4, 0, 1.4, 0)
+    blob3.BackgroundTransparency = 1
+    blob3.Image = "rbxassetid://1868510801"
+    blob3.ImageColor3 = Color3.fromRGB(220, 15, 25)
+    blob3.ImageTransparency = 0.7
+    blob3.ZIndex = 6
+    
+    local tickOffset1 = math.random(0, 1000)
+    local tickOffset2 = math.random(0, 1000)
+    local tickOffset3 = math.random(0, 1000)
+    
+    RunService.RenderStepped:Connect(function()
+        local t = tick()
+        -- Movimentação suave e orgânica usando ondas seno e cosseno
+        blob1.Position = UDim2.new(0.5 + math.sin(t * 0.1 + tickOffset1) * 0.2, 0, 0.5 + math.cos(t * 0.14 + tickOffset1) * 0.2, 0)
+        blob2.Position = UDim2.new(0.5 + math.sin(t * 0.15 + tickOffset2) * 0.3, 0, 0.5 + math.cos(t * 0.12 + tickOffset2) * 0.3, 0)
+        blob3.Position = UDim2.new(0.5 + math.cos(t * 0.2 + tickOffset3) * 0.4, 0, 0.5 + math.sin(t * 0.18 + tickOffset3) * 0.4, 0)
     end)
+    -- =================================================================================
     
     local stroke = Instance.new("UIStroke", InnerBg)
     stroke.Color = Color3.fromRGB(255, 80, 80)
