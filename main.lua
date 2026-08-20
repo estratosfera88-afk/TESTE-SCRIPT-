@@ -265,13 +265,13 @@ local function CreateGradientPanel(parent, size, pos, name)
 
     local redGrad = Instance.new("UIGradient", overlay)
     redGrad.Rotation = 90
+    -- ALTERAÇÃO REALIZADA: Removido o ponto central para eliminar a linha/brilho
     redGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(25, 0, 5)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(160, 10, 20)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(25, 0, 5))
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(50, 0, 5)), 
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(150, 20, 30))
     })
 
-    -- Animação simplificada apenas do Gradiente (Sem Streaks/Blobs)
+    -- Animação do Gradiente
     RunService.RenderStepped:Connect(function()
         local t = os.clock()
         redGrad.Rotation = (t * 12) % 360
@@ -283,7 +283,9 @@ end
 local LeftPanel = CreateGradientPanel(mainFrame, UDim2.new(0, 200, 1, 0), UDim2.new(0, 0, 0, 0), "LeftPanel")
 local RightPanel = CreateGradientPanel(mainFrame, UDim2.new(1, -215, 1, 0), UDim2.new(0, 215, 0, 0), "RightPanel")
 
--- ==================== LEFT PANEL CONTENT ====================
+-- ==================== [Restante do script permanece inalterado] ====================
+-- (Mantive o restante do código igual, apenas substitua a função CreateGradientPanel acima)
+
 local LeftSeparatorLine = Instance.new("Frame", LeftPanel.InnerBg)
 LeftSeparatorLine.Size = UDim2.new(1, 0, 0, 1)
 LeftSeparatorLine.Position = UDim2.new(0, 0, 0, 36)
@@ -316,7 +318,7 @@ subtitle.AnchorPoint = Vector2.new(0.5, 0)
 subtitle.Position = UDim2.new(0.5, 0, 0, 20)
 subtitle.BackgroundTransparency = 1
 subtitle.Text = "MM2 SCRIPT | by zeni <3"
-subtitle.TextColor3 = Color3.fromRGB(180, 180, 180) -- ALTERADO: Cor cinza
+subtitle.TextColor3 = Color3.fromRGB(180, 180, 180)
 subtitle.TextTransparency = 0.2
 subtitle.TextSize = 9.5
 subtitle.Font = Enum.Font.Gotham
@@ -586,10 +588,9 @@ RightSeparatorLine.BackgroundTransparency = 0.5
 RightSeparatorLine.BorderSizePixel = 0
 RightSeparatorLine.ZIndex = 10
 
--- Badge do usuário (MODIFICADO)
 local BadgeFrame = Instance.new("Frame", RightPanel.InnerBg)
 BadgeFrame.Name = "BadgeFrame"
-BadgeFrame.Size = UDim2.new(0, 50, 0, 18) -- ALTERADO: Largura reduzida
+BadgeFrame.Size = UDim2.new(0, 50, 0, 18)
 BadgeFrame.Position = UDim2.new(0, 12, 0, 9)
 BadgeFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 BadgeFrame.BorderSizePixel = 0
@@ -606,7 +607,7 @@ badgeGrad.Color = ColorSequence.new({
 local BadgeText = Instance.new("TextLabel", BadgeFrame)
 BadgeText.Size = UDim2.new(1, 0, 1, 0)
 BadgeText.BackgroundTransparency = 1
-BadgeText.Text = "V3.6" -- ALTERADO: Texto para V3.6
+BadgeText.Text = "V3.6"
 BadgeText.TextColor3 = Color3.fromRGB(255, 255, 255)
 BadgeText.Font = Enum.Font.GothamBold
 BadgeText.TextSize = 9
@@ -651,7 +652,6 @@ end
 containerLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(UpdateCanvasSize)
 togglesContainer:GetPropertyChangedSignal("AbsoluteSize"):Connect(UpdateCanvasSize)
 
--- Novo Fundo de Confirmação
 local confirmFrame = Instance.new("Frame", mainWrapper)
 confirmFrame.Name = "ConfirmFrame"
 confirmFrame.Size = UDim2.new(1, 0, 1, 0)
@@ -693,7 +693,6 @@ btnNo.Text = UI_TEXT.CancelBtn
 btnNo.ZIndex = 1000
 Instance.new("UICorner", btnNo).CornerRadius = UDim.new(0, 6)
 
--- ==================== FUNÇÕES DA INTERFACE ====================
 local function filterToggles(currentActiveTab, query)
     local searchQuery = (query or ""):lower()
     local itemIndex = 0
