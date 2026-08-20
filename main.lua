@@ -31,7 +31,7 @@ local UI_TEXT = {
     ConfirmBtn = "Confirm",
     CancelBtn = "Cancel",
     Intro = '<font color="#FFFFFF">Scripts by | </font><font color="#8B0000">AKATSUKI</font>',
-    Tabs = { Player = "Player", Combat = "Combat", Visuals = "Visuals", Teleports = "Teleports", Misc = "Misc" },
+    Tabs = { Player = "Player", Combat = "Combat", Visuals = "Visuals", Teleports = "Teleports", Misc = "Settings" },
     Options = {
         AutoShoot = { Title = "Aimbot Murderer", Desc = "Automatic aimbot that stays in the murderer's head non-stop." },
         Reach = { Title = "Knife Reach", Desc = "Significantly increases your knife attack reach (18 studs)." },
@@ -848,11 +848,11 @@ local function createTabBtn(tabName)
     imageLabel.ZIndex = 13
     imageLabel.ImageColor3 = Color3.fromRGB(150, 150, 150)
     
-    if tabName == "Player" then imageLabel.Image = "rbxthumb://type=Asset&id=78324938264014&w=150&h=150"
-    elseif tabName == "Teleports" then imageLabel.Image = "rbxthumb://type=Asset&id=122367250674432&w=150&h=150"
-    elseif tabName == "Misc" then imageLabel.Image = "rbxthumb://type=Asset&id=79429182159899&w=150&h=150"
-    elseif tabName == "Visuals" then imageLabel.Image = "rbxthumb://type=Asset&id=135604583195835&w=150&h=150"
-    elseif tabName == "Combat" then imageLabel.Image = "rbxthumb://type=Asset&id=139442231247295&w=150&h=150" end
+    if tabName == "Player" then imageLabel.Image = "rbxthumb://type=Asset&id=107032293182891&w=150&h=150"
+    elseif tabName == "Teleports" then imageLabel.Image = "rbxthumb://type=Asset&id=131082536388353&w=150&h=150"
+    elseif tabName == "Settings" then imageLabel.Image = "rbxthumb://type=Asset&id=88409765080516&w=150&h=150"
+    elseif tabName == "Visuals" then imageLabel.Image = "rbxthumb://type=Asset&id=97681798175944&w=150&h=150"
+    elseif tabName == "Combat" then imageLabel.Image = "rbxthumb://type=Asset&id=105897102093789&w=150&h=150" end
 
     local tabLabel = Instance.new("TextLabel", tabBtn)
     tabLabel.Name = "Label"
