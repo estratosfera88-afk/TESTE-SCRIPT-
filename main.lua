@@ -31,7 +31,7 @@ local UI_TEXT = {
     ConfirmBtn = "Confirm",
     CancelBtn = "Cancel",
     Intro = '<font color="#FFFFFF">Scripts by | </font><font color="#8B0000">AKATSUKI</font>',
-    Tabs = { Player = "Player", Combat = "Combat", Visuals = "Visuals", Teleports = "Teleports", Misc = "Settings" },
+    Tabs = { Player = "Player", Combat = "Combat", Visuals = "Visuals", Teleports = "Teleports", Settings = "Settings" },
     Options = {
         AutoShoot = { Title = "Aimbot Murderer", Desc = "Automatic aimbot that stays in the murderer's head non-stop." },
         Reach = { Title = "Knife Reach", Desc = "Significantly increases your knife attack reach (18 studs)." },
@@ -1111,7 +1111,7 @@ createTabBtn("Player")
 createTabBtn("Combat")
 createTabBtn("Visuals")
 createTabBtn("Teleports")
-createTabBtn("Misc")
+createTabBtn("Settings")
 
 createToggle(togglesContainer, "Speed",       "Player")
 createToggle(togglesContainer, "AntiFling",   "Player")
@@ -1120,8 +1120,8 @@ createToggle(togglesContainer, "Reach",       "Combat")
 createToggle(togglesContainer, "ESP",         "Visuals")
 createToggle(togglesContainer, "TpToGun",     "Teleports")
 createToggle(togglesContainer, "SafeSpot",    "Teleports")
-createToggle(togglesContainer, "AutoCollect", "Misc")
-createToggle(togglesContainer, "ChatRoles",   "Misc")
+createToggle(togglesContainer, "AutoCollect", "Settings")
+createToggle(togglesContainer, "ChatRoles",   "Settings")
 
 -- ==================== ANIMAÇÃO DE INTRODUÇÃO ====================
 local function ExecutarIntroAkat()
