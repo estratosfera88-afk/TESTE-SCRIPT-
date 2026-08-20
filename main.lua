@@ -312,7 +312,8 @@ local function CreateGradientPanel(parent, size, pos, name)
 
     RunService.RenderStepped:Connect(function()
         local t = os.clock()
-        redGrad.Rotation = 90 + math.sin(t * 0.1) * 12
+        -- Alterado para rotação contínua e sem parar (360 graus)
+        redGrad.Rotation = (t * 45) % 360
         
         for _, data in ipairs(blobs) do
             local x = 0.5 + math.sin(t * data.cfg.speedX + data.seedX) * 0.35
