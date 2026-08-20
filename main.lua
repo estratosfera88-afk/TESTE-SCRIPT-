@@ -118,7 +118,7 @@ FloatBtn.ZIndex = 100
 FloatBtn.ClipsDescendants = false
 if not FloatBtn:FindFirstChildOfClass("UICorner") then Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(0, 8) end
 
--- Contorno Gradiente Forte e Visível (Vermelho Vivo + Vermelho Escuro)
+-- Contorno Gradiente Forte e Visível (Exato Gradient da Badge V3.8)
 local FloatStroke = FloatBtn:FindFirstChild("FloatStroke") or Instance.new("UIStroke", FloatBtn)
 FloatStroke.Name = "FloatStroke"
 FloatStroke.Thickness = 3
@@ -126,14 +126,14 @@ FloatStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 local floatStrokeGradient = FloatStroke:FindFirstChildOfClass("UIGradient") or Instance.new("UIGradient", FloatStroke)
 floatStrokeGradient.Rotation = 45
 floatStrokeGradient.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 25, 30)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(110, 0, 0))
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(230, 20, 25)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 0, 0))
 })
 
--- Som do Botão Flutuante (Correção do Carregamento de Asset)
+-- Som do Botão Flutuante Corrigido para ID Válido
 local ButtonClickSound = FloatBtn:FindFirstChild("ButtonClickSound") or Instance.new("Sound", FloatBtn)
 ButtonClickSound.Name = "ButtonClickSound"
-ButtonClickSound.SoundId = "rbxassetid://631083768"
+ButtonClickSound.SoundId = "rbxassetid://6895079853"
 ButtonClickSound.Volume = 0.6
 
 task.spawn(function()
@@ -171,10 +171,10 @@ UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
         if dragToggle and not isDragging then
             if UIState == "MINIMIZED" or UIState == "CLOSED" then
-                pcall(function() ButtonClickSound:Play() end) -- Toca SOMENTE no primeiro clique ao abrir
+                pcall(function() ButtonClickSound:Play() end)
                 SetUIState("OPEN")
             elseif UIState == "OPEN" then
-                SetUIState("MINIMIZED") -- Segundo clique fecha/minimiza SEM tocar som
+                SetUIState("MINIMIZED")
             end
         end
         dragToggle = false 
@@ -185,7 +185,8 @@ end)
 local mainWrapper = Instance.new("Frame", screenGui)
 mainWrapper.Name = "MainWrapper"
 mainWrapper.AnchorPoint = Vector2.new(0.5, 0.5)
-mainWrapper.Size = UDim2.new(0, 535, 0, 300)
+-- TAMANHO AUMENTADO BASE (560x315)
+mainWrapper.Size = UDim2.new(0, 560, 0, 315)
 mainWrapper.Position = UDim2.new(0.5, 0, 0.5, 0)
 mainWrapper.BackgroundTransparency = 1
 mainWrapper.Visible = false
@@ -225,7 +226,6 @@ local function CreateGradientPanel(parent, size, pos, name)
     panel.ZIndex = 5
     panel.ClipsDescendants = false
 
-    -- Sombra 3D Perfeita sem pontas sobressalentes
     local shadow = Instance.new("ImageLabel", panel)
     shadow.Name = "Shadow3D"
     shadow.Size = UDim2.new(1, 14, 1, 14)
@@ -242,7 +242,7 @@ local function CreateGradientPanel(parent, size, pos, name)
     local InnerBg = Instance.new("Frame", panel)
     InnerBg.Name = "InnerBg"
     InnerBg.Size = UDim2.new(1, 0, 1, 0)
-    InnerBg.BackgroundColor3 = Color3.fromRGB(15, 8, 10)
+    InnerBg.BackgroundColor3 = Color3.fromRGB(15, 2, 4) -- Fundo sutilmente mais escuro
     InnerBg.BorderSizePixel = 0
     InnerBg.ClipsDescendants = true
     InnerBg.ZIndex = 5
@@ -254,19 +254,23 @@ local function CreateGradientPanel(parent, size, pos, name)
     overlay.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     overlay.BorderSizePixel = 0
     overlay.ZIndex = 5
+    -- Fix para as bordas vazadas do roblox
+    Instance.new("UICorner", overlay).CornerRadius = UDim.new(0, 10)
 
     local redGrad = Instance.new("UIGradient", overlay)
     redGrad.Rotation = 90
+    -- NOVO GRADIENT SUAVE BASEADO NO VÍDEO
     redGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(150, 15, 20)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(220, 30, 40)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(150, 15, 20))
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(60, 0, 5)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(210, 10, 20)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 0, 5))
     })
     
+    -- Ajuste de transparência para fazer a cor ser bem destacada
     redGrad.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0.90),
-        NumberSequenceKeypoint.new(0.5, 0.70),
-        NumberSequenceKeypoint.new(1, 0.90)
+        NumberSequenceKeypoint.new(0, 0.35),
+        NumberSequenceKeypoint.new(0.5, 0.1),
+        NumberSequenceKeypoint.new(1, 0.35)
     })
 
     local lightBeam = Instance.new("Frame", InnerBg)
@@ -276,6 +280,8 @@ local function CreateGradientPanel(parent, size, pos, name)
     lightBeam.Position = UDim2.new(0.5, 0, 0.5, 0)
     lightBeam.BackgroundTransparency = 1
     lightBeam.ZIndex = 6
+    -- Fix para bordas vazadas
+    Instance.new("UICorner", lightBeam).CornerRadius = UDim.new(0, 10)
 
     local beamGrad = Instance.new("UIGradient", lightBeam)
     beamGrad.Rotation = 45
@@ -287,7 +293,7 @@ local function CreateGradientPanel(parent, size, pos, name)
     
     beamGrad.Transparency = NumberSequence.new({
         NumberSequenceKeypoint.new(0, 1),
-        NumberSequenceKeypoint.new(0.5, 0.96),
+        NumberSequenceKeypoint.new(0.5, 0.94),
         NumberSequenceKeypoint.new(1, 1)
     })
 
@@ -303,8 +309,9 @@ local function CreateGradientPanel(parent, size, pos, name)
     return panel
 end
 
-local LeftPanel = CreateGradientPanel(mainFrame, UDim2.new(0, 165, 1, 0), UDim2.new(0, 0, 0, 0), "LeftPanel")
-local RightPanel = CreateGradientPanel(mainFrame, UDim2.new(1, -180, 1, 0), UDim2.new(0, 180, 0, 0), "RightPanel")
+-- Divisão dos painéis otimizada para o novo tamanho
+local LeftPanel = CreateGradientPanel(mainFrame, UDim2.new(0, 175, 1, 0), UDim2.new(0, 0, 0, 0), "LeftPanel")
+local RightPanel = CreateGradientPanel(mainFrame, UDim2.new(1, -190, 1, 0), UDim2.new(0, 190, 0, 0), "RightPanel")
 
 -- ==================== LEFT PANEL CONTENT ====================
 local LeftSeparatorLine = Instance.new("Frame", LeftPanel.InnerBg)
@@ -347,7 +354,8 @@ subtitle.ZIndex = 11
 
 local TabsContainer = Instance.new("ScrollingFrame", LeftPanel.InnerBg)
 TabsContainer.Name = "TabsContainer"
-TabsContainer.Size = UDim2.new(1, 0, 1, -94)
+-- Otimizado para o grande tamanho do badge
+TabsContainer.Size = UDim2.new(1, 0, 1, -114)
 TabsContainer.Position = UDim2.new(0, 0, 0, 44)
 TabsContainer.BackgroundTransparency = 1
 TabsContainer.BorderSizePixel = 0
@@ -367,9 +375,10 @@ TabsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     TabsContainer.CanvasSize = UDim2.new(0, 0, 0, TabsLayout.AbsoluteContentSize.Y + 8)
 end)
 
+-- BADGE MAIOR (Altura aumentada para 60 e posicionamento reajustado)
 local UserProfileFrame = Instance.new("Frame", LeftPanel.InnerBg)
-UserProfileFrame.Size = UDim2.new(1, -12, 0, 44)
-UserProfileFrame.Position = UDim2.new(0, 6, 1, -50)
+UserProfileFrame.Size = UDim2.new(1, -12, 0, 60)
+UserProfileFrame.Position = UDim2.new(0, 6, 1, -66)
 UserProfileFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
 UserProfileFrame.BackgroundTransparency = 0.4
 UserProfileFrame.BorderSizePixel = 0
@@ -383,41 +392,42 @@ userGrad.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(1, Color3.fromRGB(5, 5, 5))
 })
 
+-- FOTO DE PERFIL BASTANTE AUMENTADA
 local AvatarImage = Instance.new("ImageLabel", UserProfileFrame)
-AvatarImage.Size = UDim2.new(0, 28, 0, 28)
-AvatarImage.Position = UDim2.new(0, 6, 0.5, -14)
+AvatarImage.Size = UDim2.new(0, 42, 0, 42)
+AvatarImage.Position = UDim2.new(0, 8, 0.5, -21)
 AvatarImage.BackgroundTransparency = 1
 AvatarImage.Image = "rbxthumb://type=AvatarHeadShot&id=" .. player.UserId .. "&w=150&h=150"
 AvatarImage.ZIndex = 11
 Instance.new("UICorner", AvatarImage).CornerRadius = UDim.new(1, 0)
 
 local DisplayNameLabel = Instance.new("TextLabel", UserProfileFrame)
-DisplayNameLabel.Size = UDim2.new(1, -62, 0, 13)
-DisplayNameLabel.Position = UDim2.new(0, 38, 0.5, -12)
+DisplayNameLabel.Size = UDim2.new(1, -84, 0, 16)
+DisplayNameLabel.Position = UDim2.new(0, 58, 0.5, -16)
 DisplayNameLabel.BackgroundTransparency = 1
 DisplayNameLabel.Text = player.DisplayName
 DisplayNameLabel.TextColor3 = Color3.fromRGB(235, 235, 235)
 DisplayNameLabel.Font = Enum.Font.GothamBold
-DisplayNameLabel.TextSize = 9.5
+DisplayNameLabel.TextSize = 11
 DisplayNameLabel.TextXAlignment = Enum.TextXAlignment.Left
 DisplayNameLabel.TextTruncate = Enum.TextTruncate.AtEnd
 DisplayNameLabel.ZIndex = 11
 
 local UsernameLabel = Instance.new("TextLabel", UserProfileFrame)
-UsernameLabel.Size = UDim2.new(1, -62, 0, 11)
-UsernameLabel.Position = UDim2.new(0, 38, 0.5, 1)
+UsernameLabel.Size = UDim2.new(1, -84, 0, 14)
+UsernameLabel.Position = UDim2.new(0, 58, 0.5, 2)
 UsernameLabel.BackgroundTransparency = 1
 UsernameLabel.Text = "@" .. player.Name
 UsernameLabel.TextColor3 = Color3.fromRGB(140, 140, 140)
 UsernameLabel.Font = Enum.Font.Gotham
-UsernameLabel.TextSize = 8.5
+UsernameLabel.TextSize = 10
 UsernameLabel.TextXAlignment = Enum.TextXAlignment.Left
 UsernameLabel.TextTruncate = Enum.TextTruncate.AtEnd
 UsernameLabel.ZIndex = 11
 
 local PrivacyBtn = Instance.new("ImageButton", UserProfileFrame)
 PrivacyBtn.Size = UDim2.new(0, 20, 0, 20)
-PrivacyBtn.Position = UDim2.new(1, -24, 0.5, -10)
+PrivacyBtn.Position = UDim2.new(1, -26, 0.5, -10)
 PrivacyBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 PrivacyBtn.BackgroundTransparency = 0.2
 PrivacyBtn.ZIndex = 12
@@ -516,7 +526,6 @@ searchTextBox.TextXAlignment = Enum.TextXAlignment.Left
 searchTextBox.Visible = false
 searchTextBox.ZIndex = 12
 
--- Posição trocada: Minimizar (-) agora fica ANTES de Maximizar (□)
 local MinimizeBtn = Instance.new("TextButton", ControlsFrame)
 MinimizeBtn.Name = "MinimizeBtn"
 MinimizeBtn.LayoutOrder = 2
@@ -591,7 +600,6 @@ RightSeparatorLine.BackgroundColor3 = Color3.fromRGB(80, 20, 25)
 RightSeparatorLine.BorderSizePixel = 0
 RightSeparatorLine.ZIndex = 10
 
--- BADGE com Gradient Forte de Vermelho Normal para Vermelho Escuro
 local BadgeFrame = Instance.new("Frame", RightPanel.InnerBg)
 BadgeFrame.Name = "BadgeFrame"
 BadgeFrame.Size = UDim2.new(0, 56, 0, 18)
@@ -617,7 +625,6 @@ BadgeText.Font = Enum.Font.GothamBold
 BadgeText.TextSize = 9
 BadgeText.ZIndex = 16
 
--- Scrollbar do Painel Direito Otimizada
 local togglesContainer = Instance.new("ScrollingFrame", RightPanel.InnerBg)
 togglesContainer.Name = "TogglesContainer"
 togglesContainer.Size = UDim2.new(1, -6, 1, -48)
@@ -642,7 +649,6 @@ uiPadding.PaddingBottom = UDim.new(0, 8)
 uiPadding.PaddingLeft = UDim.new(0, 4)
 uiPadding.PaddingRight = UDim.new(0, 8)
 
--- Mantém a Scrollbar SEMPRE visível mesmo com poucas opções
 local function UpdateCanvasSize()
     local contentHeight = containerLayout.AbsoluteContentSize.Y + 24
     local minHeight = togglesContainer.AbsoluteSize.Y + 1
@@ -652,12 +658,12 @@ end
 containerLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(UpdateCanvasSize)
 togglesContainer:GetPropertyChangedSignal("AbsoluteSize"):Connect(UpdateCanvasSize)
 
--- Confirm Frame
+-- Confirm Frame Focado e com fundo mais forte
 local confirmFrame = Instance.new("Frame", mainFrame)
 confirmFrame.Name = "ConfirmFrame"
 confirmFrame.Size = UDim2.new(1, 0, 1, 0)
 confirmFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-confirmFrame.BackgroundTransparency = 0.4
+confirmFrame.BackgroundTransparency = 0.2
 confirmFrame.Visible = false
 confirmFrame.ZIndex = 50
 Instance.new("UICorner", confirmFrame).CornerRadius = UDim.new(0, 9)
@@ -948,9 +954,10 @@ UserInputService.InputBegan:Connect(function(input)
     end
 end)
 
+-- COMPORTAMENTO EXPANDIR REFORMULADO
 ExpandBtn.MouseButton1Click:Connect(function()
     isExpanded = not isExpanded
-    local newSize = isExpanded and UDim2.new(0, 620, 0, 380) or UDim2.new(0, 535, 0, 300)
+    local newSize = isExpanded and UDim2.new(0, 800, 0, 460) or UDim2.new(0, 560, 0, 315)
     TweenService:Create(mainWrapper, TweenInfo.new(0.3, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {Size = newSize}):Play()
 end)
 
@@ -967,7 +974,7 @@ SetUIState = function(newState)
         AplicarFadeSincronizado(mainWrapper, true, 0)
         AplicarFadeSincronizado(mainWrapper, false, tempoAnim)
         
-        local openTween = TweenService:Create(mainWrapper, windowAnim, {Size = isExpanded and UDim2.new(0, 620, 0, 380) or UDim2.new(0, 535, 0, 300)})
+        local openTween = TweenService:Create(mainWrapper, windowAnim, {Size = isExpanded and UDim2.new(0, 800, 0, 460) or UDim2.new(0, 560, 0, 315)})
         openTween:Play()
         openTween.Completed:Connect(function()
             UIState = "OPEN"
@@ -990,7 +997,7 @@ MinimizeBtn.MouseButton1Click:Connect(function()
     SetUIState("MINIMIZED")
 end)
 
--- Confirmação de fechar com Blur Intenso (Size = 35)
+-- Confirmação de fechar com Blur MÁXIMO E INTENSO
 local function AlternarConfirmacao(exibir)
     isConfirmOpen = exibir
     local tempoAnim = 0.15
@@ -999,7 +1006,7 @@ local function AlternarConfirmacao(exibir)
         confirmFrame.Visible = true
         AplicarFadeSincronizado(confirmFrame, true, 0)
         AplicarFadeSincronizado(confirmFrame, false, tempoAnim)
-        TweenService:Create(confirmBlur, TweenInfo.new(tempoAnim, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {Size = 35}):Play()
+        TweenService:Create(confirmBlur, TweenInfo.new(tempoAnim, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {Size = 56}):Play() -- Blur na proporção máxima
     else
         AplicarFadeSincronizado(confirmFrame, true, tempoAnim)
         if confirmBlur then 
@@ -1022,9 +1029,10 @@ btnYes.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
--- Animação perfeitamente sincronizada para o botão minimizar e os demais controles
+-- Animação perfeitamente sincronizada corrigida para evitar "quadrados" durante o close
 local function AplicarEfeitoFisicoBotao(btn, hoverColor)
     btn.MouseEnter:Connect(function()
+        if UIState ~= "OPEN" then return end -- Bloqueia efeito de hover fora de hora
         TweenService:Create(btn, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = Color3.fromRGB(30, 30, 30), BackgroundTransparency = 0.1}):Play()
         if btn.Name == "ExpandBtn" then TweenService:Create(ExpandStroke, TweenInfo.new(0.15), {Color = hoverColor}):Play()
         elseif btn.Name == "MinimizeBtn" then TweenService:Create(MinimizeLine, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play()
@@ -1032,6 +1040,7 @@ local function AplicarEfeitoFisicoBotao(btn, hoverColor)
         elseif btn.Name == "CloseBtn" then TweenService:Create(CloseLine1, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play(); TweenService:Create(CloseLine2, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play() end
     end)
     btn.MouseLeave:Connect(function()
+        if UIState ~= "OPEN" then return end -- Permite que AplicarFadeSincronizado comande o encerramento em paz
         TweenService:Create(btn, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = Color3.fromRGB(15, 15, 15), BackgroundTransparency = 0.3}):Play()
         if btn.Name == "ExpandBtn" then TweenService:Create(ExpandStroke, TweenInfo.new(0.15), {Color = Color3.fromHex("#A0A0A0")}):Play()
         elseif btn.Name == "MinimizeBtn" then TweenService:Create(MinimizeLine, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play()
