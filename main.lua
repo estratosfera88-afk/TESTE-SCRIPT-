@@ -248,7 +248,6 @@ local function CreateGradientPanel(parent, size, pos, name)
     local InnerBg = Instance.new("Frame", panel)
     InnerBg.Name = "InnerBg"
     InnerBg.Size = UDim2.new(1, 0, 1, 0)
-    -- FUNDO 100% OPACO E SÓLIDO (Bloqueia totalmente a visão do jogo)
     InnerBg.BackgroundColor3 = Color3.fromRGB(15, 0, 3)
     InnerBg.BackgroundTransparency = 0 
     InnerBg.BorderSizePixel = 0
@@ -260,18 +259,17 @@ local function CreateGradientPanel(parent, size, pos, name)
     overlay.Name = "RedGradientOverlay"
     overlay.Size = UDim2.new(1, 0, 1, 0)
     overlay.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    overlay.BackgroundTransparency = 0 -- CAMADA 100% OPACA
+    overlay.BackgroundTransparency = 0
     overlay.BorderSizePixel = 0
     overlay.ZIndex = 5
     Instance.new("UICorner", overlay).CornerRadius = UDim.new(0, 10)
 
     local redGrad = Instance.new("UIGradient", overlay)
     redGrad.Rotation = 90
-    -- Transições fluidas e intensas, sem transparência para não revelar o mapa
     redGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(25, 0, 5)),     -- vermelho escuro profundo
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(160, 10, 20)),-- vermelho intenso
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(25, 0, 5))      -- vermelho escuro profundo
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(25, 0, 5)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(160, 10, 20)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(25, 0, 5))
     })
 
     -- ================= LIQUID AURORA BLOBS =================
@@ -282,12 +280,11 @@ local function CreateGradientPanel(parent, size, pos, name)
     auroraContainer.ZIndex = 6 
     
     local blobs = {}
-    -- Mistura intensa para o efeito de "luz vermelha líquida"
     local blobConfigs = {
-        { r = 255, g = 30, b = 40, size = UDim2.new(1.8, 0, 1.8, 0), speedX = 0.15, speedY = 0.11, speedT = 0.22 }, -- Áreas de vermelho mais brilhante
-        { r = 180, g = 0,  b = 20, size = UDim2.new(1.6, 0, 1.6, 0), speedX = 0.12, speedY = 0.18, speedT = 0.16 }, -- Vermelho rubi
-        { r = 220, g = 10, b = 20, size = UDim2.new(2.0, 0, 2.0, 0), speedX = 0.08, speedY = 0.14, speedT = 0.13 }, -- Vermelho intenso
-        { r = 50,  g = 0,  b = 10, size = UDim2.new(1.5, 0, 1.5, 0), speedX = 0.18, speedY = 0.09, speedT = 0.25 }  -- Áreas de vermelho mais escuro
+        { r = 255, g = 30, b = 40, size = UDim2.new(1.8, 0, 1.8, 0), speedX = 0.15, speedY = 0.11, speedT = 0.22 },
+        { r = 180, g = 0,  b = 20, size = UDim2.new(1.6, 0, 1.6, 0), speedX = 0.12, speedY = 0.18, speedT = 0.16 },
+        { r = 220, g = 10, b = 20, size = UDim2.new(2.0, 0, 2.0, 0), speedX = 0.08, speedY = 0.14, speedT = 0.13 },
+        { r = 50,  g = 0,  b = 10, size = UDim2.new(1.5, 0, 1.5, 0), speedX = 0.18, speedY = 0.09, speedT = 0.25 }
     }
 
     for i, config in ipairs(blobConfigs) do
@@ -297,7 +294,6 @@ local function CreateGradientPanel(parent, size, pos, name)
         blob.Size = config.size
         blob.BackgroundTransparency = 1
         blob.Image = "rbxassetid://1311210086"
-        -- As luzes se misturam SOMENTE no fundo opaco da UI, formando o líquido visual
         blob.ImageTransparency = 0.4 
         blob.ZIndex = 6
         
@@ -312,8 +308,8 @@ local function CreateGradientPanel(parent, size, pos, name)
 
     RunService.RenderStepped:Connect(function()
         local t = os.clock()
-        -- Alterado para rotação contínua e sem parar (360 graus)
-        redGrad.Rotation = (t * 45) % 360
+        -- Rotação reduzida para t * 12 (muito mais suave e lenta)
+        redGrad.Rotation = (t * 12) % 360
         
         for _, data in ipairs(blobs) do
             local x = 0.5 + math.sin(t * data.cfg.speedX + data.seedX) * 0.35
@@ -333,8 +329,9 @@ local function CreateGradientPanel(parent, size, pos, name)
     return panel
 end
 
-local LeftPanel = CreateGradientPanel(mainFrame, UDim2.new(0, 175, 1, 0), UDim2.new(0, 0, 0, 0), "LeftPanel")
-local RightPanel = CreateGradientPanel(mainFrame, UDim2.new(1, -190, 1, 0), UDim2.new(0, 190, 0, 0), "RightPanel")
+-- Painel esquerdo ampliado para 200px de largura
+local LeftPanel = CreateGradientPanel(mainFrame, UDim2.new(0, 200, 1, 0), UDim2.new(0, 0, 0, 0), "LeftPanel")
+local RightPanel = CreateGradientPanel(mainFrame, UDim2.new(1, -215, 1, 0), UDim2.new(0, 215, 0, 0), "RightPanel")
 
 -- ==================== LEFT PANEL CONTENT ====================
 local LeftSeparatorLine = Instance.new("Frame", LeftPanel.InnerBg)
@@ -384,19 +381,25 @@ TabsContainer.BackgroundTransparency = 1
 TabsContainer.BorderSizePixel = 0
 TabsContainer.ZIndex = 10
 TabsContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
-TabsContainer.ScrollBarThickness = 2
+TabsContainer.ScrollBarThickness = 3
 TabsContainer.ScrollBarImageColor3 = Color3.fromRGB(200, 50, 50)
 TabsContainer.ScrollBarImageTransparency = 0.2
 TabsContainer.VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar
-TabsContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y
 
 local TabsLayout = Instance.new("UIListLayout", TabsContainer)
 TabsLayout.SortOrder = Enum.SortOrder.LayoutOrder
 TabsLayout.Padding = UDim.new(0, 6)
 TabsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-TabsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    TabsContainer.CanvasSize = UDim2.new(0, 0, 0, TabsLayout.AbsoluteContentSize.Y + 8)
-end)
+
+-- Força a barra de rolagem do painel esquerdo a aparecer permanentemente
+local function UpdateTabsCanvas()
+    local contentH = TabsLayout.AbsoluteContentSize.Y + 8
+    local minH = TabsContainer.AbsoluteSize.Y + 12
+    TabsContainer.CanvasSize = UDim2.new(0, 0, 0, math.max(contentH, minH))
+end
+
+TabsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(UpdateTabsCanvas)
+TabsContainer:GetPropertyChangedSignal("AbsoluteSize"):Connect(UpdateTabsCanvas)
 
 local UserProfileFrame = Instance.new("Frame", LeftPanel.InnerBg)
 UserProfileFrame.Size = UDim2.new(1, -12, 0, 75)
@@ -423,8 +426,8 @@ AvatarImage.ZIndex = 11
 Instance.new("UICorner", AvatarImage).CornerRadius = UDim.new(1, 0)
 
 local DisplayNameLabel = Instance.new("TextLabel", UserProfileFrame)
-DisplayNameLabel.Size = UDim2.new(1, -84, 0, 16)
-DisplayNameLabel.Position = UDim2.new(0, 66, 0.5, -18)
+DisplayNameLabel.Size = UDim2.new(1, -94, 0, 16)
+DisplayNameLabel.Position = UDim2.new(0, 64, 0.5, -18)
 DisplayNameLabel.BackgroundTransparency = 1
 DisplayNameLabel.Text = player.DisplayName
 DisplayNameLabel.TextColor3 = Color3.fromRGB(235, 235, 235)
@@ -435,8 +438,8 @@ DisplayNameLabel.TextTruncate = Enum.TextTruncate.AtEnd
 DisplayNameLabel.ZIndex = 11
 
 local UsernameLabel = Instance.new("TextLabel", UserProfileFrame)
-UsernameLabel.Size = UDim2.new(1, -84, 0, 14)
-UsernameLabel.Position = UDim2.new(0, 66, 0.5, 2)
+UsernameLabel.Size = UDim2.new(1, -94, 0, 14)
+UsernameLabel.Position = UDim2.new(0, 64, 0.5, 2)
 UsernameLabel.BackgroundTransparency = 1
 UsernameLabel.Text = "@" .. player.Name
 UsernameLabel.TextColor3 = Color3.fromRGB(140, 140, 140)
@@ -446,20 +449,29 @@ UsernameLabel.TextXAlignment = Enum.TextXAlignment.Left
 UsernameLabel.TextTruncate = Enum.TextTruncate.AtEnd
 UsernameLabel.ZIndex = 11
 
+-- Botão de censura com o estilo da Badge (Vermelho gradiente Akatsuki)
 local PrivacyBtn = Instance.new("ImageButton", UserProfileFrame)
 PrivacyBtn.Size = UDim2.new(0, 24, 0, 24)
 PrivacyBtn.Position = UDim2.new(1, -28, 0, 4)
-PrivacyBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-PrivacyBtn.BackgroundTransparency = 0.2
+PrivacyBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+PrivacyBtn.BackgroundTransparency = 0
+PrivacyBtn.BorderSizePixel = 0
 PrivacyBtn.ZIndex = 12
 Instance.new("UICorner", PrivacyBtn).CornerRadius = UDim.new(0, 6)
+
+local privGrad = Instance.new("UIGradient", PrivacyBtn)
+privGrad.Rotation = 45
+privGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(230, 20, 25)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 0, 0))
+})
 
 local PrivacyIcon = Instance.new("ImageLabel", PrivacyBtn)
 PrivacyIcon.Size = UDim2.new(1, -6, 1, -6)
 PrivacyIcon.Position = UDim2.new(0, 3, 0, 3)
 PrivacyIcon.BackgroundTransparency = 1
 PrivacyIcon.Image = "rbxthumb://type=Asset&id=103096515071530&w=150&h=150"
-PrivacyIcon.ImageColor3 = Color3.fromRGB(220, 220, 220)
+PrivacyIcon.ImageColor3 = Color3.fromRGB(255, 255, 255)
 PrivacyIcon.ZIndex = 13
 
 local isPrivate = false
@@ -623,10 +635,11 @@ RightSeparatorLine.BackgroundTransparency = 0.5
 RightSeparatorLine.BorderSizePixel = 0
 RightSeparatorLine.ZIndex = 10
 
+-- Badge do usuário com largura aumentada (68px)
 local BadgeFrame = Instance.new("Frame", RightPanel.InnerBg)
 BadgeFrame.Name = "BadgeFrame"
-BadgeFrame.Size = UDim2.new(0, 48, 0, 16)
-BadgeFrame.Position = UDim2.new(0, 12, 0, 10)
+BadgeFrame.Size = UDim2.new(0, 68, 0, 18)
+BadgeFrame.Position = UDim2.new(0, 12, 0, 9)
 BadgeFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 BadgeFrame.BorderSizePixel = 0
 BadgeFrame.ZIndex = 15
@@ -645,7 +658,7 @@ BadgeText.BackgroundTransparency = 1
 BadgeText.Text = "UI V3.8"
 BadgeText.TextColor3 = Color3.fromRGB(255, 255, 255)
 BadgeText.Font = Enum.Font.GothamBold
-BadgeText.TextSize = 8.5
+BadgeText.TextSize = 9
 BadgeText.ZIndex = 16
 
 local togglesContainer = Instance.new("ScrollingFrame", RightPanel.InnerBg)
@@ -777,6 +790,8 @@ local function selectTab(tabName)
             if iconContainer and iconContainer:FindFirstChild("AccentImage") then
                 TweenService:Create(iconContainer.AccentImage, animSpeed, {ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
             end
+            -- Atualiza transparência registrada para não sumir ao ocultar/reabrir UI
+            originalTrans[btn] = { BackgroundTransparency = 0.4, TextTransparency = 0 }
         else
             TweenService:Create(btn, animSpeed, {BackgroundColor3 = Color3.fromRGB(15, 15, 15), BackgroundTransparency = 1}):Play()
             if label then TweenService:Create(label, animSpeed, {TextColor3 = Color3.fromRGB(150, 150, 150)}):Play() end
@@ -784,6 +799,7 @@ local function selectTab(tabName)
             if iconContainer and iconContainer:FindFirstChild("AccentImage") then
                 TweenService:Create(iconContainer.AccentImage, animSpeed, {ImageColor3 = Color3.fromRGB(150, 150, 150)}):Play()
             end
+            originalTrans[btn] = { BackgroundTransparency = 1, TextTransparency = 0 }
         end
     end
     togglesContainer.CanvasPosition = Vector2.new(0, 0)
@@ -1019,6 +1035,9 @@ end
 
 MinimizeBtn.MouseButton1Click:Connect(function() 
     PlayUI_Click()
+    -- Reseta a cor do botão ao clicar para não ficar travado em hover
+    TweenService:Create(MinimizeBtn, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = Color3.fromRGB(15, 15, 15), BackgroundTransparency = 0.3}):Play()
+    TweenService:Create(MinimizeLine, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play()
     SetUIState("MINIMIZED")
 end)
 
