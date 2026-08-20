@@ -256,13 +256,21 @@ local function CreateGradientPanel(parent, size, pos, name)
     Instance.new("UICorner", InnerBg).CornerRadius = UDim.new(0, 10)
     
     local overlay = Instance.new("Frame", InnerBg)
-    overlay.Name = "ColorOverlay"
+    overlay.Name = "RedGradientOverlay"
     overlay.Size = UDim2.new(1, 0, 1, 0)
-    overlay.BackgroundColor3 = Color3.fromRGB(25, 0, 5)
+    overlay.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     overlay.BackgroundTransparency = 0
     overlay.BorderSizePixel = 0
     overlay.ZIndex = 5
     Instance.new("UICorner", overlay).CornerRadius = UDim.new(0, 10)
+
+    local redGrad = Instance.new("UIGradient", overlay)
+    redGrad.Rotation = 90
+    redGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(25, 0, 5)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(160, 10, 20)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(25, 0, 5))
+    })
 
     -- ================= LIQUID AURORA BLOBS =================
     local auroraContainer = Instance.new("Frame", InnerBg)
@@ -300,9 +308,7 @@ local function CreateGradientPanel(parent, size, pos, name)
 
     RunService.RenderStepped:Connect(function()
         local t = os.clock()
-        
-        -- Efeito da cor girando suave (Muda o Hue progressivamente ao longo do tempo sem linhas de corte)
-        overlay.BackgroundColor3 = Color3.fromHSV((t * 0.1) % 1, 0.8, 0.4)
+        redGrad.Rotation = (t * 12) % 360
         
         for _, data in ipairs(blobs) do
             local x = 0.5 + math.sin(t * data.cfg.speedX + data.seedX) * 0.35
@@ -358,8 +364,8 @@ subtitle.AnchorPoint = Vector2.new(0.5, 0)
 subtitle.Position = UDim2.new(0.5, 0, 0, 20)
 subtitle.BackgroundTransparency = 1
 subtitle.Text = "MM2 SCRIPT | by zeni <3"
-subtitle.TextColor3 = Color3.fromRGB(150, 150, 150)
-subtitle.TextTransparency = 0.2
+subtitle.TextColor3 = Color3.fromRGB(150, 150, 150) -- Cor alterada para cinza
+subtitle.TextTransparency = 0
 subtitle.TextSize = 9.5
 subtitle.Font = Enum.Font.Gotham
 subtitle.TextXAlignment = Enum.TextXAlignment.Center
@@ -380,7 +386,7 @@ TabsContainer.VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar
 
 local TabsLayout = Instance.new("UIListLayout", TabsContainer)
 TabsLayout.SortOrder = Enum.SortOrder.LayoutOrder
-TabsLayout.Padding = UDim.new(0, 2) 
+TabsLayout.Padding = UDim.new(0, 2)
 TabsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
 local function UpdateTabsCanvas()
@@ -440,15 +446,24 @@ UsernameLabel.TextXAlignment = Enum.TextXAlignment.Left
 UsernameLabel.TextTruncate = Enum.TextTruncate.AtEnd
 UsernameLabel.ZIndex = 11
 
--- Botão de censura (fundo transparente sem gradient)
+-- Botão de censura
 local PrivacyBtn = Instance.new("ImageButton", UserProfileFrame)
 PrivacyBtn.Size = UDim2.new(0, 24, 0, 24)
 PrivacyBtn.Position = UDim2.new(1, -28, 0, 4)
 PrivacyBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-PrivacyBtn.BackgroundTransparency = 1 
+PrivacyBtn.BackgroundTransparency = 0 -- O fundo base agora é 0 para o gradient funcionar com a própria transparência
 PrivacyBtn.BorderSizePixel = 0
 PrivacyBtn.ZIndex = 12
 Instance.new("UICorner", PrivacyBtn).CornerRadius = UDim.new(0, 6)
+
+local privGrad = Instance.new("UIGradient", PrivacyBtn)
+privGrad.Rotation = 45
+privGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(230, 20, 25)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 0, 0))
+})
+-- Aplicando pouca transparência diretamente ao gradient
+privGrad.Transparency = NumberSequence.new(0.4) 
 
 local PrivacyIcon = Instance.new("ImageLabel", PrivacyBtn)
 PrivacyIcon.Size = UDim2.new(1, -6, 1, -6)
@@ -462,8 +477,7 @@ local isPrivate = false
 PrivacyBtn.MouseButton1Click:Connect(function()
     PlayUI_Click()
     
-    -- Efeito Flash rápido no clique ajustado para transparência
-    local flashTween = TweenService:Create(PrivacyBtn, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, true), {BackgroundTransparency = 0.5})
+    local flashTween = TweenService:Create(privGrad, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, true), {Transparency = NumberSequence.new(0)})
     flashTween:Play()
 
     isPrivate = not isPrivate
@@ -624,24 +638,38 @@ RightSeparatorLine.BackgroundTransparency = 0.5
 RightSeparatorLine.BorderSizePixel = 0
 RightSeparatorLine.ZIndex = 10
 
--- Badge do usuário modificada (verde sólido sem contorno)
+-- Badge do usuário com largura ajustada para não ficar com espaços
 local BadgeFrame = Instance.new("Frame", RightPanel.InnerBg)
 BadgeFrame.Name = "BadgeFrame"
-BadgeFrame.Size = UDim2.new(0, 68, 0, 18)
+BadgeFrame.Size = UDim2.new(0, 40, 0, 18) -- Alterado de 68 para 40
 BadgeFrame.Position = UDim2.new(0, 12, 0, 9)
-BadgeFrame.BackgroundColor3 = Color3.fromRGB(40, 200, 80)
+BadgeFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 BadgeFrame.BorderSizePixel = 0
 BadgeFrame.ZIndex = 15
 Instance.new("UICorner", BadgeFrame).CornerRadius = UDim.new(1, 0)
 
+local badgeGrad = Instance.new("UIGradient", BadgeFrame)
+badgeGrad.Rotation = 45
+badgeGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(230, 20, 25)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 0, 0))
+})
+
 local BadgeText = Instance.new("TextLabel", BadgeFrame)
 BadgeText.Size = UDim2.new(1, 0, 1, 0)
 BadgeText.BackgroundTransparency = 1
-BadgeText.Text = "v3.6"
+BadgeText.Text = "V3.6" -- Alterado de "UI V3.8"
 BadgeText.TextColor3 = Color3.fromRGB(255, 255, 255)
 BadgeText.Font = Enum.Font.GothamBold
 BadgeText.TextSize = 9
 BadgeText.ZIndex = 16
+
+-- Contorno transparente na cor da UI
+local BadgeStroke = Instance.new("UIStroke", BadgeFrame)
+BadgeStroke.Color = Color3.fromRGB(230, 20, 25)
+BadgeStroke.Transparency = 0.7
+BadgeStroke.Thickness = 1.5
+BadgeStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
 local togglesContainer = Instance.new("ScrollingFrame", RightPanel.InnerBg)
 togglesContainer.Name = "TogglesContainer"
@@ -1102,7 +1130,9 @@ local function ExecutarIntroAkat()
     local IntroFrame = Instance.new("Frame", screenGui); IntroFrame.Size = UDim2.new(1, 0, 1, 0); IntroFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0); IntroFrame.BackgroundTransparency = 1; IntroFrame.ZIndex = 500
     local MaskContainer = Instance.new("Frame", IntroFrame); MaskContainer.AnchorPoint = Vector2.new(0.5, 0.5); MaskContainer.Position = UDim2.new(0.5, 0, 0.5, -10); MaskContainer.Size = UDim2.new(0, 420, 0, 40); MaskContainer.BackgroundTransparency = 1; MaskContainer.ClipsDescendants = true; MaskContainer.ZIndex = 501
     local IntroText = Instance.new("TextLabel", MaskContainer); IntroText.Size = UDim2.new(1, 0, 1, 0); IntroText.Position = UDim2.new(0, 0, 1, 0); IntroText.BackgroundTransparency = 1; IntroText.Font = Enum.Font.GothamBold; IntroText.TextSize = 26; IntroText.RichText = true; IntroText.Text = UI_TEXT.Intro; IntroText.ZIndex = 502
-    local IntroLine = Instance.new("Frame", IntroFrame); IntroLine.AnchorPoint = Vector2.new(0.5, 0.5); IntroLine.Position = UDim2.new(0.5, 0, 0.5, 22); IntroLine.Size = UDim2.new(0, 0, 0, 2); IntroLine.BackgroundColor3 = Color3.fromHex("#8B0000"); IntroLine.BorderSizePixel = 0; IntroLine.BackgroundTransparency = 1; IntroLine.ZIndex = 503; Instance.new("UICorner", IntroLine).CornerRadius = UDim.new(1, 0)
+    
+    -- Aqui aproximamos a linha vermelha da Intro alterando o Y de 22 para 12
+    local IntroLine = Instance.new("Frame", IntroFrame); IntroLine.AnchorPoint = Vector2.new(0.5, 0.5); IntroLine.Position = UDim2.new(0.5, 0, 0.5, 12); IntroLine.Size = UDim2.new(0, 0, 0, 2); IntroLine.BackgroundColor3 = Color3.fromHex("#8B0000"); IntroLine.BorderSizePixel = 0; IntroLine.BackgroundTransparency = 1; IntroLine.ZIndex = 503; Instance.new("UICorner", IntroLine).CornerRadius = UDim.new(1, 0)
 
     TweenService:Create(IntroFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0.05}):Play()
     TweenService:Create(Blur, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = 24}):Play(); task.wait(0.1)
