@@ -1,4 +1,4 @@
--- [[ AKATSUKI UI ONLY [v3.8] - FIXED & IMPROVED (LIQUID AURORA EDITION) ]]
+-- [[ AKATSUKI UI ONLY [v3.8] - FIXED & IMPROVED (LIQUID RED GLASS EDITION) ]]
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -131,7 +131,6 @@ FloatBtn.ZIndex = 100
 FloatBtn.ClipsDescendants = false
 if not FloatBtn:FindFirstChildOfClass("UICorner") then Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(0, 8) end
 
--- Som de Abertura pelo Botão Flutuante
 local FloatOpenSound = FloatBtn:FindFirstChild("FloatOpenSound") or Instance.new("Sound", FloatBtn)
 FloatOpenSound.Name = "FloatOpenSound"
 FloatOpenSound.SoundId = "rbxassetid://6310837681"
@@ -243,13 +242,15 @@ local function CreateGradientPanel(parent, size, pos, name)
     outerGrad.Rotation = 45
     outerGrad.Color = ColorSequence.new({
         ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(140, 0, 0))
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(180, 20, 30))
     })
 
     local InnerBg = Instance.new("Frame", panel)
     InnerBg.Name = "InnerBg"
     InnerBg.Size = UDim2.new(1, 0, 1, 0)
-    InnerBg.BackgroundColor3 = Color3.fromRGB(15, 2, 4) -- Fundo predominante vermelho bem escuro
+    -- Tonalidade escura e altamente transparente para criar o efeito "Vidro" e revelar o fundo
+    InnerBg.BackgroundColor3 = Color3.fromRGB(20, 0, 5)
+    InnerBg.BackgroundTransparency = 0.7 
     InnerBg.BorderSizePixel = 0
     InnerBg.ClipsDescendants = true
     InnerBg.ZIndex = 5
@@ -265,15 +266,17 @@ local function CreateGradientPanel(parent, size, pos, name)
 
     local redGrad = Instance.new("UIGradient", overlay)
     redGrad.Rotation = 90
+    -- Cores transicionando de forma suave, sem faixas rígidas
     redGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(60, 0, 5)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(210, 10, 20)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 0, 5))
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 0, 5)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(180, 10, 20)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 0, 5))
     })
+    -- Transparência alta no gradient para atuar como uma camada leve de luz, não uma cor sólida
     redGrad.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0.35),
-        NumberSequenceKeypoint.new(0.5, 0.1),
-        NumberSequenceKeypoint.new(1, 0.35)
+        NumberSequenceKeypoint.new(0, 0.85),
+        NumberSequenceKeypoint.new(0.5, 0.7),
+        NumberSequenceKeypoint.new(1, 0.85)
     })
 
     -- ================= LIQUID AURORA BLOBS =================
@@ -281,15 +284,15 @@ local function CreateGradientPanel(parent, size, pos, name)
     auroraContainer.Name = "AuroraContainer"
     auroraContainer.Size = UDim2.new(1, 0, 1, 0)
     auroraContainer.BackgroundTransparency = 1
-    auroraContainer.ZIndex = 6 -- Fica sutilmente em cima do fundo, preenchendo a UI
+    auroraContainer.ZIndex = 6 
     
     local blobs = {}
-    -- Configuração individual para gerar movimento e profundidade naturais
+    -- Combinação profunda e orgânica de vermelhos vivos e escuros
     local blobConfigs = {
-        { r = 255, g = 30, b = 40, size = UDim2.new(1.8, 0, 1.8, 0), speedX = 0.15, speedY = 0.11, speedT = 0.22 },
-        { r = 210, g = 10, b = 25, size = UDim2.new(1.6, 0, 1.6, 0), speedX = 0.12, speedY = 0.18, speedT = 0.16 },
-        { r = 255, g = 50, b = 50, size = UDim2.new(2.0, 0, 2.0, 0), speedX = 0.08, speedY = 0.14, speedT = 0.13 },
-        { r = 160, g = 0,  b = 15, size = UDim2.new(1.5, 0, 1.5, 0), speedX = 0.18, speedY = 0.09, speedT = 0.25 }
+        { r = 255, g = 20, b = 30, size = UDim2.new(1.8, 0, 1.8, 0), speedX = 0.15, speedY = 0.11, speedT = 0.22 },
+        { r = 200, g = 10, b = 15, size = UDim2.new(1.6, 0, 1.6, 0), speedX = 0.12, speedY = 0.18, speedT = 0.16 },
+        { r = 255, g = 40, b = 40, size = UDim2.new(2.0, 0, 2.0, 0), speedX = 0.08, speedY = 0.14, speedT = 0.13 },
+        { r = 140, g = 0,  b = 10, size = UDim2.new(1.5, 0, 1.5, 0), speedX = 0.18, speedY = 0.09, speedT = 0.25 }
     }
 
     for i, config in ipairs(blobConfigs) do
@@ -298,10 +301,9 @@ local function CreateGradientPanel(parent, size, pos, name)
         blob.AnchorPoint = Vector2.new(0.5, 0.5)
         blob.Size = config.size
         blob.BackgroundTransparency = 1
-        -- Asset padrão de círculo suave/difuso no Roblox (Extremamente suave)
         blob.Image = "rbxassetid://1311210086"
-        -- Fixamos a transparência para o FadeSincronizado funcionar, e animaremos a cor!
-        blob.ImageTransparency = 0.35 
+        -- Elevada transparência para as luzes se fundirem sutilmente no vidro vermelho
+        blob.ImageTransparency = 0.6 
         blob.ZIndex = 6
         
         table.insert(blobs, {
@@ -315,17 +317,12 @@ local function CreateGradientPanel(parent, size, pos, name)
 
     RunService.RenderStepped:Connect(function()
         local t = os.clock()
-        -- Rotação sutil e orgânica do Gradient de fundo, como uma respiração lenta
         redGrad.Rotation = 90 + math.sin(t * 0.1) * 12
         
-        -- Animação fluida das manchas de luz difusa
         for _, data in ipairs(blobs) do
-            -- Posição orgânica
             local x = 0.5 + math.sin(t * data.cfg.speedX + data.seedX) * 0.35
             local y = 0.5 + math.cos(t * data.cfg.speedY + data.seedY) * 0.35
             
-            -- Para fazer o brilho "aparecer e desaparecer" gradualmente sem quebrar 
-            -- seu sistema de tween da UI, animamos a intensidade da cor RGB:
             local brightness = 0.6 + math.sin(t * data.cfg.speedT + data.seedT) * 0.4
             
             data.element.Position = UDim2.new(x, 0, y, 0)
@@ -340,7 +337,7 @@ local function CreateGradientPanel(parent, size, pos, name)
     local stroke = Instance.new("UIStroke", InnerBg)
     stroke.Color = Color3.fromRGB(255, 80, 80)
     stroke.Thickness = 1
-    stroke.Transparency = 0.5
+    stroke.Transparency = 0.6
     
     return panel
 end
@@ -413,8 +410,9 @@ end)
 local UserProfileFrame = Instance.new("Frame", LeftPanel.InnerBg)
 UserProfileFrame.Size = UDim2.new(1, -12, 0, 75)
 UserProfileFrame.Position = UDim2.new(0, 6, 1, -81)
-UserProfileFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
-UserProfileFrame.BackgroundTransparency = 0.4
+-- Ajustado levemente para fundir melhor com o vidro vermelho
+UserProfileFrame.BackgroundColor3 = Color3.fromRGB(15, 5, 5)
+UserProfileFrame.BackgroundTransparency = 0.5
 UserProfileFrame.BorderSizePixel = 0
 UserProfileFrame.ZIndex = 10
 Instance.new("UICorner", UserProfileFrame).CornerRadius = UDim.new(0, 8)
@@ -763,7 +761,7 @@ local function filterToggles(currentActiveTab, query)
                     task.delay((itemIndex - 1) * 0.02, function()
                         if not child or not child.Parent then return end
                         TweenService:Create(child, TweenInfo.new(0.2, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {
-                            Size = UDim2.new(1, -12, 0, 52), BackgroundTransparency = 0.35
+                            Size = UDim2.new(1, -12, 0, 52), BackgroundTransparency = 0.45
                         }):Play()
                         if t then TweenService:Create(t, TweenInfo.new(0.15), {TextTransparency = 0}):Play() end
                         if d then TweenService:Create(d, TweenInfo.new(0.15), {TextTransparency = 0}):Play() end
@@ -862,8 +860,9 @@ local function createToggle(parent, configKey, tabCategory)
     local toggleFrame = Instance.new("Frame")
     toggleFrame.Name = configKey
     toggleFrame.Size = UDim2.new(1, -12, 0, 52)
-    toggleFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
-    toggleFrame.BackgroundTransparency = 0.35
+    -- Ajustado para um tom escuro avermelhado para combinar com o fundo e se manter legível e translúcido
+    toggleFrame.BackgroundColor3 = Color3.fromRGB(15, 5, 5)
+    toggleFrame.BackgroundTransparency = 0.45
     toggleFrame.ZIndex = 11
     toggleFrame.ClipsDescendants = true 
     toggleFrame:SetAttribute("Tab", tabCategory)
