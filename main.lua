@@ -23,7 +23,7 @@ local Configs = {
 }
 
 -- ==================== DYNAMIC UI COMPONENT & STATE MACHINE ====================
-local UIState = "CLOSED" -- Estados: OPEN, CLOSED, MINIMIZED, OPENING, CLOSING
+local UIState = "CLOSED" 
 
 local UI_TEXT = {
     SearchPlaceholder = "Search...",
@@ -63,7 +63,6 @@ if gethui then uiParent = gethui() else pcall(function() uiParent = game:GetServ
 if uiParent:FindFirstChild("DeltaAkatUniversalUI") then pcall(function() uiParent.DeltaAkatUniversalUI:Destroy() end) end
 screenGui.Parent = uiParent
 
--- Sons de Clique Global
 local SharedClickSound = Instance.new("Sound", screenGui)
 SharedClickSound.Name = "SharedClickSound"
 SharedClickSound.SoundId = "rbxassetid://6895079853"
@@ -219,7 +218,7 @@ UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragUIToggle = false end
 end)
 
--- ==================== SOLID LIQUID RED BACKGROUND SYSTEM ====================
+-- ==================== SOLID LIQUID RED BACKGROUND SYSTEM (MODIFIED) ====================
 local function CreateGradientPanel(parent, size, pos, name)
     local panel = Instance.new("Frame", parent)
     panel.Name = name
@@ -272,57 +271,10 @@ local function CreateGradientPanel(parent, size, pos, name)
         ColorSequenceKeypoint.new(1, Color3.fromRGB(25, 0, 5))
     })
 
-    -- ================= LIQUID AURORA BLOBS =================
-    local auroraContainer = Instance.new("Frame", InnerBg)
-    auroraContainer.Name = "AuroraContainer"
-    auroraContainer.Size = UDim2.new(1, 0, 1, 0)
-    auroraContainer.BackgroundTransparency = 1
-    auroraContainer.ZIndex = 6 
-    
-    local blobs = {}
-    local blobConfigs = {
-        { r = 255, g = 30, b = 40, size = UDim2.new(1.8, 0, 1.8, 0), speedX = 0.15, speedY = 0.11, speedT = 0.22 },
-        { r = 180, g = 0,  b = 20, size = UDim2.new(1.6, 0, 1.6, 0), speedX = 0.12, speedY = 0.18, speedT = 0.16 },
-        { r = 220, g = 10, b = 20, size = UDim2.new(2.0, 0, 2.0, 0), speedX = 0.08, speedY = 0.14, speedT = 0.13 },
-        { r = 50,  g = 0,  b = 10, size = UDim2.new(1.5, 0, 1.5, 0), speedX = 0.18, speedY = 0.09, speedT = 0.25 }
-    }
-
-    for i, config in ipairs(blobConfigs) do
-        local blob = Instance.new("ImageLabel", auroraContainer)
-        blob.Name = "AuroraBlob" .. i
-        blob.AnchorPoint = Vector2.new(0.5, 0.5)
-        blob.Size = config.size
-        blob.BackgroundTransparency = 1
-        blob.Image = "rbxassetid://1311210086"
-        blob.ImageTransparency = 0.4 
-        blob.ZIndex = 6
-        
-        table.insert(blobs, {
-            element = blob,
-            cfg = config,
-            seedX = math.random() * 1000,
-            seedY = math.random() * 1000,
-            seedT = math.random() * 1000
-        })
-    end
-
+    -- Animação simplificada apenas do Gradiente (Sem Streaks/Blobs)
     RunService.RenderStepped:Connect(function()
         local t = os.clock()
         redGrad.Rotation = (t * 12) % 360
-        
-        for _, data in ipairs(blobs) do
-            local x = 0.5 + math.sin(t * data.cfg.speedX + data.seedX) * 0.35
-            local y = 0.5 + math.cos(t * data.cfg.speedY + data.seedY) * 0.35
-            
-            local brightness = 0.6 + math.sin(t * data.cfg.speedT + data.seedT) * 0.4
-            
-            data.element.Position = UDim2.new(x, 0, y, 0)
-            data.element.ImageColor3 = Color3.fromRGB(
-                math.clamp(data.cfg.r * brightness, 0, 255),
-                math.clamp(data.cfg.g * brightness, 0, 255),
-                math.clamp(data.cfg.b * brightness, 0, 255)
-            )
-        end
     end)
     
     return panel
@@ -364,8 +316,8 @@ subtitle.AnchorPoint = Vector2.new(0.5, 0)
 subtitle.Position = UDim2.new(0.5, 0, 0, 20)
 subtitle.BackgroundTransparency = 1
 subtitle.Text = "MM2 SCRIPT | by zeni <3"
-subtitle.TextColor3 = Color3.fromRGB(150, 150, 150) -- Cor alterada para cinza
-subtitle.TextTransparency = 0
+subtitle.TextColor3 = Color3.fromRGB(180, 180, 180) -- ALTERADO: Cor cinza
+subtitle.TextTransparency = 0.2
 subtitle.TextSize = 9.5
 subtitle.Font = Enum.Font.Gotham
 subtitle.TextXAlignment = Enum.TextXAlignment.Center
@@ -446,12 +398,11 @@ UsernameLabel.TextXAlignment = Enum.TextXAlignment.Left
 UsernameLabel.TextTruncate = Enum.TextTruncate.AtEnd
 UsernameLabel.ZIndex = 11
 
--- Botão de censura
 local PrivacyBtn = Instance.new("ImageButton", UserProfileFrame)
 PrivacyBtn.Size = UDim2.new(0, 24, 0, 24)
 PrivacyBtn.Position = UDim2.new(1, -28, 0, 4)
 PrivacyBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-PrivacyBtn.BackgroundTransparency = 0 -- O fundo base agora é 0 para o gradient funcionar com a própria transparência
+PrivacyBtn.BackgroundTransparency = 0.4
 PrivacyBtn.BorderSizePixel = 0
 PrivacyBtn.ZIndex = 12
 Instance.new("UICorner", PrivacyBtn).CornerRadius = UDim.new(0, 6)
@@ -462,8 +413,6 @@ privGrad.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(0, Color3.fromRGB(230, 20, 25)),
     ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 0, 0))
 })
--- Aplicando pouca transparência diretamente ao gradient
-privGrad.Transparency = NumberSequence.new(0.4) 
 
 local PrivacyIcon = Instance.new("ImageLabel", PrivacyBtn)
 PrivacyIcon.Size = UDim2.new(1, -6, 1, -6)
@@ -476,8 +425,7 @@ PrivacyIcon.ZIndex = 13
 local isPrivate = false
 PrivacyBtn.MouseButton1Click:Connect(function()
     PlayUI_Click()
-    
-    local flashTween = TweenService:Create(privGrad, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, true), {Transparency = NumberSequence.new(0)})
+    local flashTween = TweenService:Create(PrivacyBtn, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, true), {BackgroundTransparency = 0})
     flashTween:Play()
 
     isPrivate = not isPrivate
@@ -638,10 +586,10 @@ RightSeparatorLine.BackgroundTransparency = 0.5
 RightSeparatorLine.BorderSizePixel = 0
 RightSeparatorLine.ZIndex = 10
 
--- Badge do usuário com largura ajustada para não ficar com espaços
+-- Badge do usuário (MODIFICADO)
 local BadgeFrame = Instance.new("Frame", RightPanel.InnerBg)
 BadgeFrame.Name = "BadgeFrame"
-BadgeFrame.Size = UDim2.new(0, 40, 0, 18) -- Alterado de 68 para 40
+BadgeFrame.Size = UDim2.new(0, 50, 0, 18) -- ALTERADO: Largura reduzida
 BadgeFrame.Position = UDim2.new(0, 12, 0, 9)
 BadgeFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 BadgeFrame.BorderSizePixel = 0
@@ -658,13 +606,12 @@ badgeGrad.Color = ColorSequence.new({
 local BadgeText = Instance.new("TextLabel", BadgeFrame)
 BadgeText.Size = UDim2.new(1, 0, 1, 0)
 BadgeText.BackgroundTransparency = 1
-BadgeText.Text = "V3.6" -- Alterado de "UI V3.8"
+BadgeText.Text = "V3.6" -- ALTERADO: Texto para V3.6
 BadgeText.TextColor3 = Color3.fromRGB(255, 255, 255)
 BadgeText.Font = Enum.Font.GothamBold
 BadgeText.TextSize = 9
 BadgeText.ZIndex = 16
 
--- Contorno transparente na cor da UI
 local BadgeStroke = Instance.new("UIStroke", BadgeFrame)
 BadgeStroke.Color = Color3.fromRGB(230, 20, 25)
 BadgeStroke.Transparency = 0.7
@@ -1130,9 +1077,7 @@ local function ExecutarIntroAkat()
     local IntroFrame = Instance.new("Frame", screenGui); IntroFrame.Size = UDim2.new(1, 0, 1, 0); IntroFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0); IntroFrame.BackgroundTransparency = 1; IntroFrame.ZIndex = 500
     local MaskContainer = Instance.new("Frame", IntroFrame); MaskContainer.AnchorPoint = Vector2.new(0.5, 0.5); MaskContainer.Position = UDim2.new(0.5, 0, 0.5, -10); MaskContainer.Size = UDim2.new(0, 420, 0, 40); MaskContainer.BackgroundTransparency = 1; MaskContainer.ClipsDescendants = true; MaskContainer.ZIndex = 501
     local IntroText = Instance.new("TextLabel", MaskContainer); IntroText.Size = UDim2.new(1, 0, 1, 0); IntroText.Position = UDim2.new(0, 0, 1, 0); IntroText.BackgroundTransparency = 1; IntroText.Font = Enum.Font.GothamBold; IntroText.TextSize = 26; IntroText.RichText = true; IntroText.Text = UI_TEXT.Intro; IntroText.ZIndex = 502
-    
-    -- Aqui aproximamos a linha vermelha da Intro alterando o Y de 22 para 12
-    local IntroLine = Instance.new("Frame", IntroFrame); IntroLine.AnchorPoint = Vector2.new(0.5, 0.5); IntroLine.Position = UDim2.new(0.5, 0, 0.5, 12); IntroLine.Size = UDim2.new(0, 0, 0, 2); IntroLine.BackgroundColor3 = Color3.fromHex("#8B0000"); IntroLine.BorderSizePixel = 0; IntroLine.BackgroundTransparency = 1; IntroLine.ZIndex = 503; Instance.new("UICorner", IntroLine).CornerRadius = UDim.new(1, 0)
+    local IntroLine = Instance.new("Frame", IntroFrame); IntroLine.AnchorPoint = Vector2.new(0.5, 0.5); IntroLine.Position = UDim2.new(0.5, 0, 0.5, 16); IntroLine.Size = UDim2.new(0, 0, 0, 2); IntroLine.BackgroundColor3 = Color3.fromHex("#8B0000"); IntroLine.BorderSizePixel = 0; IntroLine.BackgroundTransparency = 1; IntroLine.ZIndex = 503; Instance.new("UICorner", IntroLine).CornerRadius = UDim.new(1, 0)
 
     TweenService:Create(IntroFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0.05}):Play()
     TweenService:Create(Blur, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = 24}):Play(); task.wait(0.1)
