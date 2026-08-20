@@ -1,4 +1,4 @@
--- [[ AKATSUKI UI ONLY [v3.8] - FIXED & IMPROVED (LIQUID RED GLASS EDITION) ]]
+-- [[ AKATSUKI UI ONLY [v3.8] - FIXED & IMPROVED (SOLID LIQUID RED EDITION) ]]
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -219,7 +219,7 @@ UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragUIToggle = false end
 end)
 
--- ==================== LIQUID AURORA BACKGROUND SYSTEM ====================
+-- ==================== SOLID LIQUID RED BACKGROUND SYSTEM ====================
 local function CreateGradientPanel(parent, size, pos, name)
     local panel = Instance.new("Frame", parent)
     panel.Name = name
@@ -248,9 +248,9 @@ local function CreateGradientPanel(parent, size, pos, name)
     local InnerBg = Instance.new("Frame", panel)
     InnerBg.Name = "InnerBg"
     InnerBg.Size = UDim2.new(1, 0, 1, 0)
-    -- Tonalidade escura e altamente transparente para criar o efeito "Vidro" e revelar o fundo
-    InnerBg.BackgroundColor3 = Color3.fromRGB(20, 0, 5)
-    InnerBg.BackgroundTransparency = 0.7 
+    -- FUNDO 100% OPACO E SÓLIDO (Bloqueia totalmente a visão do jogo)
+    InnerBg.BackgroundColor3 = Color3.fromRGB(15, 0, 3)
+    InnerBg.BackgroundTransparency = 0 
     InnerBg.BorderSizePixel = 0
     InnerBg.ClipsDescendants = true
     InnerBg.ZIndex = 5
@@ -260,23 +260,18 @@ local function CreateGradientPanel(parent, size, pos, name)
     overlay.Name = "RedGradientOverlay"
     overlay.Size = UDim2.new(1, 0, 1, 0)
     overlay.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    overlay.BackgroundTransparency = 0 -- CAMADA 100% OPACA
     overlay.BorderSizePixel = 0
     overlay.ZIndex = 5
     Instance.new("UICorner", overlay).CornerRadius = UDim.new(0, 10)
 
     local redGrad = Instance.new("UIGradient", overlay)
     redGrad.Rotation = 90
-    -- Cores transicionando de forma suave, sem faixas rígidas
+    -- Transições fluidas e intensas, sem transparência para não revelar o mapa
     redGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 0, 5)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(180, 10, 20)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 0, 5))
-    })
-    -- Transparência alta no gradient para atuar como uma camada leve de luz, não uma cor sólida
-    redGrad.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0.85),
-        NumberSequenceKeypoint.new(0.5, 0.7),
-        NumberSequenceKeypoint.new(1, 0.85)
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(25, 0, 5)),     -- vermelho escuro profundo
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(160, 10, 20)),-- vermelho intenso
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(25, 0, 5))      -- vermelho escuro profundo
     })
 
     -- ================= LIQUID AURORA BLOBS =================
@@ -287,12 +282,12 @@ local function CreateGradientPanel(parent, size, pos, name)
     auroraContainer.ZIndex = 6 
     
     local blobs = {}
-    -- Combinação profunda e orgânica de vermelhos vivos e escuros
+    -- Mistura intensa para o efeito de "luz vermelha líquida"
     local blobConfigs = {
-        { r = 255, g = 20, b = 30, size = UDim2.new(1.8, 0, 1.8, 0), speedX = 0.15, speedY = 0.11, speedT = 0.22 },
-        { r = 200, g = 10, b = 15, size = UDim2.new(1.6, 0, 1.6, 0), speedX = 0.12, speedY = 0.18, speedT = 0.16 },
-        { r = 255, g = 40, b = 40, size = UDim2.new(2.0, 0, 2.0, 0), speedX = 0.08, speedY = 0.14, speedT = 0.13 },
-        { r = 140, g = 0,  b = 10, size = UDim2.new(1.5, 0, 1.5, 0), speedX = 0.18, speedY = 0.09, speedT = 0.25 }
+        { r = 255, g = 30, b = 40, size = UDim2.new(1.8, 0, 1.8, 0), speedX = 0.15, speedY = 0.11, speedT = 0.22 }, -- Áreas de vermelho mais brilhante
+        { r = 180, g = 0,  b = 20, size = UDim2.new(1.6, 0, 1.6, 0), speedX = 0.12, speedY = 0.18, speedT = 0.16 }, -- Vermelho rubi
+        { r = 220, g = 10, b = 20, size = UDim2.new(2.0, 0, 2.0, 0), speedX = 0.08, speedY = 0.14, speedT = 0.13 }, -- Vermelho intenso
+        { r = 50,  g = 0,  b = 10, size = UDim2.new(1.5, 0, 1.5, 0), speedX = 0.18, speedY = 0.09, speedT = 0.25 }  -- Áreas de vermelho mais escuro
     }
 
     for i, config in ipairs(blobConfigs) do
@@ -302,8 +297,8 @@ local function CreateGradientPanel(parent, size, pos, name)
         blob.Size = config.size
         blob.BackgroundTransparency = 1
         blob.Image = "rbxassetid://1311210086"
-        -- Elevada transparência para as luzes se fundirem sutilmente no vidro vermelho
-        blob.ImageTransparency = 0.6 
+        -- As luzes se misturam SOMENTE no fundo opaco da UI, formando o líquido visual
+        blob.ImageTransparency = 0.4 
         blob.ZIndex = 6
         
         table.insert(blobs, {
@@ -333,11 +328,6 @@ local function CreateGradientPanel(parent, size, pos, name)
             )
         end
     end)
-    
-    local stroke = Instance.new("UIStroke", InnerBg)
-    stroke.Color = Color3.fromRGB(255, 80, 80)
-    stroke.Thickness = 1
-    stroke.Transparency = 0.6
     
     return panel
 end
@@ -410,7 +400,6 @@ end)
 local UserProfileFrame = Instance.new("Frame", LeftPanel.InnerBg)
 UserProfileFrame.Size = UDim2.new(1, -12, 0, 75)
 UserProfileFrame.Position = UDim2.new(0, 6, 1, -81)
--- Ajustado levemente para fundir melhor com o vidro vermelho
 UserProfileFrame.BackgroundColor3 = Color3.fromRGB(15, 5, 5)
 UserProfileFrame.BackgroundTransparency = 0.5
 UserProfileFrame.BorderSizePixel = 0
@@ -860,7 +849,6 @@ local function createToggle(parent, configKey, tabCategory)
     local toggleFrame = Instance.new("Frame")
     toggleFrame.Name = configKey
     toggleFrame.Size = UDim2.new(1, -12, 0, 52)
-    -- Ajustado para um tom escuro avermelhado para combinar com o fundo e se manter legível e translúcido
     toggleFrame.BackgroundColor3 = Color3.fromRGB(15, 5, 5)
     toggleFrame.BackgroundTransparency = 0.45
     toggleFrame.ZIndex = 11
