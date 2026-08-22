@@ -1,9 +1,6 @@
 -- =====================================================================
 -- [[ AKATSUKI BLOX FRUITS SCRIPT [v3.6] - AUTO FARM | PVP | RAID | TP ]]
 -- =====================================================================
--- AVISO: Este script é apenas para fins educacionais.
--- Use por sua própria conta e risco.
--- =====================================================================
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -14,6 +11,7 @@ local ContentProvider = game:GetService("ContentProvider")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
@@ -41,8 +39,6 @@ local Configs = {
     RaidInstant     = false,
     RaidESP         = false,
 
-    -- Teleports (controlados por botões, não toggles)
-
     -- Visuais
     PlayerESP       = false,
     FruitESP        = false,
@@ -61,9 +57,10 @@ local selectedMob = "Lowest Level Mob"
 local selectedBoss = "None"
 local farmSafeDistance = 15
 
--- ==================== VARIÁVEIS DE PVP ====================
+-- ==================== VARIÁVEIS DE PVP E SISTEMA ====================
 local pvpTarget = nil
 local aimbotConnection = nil
+local antiFlinchConn = nil
 local camera = Workspace.CurrentCamera
 
 -- ==================== ESP ====================
@@ -104,18 +101,22 @@ local Teleports = {
 }
 
 -- ==================== UTILITÁRIOS ====================
+local function CharacterReady()
+    character = player.Character
+    if not character then return false end
+    humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    humanoid = character:FindFirstChild("Humanoid")
+    return humanoidRootPart ~= nil and humanoid ~= nil and humanoid.Health > 0
+end
+
 local function SafeTeleport(pos)
-    if not character or not humanoidRootPart then
-        character = player.Character
-        if not character then return end
-        humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-        if not humanoidRootPart then return end
-    end
+    if not CharacterReady() then return end
     humanoidRootPart.CFrame = CFrame.new(pos)
 end
 
 local function GetClosestPlayer(maxDist)
     local closest, dist = nil, maxDist or 500
+    if not CharacterReady() then return nil end
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= player and p.Character then
             local hrp = p.Character:FindFirstChild("HumanoidRootPart")
@@ -131,6 +132,7 @@ end
 
 local function GetClosestEnemy(maxDist)
     local closest, dist = nil, maxDist or 100
+    if not CharacterReady() then return nil end
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if obj:IsA("Model") and obj ~= character then
             local hum = obj:FindFirstChild("Humanoid")
@@ -144,14 +146,6 @@ local function GetClosestEnemy(maxDist)
     return closest
 end
 
-local function CharacterReady()
-    character = player.Character
-    if not character then return false end
-    humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-    humanoid = character:FindFirstChild("Humanoid")
-    return humanoidRootPart ~= nil and humanoid ~= nil and humanoid.Health > 0
-end
-
 -- ==================== AUTO FARM ====================
 local function StartAutoFarm()
     if farmLoop then farmLoop = false; task.wait(0.1) end
@@ -163,18 +157,12 @@ local function StartAutoFarm()
             if enemy then
                 local hrp = enemy.HRP
                 local pos = hrp.Position + Vector3.new(0, 3, 0)
-                -- Teleporta atrás do mob para evitar glitch
                 humanoidRootPart.CFrame = CFrame.new(pos - (hrp.CFrame.LookVector * farmSafeDistance))
                 task.wait(0.08)
-                -- Ataca usando skills disponíveis (simula clique)
                 local tool = character:FindFirstChildOfClass("Tool")
                 if tool and tool:FindFirstChild("Handle") then
-                    local activate = tool:FindFirstChild("Activate")
-                    if activate then
-                        pcall(function() tool:Activate() end)
-                    end
+                    pcall(function() tool:Activate() end)
                 end
-                -- Usa frutas se disponível
                 if Configs.AutoFarm then
                     pcall(function()
                         local args = { enemy.Model }
@@ -226,7 +214,8 @@ local function StartAimbot()
     if aimbotConnection then aimbotConnection:Disconnect(); aimbotConnection = nil end
     aimbotConnection = RunService.RenderStepped:Connect(function()
         if not Configs.AimbotPvP then
-            aimbotConnection:Disconnect(); aimbotConnection = nil; return
+            if aimbotConnection then aimbotConnection:Disconnect(); aimbotConnection = nil end
+            return
         end
         if not CharacterReady() then return end
         local target = GetClosestPlayer(300)
@@ -258,8 +247,12 @@ end
 
 -- ==================== PLAYER ESP ====================
 local function ClearESP()
-    for _, v in pairs(espObjects) do
-        pcall(function() v:Destroy() end)
+    for p, data in pairs(espObjects) do
+        pcall(function()
+            if data.Highlight then data.Highlight:Destroy() end
+            if data.Billboard then data.Billboard:Destroy() end
+            if data.Connection then data.Connection:Disconnect() end
+        end)
     end
     espObjects = {}
 end
@@ -278,14 +271,14 @@ local function UpdateESP()
                 highlight.SurfaceTransparency = 0.7
                 highlight.SurfaceColor3 = Color3.fromRGB(200, 0, 0)
                 highlight.Parent = Workspace
-                table.insert(espObjects, highlight)
-                -- Label com nome e distância
+
                 local billboard = Instance.new("BillboardGui")
                 billboard.Adornee = hrp
                 billboard.Size = UDim2.new(0, 120, 0, 40)
                 billboard.StudsOffset = Vector3.new(0, 3, 0)
                 billboard.AlwaysOnTop = true
                 billboard.Parent = Workspace
+
                 local label = Instance.new("TextLabel", billboard)
                 label.Size = UDim2.new(1, 0, 1, 0)
                 label.BackgroundTransparency = 1
@@ -295,13 +288,15 @@ local function UpdateESP()
                 label.Font = Enum.Font.GothamBold
                 label.TextSize = 13
                 label.Text = p.Name
-                table.insert(espObjects, billboard)
-                RunService.RenderStepped:Connect(function()
-                    if hrp and humanoidRootPart then
+
+                local conn = RunService.RenderStepped:Connect(function()
+                    if hrp and humanoidRootPart and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
                         local dist = math.floor((hrp.Position - humanoidRootPart.Position).Magnitude)
                         label.Text = p.Name .. "\n[" .. dist .. "m]"
                     end
                 end)
+
+                espObjects[p] = { Highlight = highlight, Billboard = billboard, Connection = conn }
             end
         end
     end
@@ -314,7 +309,6 @@ player.CharacterAdded:Connect(function(char)
     humanoid = char:WaitForChild("Humanoid")
     if Configs.AutoRevive then
         task.wait(1)
-        -- Reinicia farms se necessário
         if Configs.AutoFarm then StartAutoFarm() end
     end
 end)
@@ -341,10 +335,8 @@ local function StartAutoRaid()
     task.spawn(function()
         while Configs.AutoRaid do
             if CharacterReady() then
-                -- Teleporta para ilha de raid
                 SafeTeleport(Vector3.new(-15970, 700, 3800))
                 task.wait(2)
-                -- Tenta iniciar raid via remote
                 pcall(function()
                     local remotes = ReplicatedStorage:FindFirstChild("Remotes")
                     if remotes then
@@ -355,7 +347,6 @@ local function StartAutoRaid()
                     end
                 end)
                 task.wait(3)
-                -- Farm inimigos da raid
                 for i = 1, 60 do
                     if not Configs.AutoRaid then break end
                     if CharacterReady() then
@@ -395,22 +386,18 @@ local UI_TEXT = {
         Settings   = "Extras",
     },
     Options = {
-        -- Auto Farm
         AutoFarm        = { Title = "Auto Farm",          Desc = "Mata mobs automaticamente próximos à você." },
         AutoFarmBoss    = { Title = "Auto Boss Farm",     Desc = "Vai até o boss e ataca automaticamente." },
         AutoEatFruit    = { Title = "Auto Comer Fruta",   Desc = "Come frutas do chão automaticamente." },
         AutoCollectChest= { Title = "Auto Chest",         Desc = "Coleta baús e drops no mapa automaticamente." },
         AutoStats       = { Title = "Auto Stats",         Desc = "Distribui atributos automaticamente ao upar." },
-        -- PvP
         AimbotPvP       = { Title = "Aimbot PvP",         Desc = "Mira na cabeça de jogadores próximos." },
         AntiFlinch      = { Title = "Anti-Flinch",        Desc = "Impede que você tome knockback de ataques." },
         PvPAutoBlock    = { Title = "Auto Block",         Desc = "Bloqueia automaticamente quando atacado." },
         FruitSniper     = { Title = "Fruit Sniper",       Desc = "Teleporta até frutas que caem no mapa." },
-        -- Raids
         AutoRaid        = { Title = "Auto Raid",          Desc = "Inicia e completa raids automaticamente." },
         RaidInstant     = { Title = "Raid Instant Kill",  Desc = "Elimina inimigos de raid muito mais rápido." },
         RaidESP         = { Title = "Raid ESP",           Desc = "Mostra inimigos de raid através das paredes." },
-        -- Visuais / Settings
         PlayerESP       = { Title = "Player ESP",         Desc = "Mostra jogadores através das paredes com distância." },
         FruitESP        = { Title = "Fruit ESP",          Desc = "Mostra frutas spawnadas no mapa." },
         ShowBossHP      = { Title = "Boss HP Bar",        Desc = "Exibe barra de vida dos bosses sobre eles." },
@@ -921,7 +908,7 @@ btnNo.BackgroundColor3 = Color3.fromRGB(26, 26, 26); btnNo.TextColor3 = Color3.f
 btnNo.Font = Enum.Font.GothamMedium; btnNo.TextSize = 12; btnNo.Text = UI_TEXT.CancelBtn; btnNo.ZIndex = 1000
 Instance.new("UICorner", btnNo).CornerRadius = UDim.new(0, 6)
 
--- ==================== TELEPORT TAB (ESPECIAL) ====================
+-- ==================== TELEPORT TAB ====================
 local teleportScrollFrame = Instance.new("ScrollingFrame", RightPanel.InnerBg)
 teleportScrollFrame.Name = "TeleportScroll"
 teleportScrollFrame.Size = UDim2.new(1, -6, 1, -48)
@@ -944,7 +931,6 @@ local tpPad = Instance.new("UIPadding", teleportScrollFrame)
 tpPad.PaddingTop = UDim.new(0, 8); tpPad.PaddingBottom = UDim.new(0, 8)
 tpPad.PaddingLeft = UDim.new(0, 4); tpPad.PaddingRight = UDim.new(0, 8)
 
--- Seções por mar
 local seaLabels = { [0] = "⭐ Especiais", [1] = "🌊 Primeiro Mar", [2] = "⚓ Segundo Mar", [3] = "🏴 Terceiro Mar" }
 local createdSections = {}
 
@@ -1004,7 +990,6 @@ for _, tp in ipairs(Teleports) do
     end)
 end
 
--- Atualizar canvas do teleport
 local function UpdateTpCanvas()
     local h = tpLayout.AbsoluteContentSize.Y + 24
     teleportScrollFrame.CanvasSize = UDim2.new(0, 0, 0, math.max(h, teleportScrollFrame.AbsoluteSize.Y + 1))
@@ -1168,7 +1153,6 @@ local function createToggle(parent, configKey, tabCategory)
     triggerBtn.Size = UDim2.new(1, 0, 1, 0); triggerBtn.BackgroundTransparency = 1
     triggerBtn.Text = ""; triggerBtn.ZIndex = 13
 
-    -- Callback com lógica real
     triggerBtn.MouseButton1Click:Connect(function()
         PlayUI_Click()
         Configs[configKey] = not Configs[configKey]
@@ -1179,7 +1163,6 @@ local function createToggle(parent, configKey, tabCategory)
         TweenService:Create(switchCircle, anim, {Position = targetPos}):Play()
         TweenService:Create(switchTrack, anim, {BackgroundColor3 = targetColor}):Play()
 
-        -- Lógica de cada toggle
         if configKey == "AutoFarm" then
             if on then StartAutoFarm() else StopAutoFarm() end
         elseif configKey == "AutoCollectChest" then
@@ -1217,9 +1200,13 @@ local function createToggle(parent, configKey, tabCategory)
                 end)
             end
         elseif configKey == "AntiFlinch" then
+            if antiFlinchConn then antiFlinchConn:Disconnect(); antiFlinchConn = nil end
             if on then
-                RunService.Stepped:Connect(function()
-                    if not Configs.AntiFlinch then return end
+                antiFlinchConn = RunService.Stepped:Connect(function()
+                    if not Configs.AntiFlinch then
+                        if antiFlinchConn then antiFlinchConn:Disconnect(); antiFlinchConn = nil end
+                        return
+                    end
                     if character then
                         local hrp = character:FindFirstChild("HumanoidRootPart")
                         if hrp then hrp.AssemblyLinearVelocity = Vector3.new(0, hrp.AssemblyLinearVelocity.Y, 0) end
@@ -1318,10 +1305,11 @@ CloseBtn.MouseButton1Click:Connect(function() PlayUI_Click(); AlternarConfirmaca
 btnNo.MouseButton1Click:Connect(function() AlternarConfirmacao(false) end)
 btnYes.MouseButton1Click:Connect(function()
     StopAutoFarm()
-    Configs.AimbotPvP = false; Configs.AutoRaid = false; Configs.NoClip = false
+    Configs.AimbotPvP = false; Configs.AutoRaid = false; Configs.NoClip = false; Configs.AntiFlinch = false; Configs.PlayerESP = false
     ClearESP()
     if aimbotConnection then aimbotConnection:Disconnect() end
     if noClipConn then noClipConn:Disconnect() end
+    if antiFlinchConn then antiFlinchConn:Disconnect() end
     local s = 0.2
     if confirmBlur then TweenService:Create(confirmBlur, TweenInfo.new(s, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {Size = 0}):Play() end
     AplicarFadeSincronizado(mainWrapper, true, s)
@@ -1384,7 +1372,7 @@ createToggle(togglesContainer, "ServerHop",  "Settings")
 RunService.Heartbeat:Connect(function()
     if Configs.PlayerESP then
         for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= player and not espObjects[p] then
+            if p ~= player and not espObjects[p] and p.Character then
                 UpdateESP()
                 break
             end
@@ -1394,7 +1382,11 @@ end)
 
 Players.PlayerRemoving:Connect(function(p)
     if espObjects[p] then
-        pcall(function() espObjects[p]:Destroy() end)
+        pcall(function()
+            if espObjects[p].Highlight then espObjects[p].Highlight:Destroy() end
+            if espObjects[p].Billboard then espObjects[p].Billboard:Destroy() end
+            if espObjects[p].Connection then espObjects[p].Connection:Disconnect() end
+        end)
         espObjects[p] = nil
     end
 end)
