@@ -1,5 +1,5 @@
 -- =====================================================================
--- [[ AKATSUKI BLOX FRUITS SCRIPT [v3.6] - AUTO FARM | PVP | RAID | TP ]]
+-- [[ AKATSUKI BLOX FRUITS SCRIPT [v1.0.0] - AUTO FARM | PVP | RAID | TP ]]
 -- =====================================================================
 
 local Players = game:GetService("Players")
@@ -95,9 +95,9 @@ local Teleports = {
     { Name = "Great Tree",         Sea = 3, Position = Vector3.new(-14150, 250, -6025) },
     { Name = "Castle on the Sea",  Sea = 3, Position = Vector3.new(-6700, 250, 8200) },
     -- Especiais
-    { Name = "🏴 Raid Island",     Sea = 0, Position = Vector3.new(-15970, 700, 3800) },
-    { Name = "⚓ Marineford",      Sea = 0, Position = Vector3.new(-28000, 11, 2375) },
-    { Name = "🌊 Fountain City",   Sea = 0, Position = Vector3.new(-5000, 350, 9800) },
+    { Name = "Raid Island",        Sea = 0, Position = Vector3.new(-15970, 700, 3800) },
+    { Name = "Marineford",         Sea = 0, Position = Vector3.new(-28000, 11, 2375) },
+    { Name = "Fountain City",      Sea = 0, Position = Vector3.new(-5000, 350, 9800) },
 }
 
 -- ==================== UTILITÁRIOS ====================
@@ -111,7 +111,13 @@ end
 
 local function SafeTeleport(pos)
     if not CharacterReady() then return end
-    humanoidRootPart.CFrame = CFrame.new(pos)
+    pcall(function()
+        humanoidRootPart.AssemblyLinearVelocity = Vector3.zero
+        humanoidRootPart.AssemblyAngularVelocity = Vector3.zero
+        character:PivotTo(CFrame.new(pos))
+        task.wait(0.05)
+        humanoidRootPart.AssemblyLinearVelocity = Vector3.zero
+    end)
 end
 
 local function GetClosestPlayer(maxDist)
@@ -157,7 +163,7 @@ local function StartAutoFarm()
             if enemy then
                 local hrp = enemy.HRP
                 local pos = hrp.Position + Vector3.new(0, 3, 0)
-                humanoidRootPart.CFrame = CFrame.new(pos - (hrp.CFrame.LookVector * farmSafeDistance))
+                SafeTeleport(pos - (hrp.CFrame.LookVector * farmSafeDistance))
                 task.wait(0.08)
                 local tool = character:FindFirstChildOfClass("Tool")
                 if tool and tool:FindFirstChild("Handle") then
@@ -352,7 +358,7 @@ local function StartAutoRaid()
                     if CharacterReady() then
                         local enemy = GetClosestEnemy(500)
                         if enemy then
-                            humanoidRootPart.CFrame = CFrame.new(enemy.HRP.Position + Vector3.new(0, 3, -8))
+                            SafeTeleport(enemy.HRP.Position + Vector3.new(0, 3, -8))
                             task.wait(0.1)
                             local tool = character:FindFirstChildOfClass("Tool")
                             if tool then pcall(function() tool:Activate() end) end
@@ -648,7 +654,7 @@ subtitle.Size = UDim2.new(1, 0, 0, 12)
 subtitle.AnchorPoint = Vector2.new(0.5, 0)
 subtitle.Position = UDim2.new(0.5, 0, 0, 20)
 subtitle.BackgroundTransparency = 1
-subtitle.Text = "BLOX FRUITS | v3.6"
+subtitle.Text = "BLOX FRUITS | v1.0.0"
 subtitle.TextColor3 = Color3.fromRGB(180, 180, 180)
 subtitle.TextTransparency = 0.2
 subtitle.TextSize = 9.5
@@ -840,7 +846,7 @@ RightSeparatorLine.BackgroundColor3 = Color3.fromRGB(255, 80, 80); RightSeparato
 RightSeparatorLine.BorderSizePixel = 0; RightSeparatorLine.ZIndex = 10
 
 local BadgeFrame = Instance.new("Frame", RightPanel.InnerBg)
-BadgeFrame.Size = UDim2.new(0, 60, 0, 18); BadgeFrame.Position = UDim2.new(0, 12, 0, 9)
+BadgeFrame.Size = UDim2.new(0, 45, 0, 18); BadgeFrame.Position = UDim2.new(0, 12, 0, 9)
 BadgeFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255); BadgeFrame.BorderSizePixel = 0; BadgeFrame.ZIndex = 15
 Instance.new("UICorner", BadgeFrame).CornerRadius = UDim.new(1, 0)
 local badgeGrad = Instance.new("UIGradient", BadgeFrame)
@@ -851,8 +857,8 @@ badgeGrad.Color = ColorSequence.new({
 })
 local BadgeText = Instance.new("TextLabel", BadgeFrame)
 BadgeText.Size = UDim2.new(1, 0, 1, 0); BadgeText.BackgroundTransparency = 1
-BadgeText.Text = "BF v3.6"; BadgeText.TextColor3 = Color3.fromRGB(255, 255, 255)
-BadgeText.Font = Enum.Font.GothamBold; BadgeText.TextSize = 9; BadgeText.ZIndex = 16
+BadgeText.Text = "3.6"; BadgeText.TextColor3 = Color3.fromRGB(255, 255, 255)
+BadgeText.Font = Enum.Font.GothamBold; BadgeText.TextSize = 10; BadgeText.ZIndex = 16
 
 -- ==================== TOGGLES CONTAINER ====================
 local togglesContainer = Instance.new("ScrollingFrame", RightPanel.InnerBg)
@@ -931,7 +937,7 @@ local tpPad = Instance.new("UIPadding", teleportScrollFrame)
 tpPad.PaddingTop = UDim.new(0, 8); tpPad.PaddingBottom = UDim.new(0, 8)
 tpPad.PaddingLeft = UDim.new(0, 4); tpPad.PaddingRight = UDim.new(0, 8)
 
-local seaLabels = { [0] = "⭐ Especiais", [1] = "🌊 Primeiro Mar", [2] = "⚓ Segundo Mar", [3] = "🏴 Terceiro Mar" }
+local seaLabels = { [0] = "Especiais", [1] = "Primeiro Mar", [2] = "Segundo Mar", [3] = "Terceiro Mar" }
 local createdSections = {}
 
 local function GetOrCreateSection(seaNum)
@@ -962,15 +968,15 @@ for _, tp in ipairs(Teleports) do
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
     local stroke = Instance.new("UIStroke", btn); stroke.Color = Color3.fromHex("#141414"); stroke.Thickness = 1
     local lbl = Instance.new("TextLabel", btn)
-    lbl.Size = UDim2.new(0.8, 0, 1, 0); lbl.Position = UDim2.new(0, 10, 0, 0)
+    lbl.Size = UDim2.new(1, -65, 1, 0); lbl.Position = UDim2.new(0, 10, 0, 0)
     lbl.BackgroundTransparency = 1; lbl.Text = tp.Name
     lbl.TextColor3 = Color3.fromHex("#CCCCCC"); lbl.Font = Enum.Font.GothamBold
     lbl.TextSize = 11; lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.ZIndex = 12
     local icon = Instance.new("TextLabel", btn)
-    icon.Size = UDim2.new(0, 30, 1, 0); icon.Position = UDim2.new(1, -35, 0, 0)
-    icon.BackgroundTransparency = 1; icon.Text = "TP ›"
+    icon.Size = UDim2.new(0, 50, 1, 0); icon.Position = UDim2.new(1, -55, 0, 0)
+    icon.BackgroundTransparency = 1; icon.Text = "TP  ›"
     icon.TextColor3 = Color3.fromRGB(200, 50, 50); icon.Font = Enum.Font.GothamBold
-    icon.TextSize = 10; icon.ZIndex = 12
+    icon.TextSize = 13; icon.ZIndex = 12
     local tpPos = tp.Position
     btn.MouseButton1Click:Connect(function()
         PlayUI_Click()
@@ -1154,7 +1160,6 @@ local function createToggle(parent, configKey, tabCategory)
     triggerBtn.Text = ""; triggerBtn.ZIndex = 13
 
     triggerBtn.MouseButton1Click:Connect(function()
-        PlayUI_Click()
         Configs[configKey] = not Configs[configKey]
         local on = Configs[configKey]
         local targetPos   = on and UDim2.new(1, -15, 0.5, -6) or UDim2.new(0, 3, 0.5, -6)
