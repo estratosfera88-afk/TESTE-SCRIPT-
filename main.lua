@@ -1,5 +1,5 @@
 -- =====================================================================
--- [[ AKATSUKI BLOX FRUITS SCRIPT [v1.0.0] - AUTO FARM | PVP | RAID | TP ]]
+-- [[ AKATSUKI BLOX FRUITS SCRIPT [v1.1.0] - AUTO FARM | PVP | RAID | TP ]]
 -- =====================================================================
 
 local Players = game:GetService("Players")
@@ -24,7 +24,6 @@ local Configs = {
     AutoFarm        = false,
     AutoFarmMob     = false,
     AutoFarmBoss    = false,
-    AutoEatFruit    = false,
     AutoCollectChest = false,
     AutoStats       = false,
 
@@ -37,25 +36,21 @@ local Configs = {
     -- Raid
     AutoRaid        = false,
     RaidInstant     = false,
-    RaidESP         = false,
 
     -- Visuais
     PlayerESP       = false,
     FruitESP        = false,
-    ShowBossHP      = false,
 
     -- Extras
-    NoClip          = false,
     AutoRevive      = false,
     ServerHop       = false,
 }
 
 -- ==================== VARIÁVEIS DO AUTO FARM ====================
-local farmTarget = nil
 local farmLoop = nil
 local selectedMob = "Lowest Level Mob"
 local selectedBoss = "None"
-local farmSafeDistance = 15
+local farmSafeDistance = 12 -- Altura flutuante
 
 -- ==================== VARIÁVEIS DE PVP E SISTEMA ====================
 local pvpTarget = nil
@@ -65,7 +60,6 @@ local camera = Workspace.CurrentCamera
 
 -- ==================== ESP ====================
 local espObjects = {}
-local raidEspObjects = {}
 
 -- ==================== LISTA DE TELEPORTES ====================
 local Teleports = {
@@ -121,7 +115,7 @@ local function SafeTeleport(pos)
 end
 
 local function GetClosestPlayer(maxDist)
-    local closest, dist = nil, maxDist or 500
+    local closest, dist = nil, maxDist or math.huge
     if not CharacterReady() then return nil end
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= player and p.Character then
@@ -136,8 +130,8 @@ local function GetClosestPlayer(maxDist)
     return closest
 end
 
-local function GetClosestEnemy(maxDist)
-    local closest, dist = nil, maxDist or 100
+local function GetClosestEnemy()
+    local closest, dist = nil, math.huge
     if not CharacterReady() then return nil end
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if obj:IsA("Model") and obj ~= character then
@@ -152,29 +146,50 @@ local function GetClosestEnemy(maxDist)
     return closest
 end
 
--- ==================== AUTO FARM ====================
+-- ==================== AUTO FARM REFORMULADO ====================
 local function StartAutoFarm()
     if farmLoop then farmLoop = false; task.wait(0.1) end
     farmLoop = true
     task.spawn(function()
         while farmLoop and Configs.AutoFarm do
             if not CharacterReady() then task.wait(1); continue end
-            local enemy = GetClosestEnemy(300)
+            
+            -- Pega a missão (Simulado via remote padrão do BF)
+            pcall(function()
+                local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+                if remotes and remotes:FindFirstChild("CommF_") then
+                    remotes.CommF_:InvokeServer("StartQuest", "BanditQuest1", 1) 
+                end
+            end)
+
+            local enemy = GetClosestEnemy() 
             if enemy then
                 local hrp = enemy.HRP
-                local pos = hrp.Position + Vector3.new(0, 3, 0)
-                SafeTeleport(pos - (hrp.CFrame.LookVector * farmSafeDistance))
-                task.wait(0.08)
+                -- Flutuar acima do monstro constantemente (12 studs)
+                humanoidRootPart.CFrame = hrp.CFrame * CFrame.new(0, farmSafeDistance, 0)
+                humanoidRootPart.AssemblyLinearVelocity = Vector3.zero
+                humanoidRootPart.AssemblyAngularVelocity = Vector3.zero
+
+                -- Equipar a primeira arma encontrada
                 local tool = character:FindFirstChildOfClass("Tool")
-                if tool and tool:FindFirstChild("Handle") then
-                    pcall(function() tool:Activate() end)
+                if not tool then
+                    for _, t in ipairs(player.Backpack:GetChildren()) do
+                        if t:IsA("Tool") then
+                            humanoid:EquipTool(t)
+                            tool = t
+                            break
+                        end
+                    end
                 end
-                if Configs.AutoFarm then
+
+                -- Socos Invisíveis / Autoclick Rápido
+                if tool then
+                    pcall(function() tool:Activate() end)
                     pcall(function()
                         local args = { enemy.Model }
                         local remotes = ReplicatedStorage:FindFirstChild("Remotes")
                         if remotes then
-                            local skillRemote = remotes:FindFirstChild("CDN")
+                            local skillRemote = remotes:FindFirstChild("Validator") or remotes:FindFirstChild("CDN")
                             if skillRemote then
                                 skillRemote:FireServer(unpack(args))
                             end
@@ -184,7 +199,7 @@ local function StartAutoFarm()
             else
                 task.wait(0.3)
             end
-            task.wait(0.05)
+            RunService.Heartbeat:Wait()
         end
     end)
 end
@@ -234,30 +249,11 @@ local function StartAimbot()
     end)
 end
 
--- ==================== NO CLIP ====================
-local noClipConn = nil
-local function ToggleNoClip(state)
-    if noClipConn then noClipConn:Disconnect(); noClipConn = nil end
-    if state then
-        noClipConn = RunService.Stepped:Connect(function()
-            if character then
-                for _, part in ipairs(character:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = false
-                    end
-                end
-            end
-        end)
-    end
-end
-
--- ==================== PLAYER ESP ====================
+-- ==================== PLAYER ESP (NOME E COR APENAS) ====================
 local function ClearESP()
     for p, data in pairs(espObjects) do
         pcall(function()
-            if data.Highlight then data.Highlight:Destroy() end
             if data.Billboard then data.Billboard:Destroy() end
-            if data.Connection then data.Connection:Disconnect() end
         end)
     end
     espObjects = {}
@@ -270,39 +266,24 @@ local function UpdateESP()
         if p ~= player and p.Character then
             local hrp = p.Character:FindFirstChild("HumanoidRootPart")
             if hrp then
-                local highlight = Instance.new("SelectionBox")
-                highlight.Adornee = p.Character
-                highlight.Color3 = Color3.fromRGB(255, 50, 50)
-                highlight.LineThickness = 0.05
-                highlight.SurfaceTransparency = 0.7
-                highlight.SurfaceColor3 = Color3.fromRGB(200, 0, 0)
-                highlight.Parent = Workspace
-
                 local billboard = Instance.new("BillboardGui")
                 billboard.Adornee = hrp
-                billboard.Size = UDim2.new(0, 120, 0, 40)
-                billboard.StudsOffset = Vector3.new(0, 3, 0)
-                billboard.AlwaysOnTop = true
+                billboard.Size = UDim2.new(0, 150, 0, 40)
+                billboard.StudsOffset = Vector3.new(0, 4, 0)
+                billboard.AlwaysOnTop = true 
                 billboard.Parent = Workspace
 
                 local label = Instance.new("TextLabel", billboard)
                 label.Size = UDim2.new(1, 0, 1, 0)
                 label.BackgroundTransparency = 1
-                label.TextColor3 = Color3.fromRGB(255, 80, 80)
+                label.TextColor3 = Color3.fromRGB(0, 255, 255) 
                 label.TextStrokeTransparency = 0
                 label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
                 label.Font = Enum.Font.GothamBold
-                label.TextSize = 13
-                label.Text = p.Name
+                label.TextSize = 14
+                label.Text = p.Name 
 
-                local conn = RunService.RenderStepped:Connect(function()
-                    if hrp and humanoidRootPart and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                        local dist = math.floor((hrp.Position - humanoidRootPart.Position).Magnitude)
-                        label.Text = p.Name .. "\n[" .. dist .. "m]"
-                    end
-                end)
-
-                espObjects[p] = { Highlight = highlight, Billboard = billboard, Connection = conn }
+                espObjects[p] = { Billboard = billboard }
             end
         end
     end
@@ -356,9 +337,9 @@ local function StartAutoRaid()
                 for i = 1, 60 do
                     if not Configs.AutoRaid then break end
                     if CharacterReady() then
-                        local enemy = GetClosestEnemy(500)
+                        local enemy = GetClosestEnemy()
                         if enemy then
-                            SafeTeleport(enemy.HRP.Position + Vector3.new(0, 3, -8))
+                            SafeTeleport(enemy.HRP.Position + Vector3.new(0, 10, 0))
                             task.wait(0.1)
                             local tool = character:FindFirstChildOfClass("Tool")
                             if tool then pcall(function() tool:Activate() end) end
@@ -392,9 +373,8 @@ local UI_TEXT = {
         Settings   = "Extras",
     },
     Options = {
-        AutoFarm        = { Title = "Auto Farm",          Desc = "Mata mobs automaticamente próximos à você." },
+        AutoFarm        = { Title = "Auto Farm",          Desc = "Flutua sobre mobs e ataca até a morte." },
         AutoFarmBoss    = { Title = "Auto Boss Farm",     Desc = "Vai até o boss e ataca automaticamente." },
-        AutoEatFruit    = { Title = "Auto Comer Fruta",   Desc = "Come frutas do chão automaticamente." },
         AutoCollectChest= { Title = "Auto Chest",         Desc = "Coleta baús e drops no mapa automaticamente." },
         AutoStats       = { Title = "Auto Stats",         Desc = "Distribui atributos automaticamente ao upar." },
         AimbotPvP       = { Title = "Aimbot PvP",         Desc = "Mira na cabeça de jogadores próximos." },
@@ -403,11 +383,8 @@ local UI_TEXT = {
         FruitSniper     = { Title = "Fruit Sniper",       Desc = "Teleporta até frutas que caem no mapa." },
         AutoRaid        = { Title = "Auto Raid",          Desc = "Inicia e completa raids automaticamente." },
         RaidInstant     = { Title = "Raid Instant Kill",  Desc = "Elimina inimigos de raid muito mais rápido." },
-        RaidESP         = { Title = "Raid ESP",           Desc = "Mostra inimigos de raid através das paredes." },
-        PlayerESP       = { Title = "Player ESP",         Desc = "Mostra jogadores através das paredes com distância." },
+        PlayerESP       = { Title = "Player ESP",         Desc = "Mostra o nome colorido de todos no mapa." },
         FruitESP        = { Title = "Fruit ESP",          Desc = "Mostra frutas spawnadas no mapa." },
-        ShowBossHP      = { Title = "Boss HP Bar",        Desc = "Exibe barra de vida dos bosses sobre eles." },
-        NoClip          = { Title = "No Clip",            Desc = "Atravessa paredes e objetos." },
         AutoRevive      = { Title = "Auto Revive",        Desc = "Reinicia farms automaticamente após morrer." },
         ServerHop       = { Title = "Server Hop",         Desc = "Troca de servidor automaticamente (menos players)." },
     }
@@ -654,7 +631,7 @@ subtitle.Size = UDim2.new(1, 0, 0, 12)
 subtitle.AnchorPoint = Vector2.new(0.5, 0)
 subtitle.Position = UDim2.new(0.5, 0, 0, 20)
 subtitle.BackgroundTransparency = 1
-subtitle.Text = "BLOX FRUITS | v1.0.0"
+subtitle.Text = "BLOX FRUITS | by zeni <3"
 subtitle.TextColor3 = Color3.fromRGB(180, 180, 180)
 subtitle.TextTransparency = 0.2
 subtitle.TextSize = 9.5
@@ -857,7 +834,7 @@ badgeGrad.Color = ColorSequence.new({
 })
 local BadgeText = Instance.new("TextLabel", BadgeFrame)
 BadgeText.Size = UDim2.new(1, 0, 1, 0); BadgeText.BackgroundTransparency = 1
-BadgeText.Text = "3.6"; BadgeText.TextColor3 = Color3.fromRGB(255, 255, 255)
+BadgeText.Text = "v1.1.0"; BadgeText.TextColor3 = Color3.fromRGB(255, 255, 255)
 BadgeText.Font = Enum.Font.GothamBold; BadgeText.TextSize = 10; BadgeText.ZIndex = 16
 
 -- ==================== TOGGLES CONTAINER ====================
@@ -1174,8 +1151,6 @@ local function createToggle(parent, configKey, tabCategory)
             if on then StartAutoChest() end
         elseif configKey == "AimbotPvP" then
             if on then StartAimbot() end
-        elseif configKey == "NoClip" then
-            ToggleNoClip(on)
         elseif configKey == "PlayerESP" then
             UpdateESP()
             if not on then ClearESP() end
@@ -1310,10 +1285,9 @@ CloseBtn.MouseButton1Click:Connect(function() PlayUI_Click(); AlternarConfirmaca
 btnNo.MouseButton1Click:Connect(function() AlternarConfirmacao(false) end)
 btnYes.MouseButton1Click:Connect(function()
     StopAutoFarm()
-    Configs.AimbotPvP = false; Configs.AutoRaid = false; Configs.NoClip = false; Configs.AntiFlinch = false; Configs.PlayerESP = false
+    Configs.AimbotPvP = false; Configs.AutoRaid = false; Configs.AntiFlinch = false; Configs.PlayerESP = false
     ClearESP()
     if aimbotConnection then aimbotConnection:Disconnect() end
-    if noClipConn then noClipConn:Disconnect() end
     if antiFlinchConn then antiFlinchConn:Disconnect() end
     local s = 0.2
     if confirmBlur then TweenService:Create(confirmBlur, TweenInfo.new(s, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {Size = 0}):Play() end
@@ -1353,7 +1327,6 @@ createTabBtn("Settings")
 -- Auto Farm tab
 createToggle(togglesContainer, "AutoFarm",         "AutoFarm")
 createToggle(togglesContainer, "AutoFarmBoss",     "AutoFarm")
-createToggle(togglesContainer, "AutoEatFruit",     "AutoFarm")
 createToggle(togglesContainer, "AutoCollectChest", "AutoFarm")
 createToggle(togglesContainer, "AutoStats",        "AutoFarm")
 -- PvP tab
@@ -1364,12 +1337,9 @@ createToggle(togglesContainer, "FruitSniper",  "PvP")
 -- Raids tab
 createToggle(togglesContainer, "AutoRaid",    "Raids")
 createToggle(togglesContainer, "RaidInstant", "Raids")
-createToggle(togglesContainer, "RaidESP",     "Raids")
 -- Settings tab
 createToggle(togglesContainer, "PlayerESP",  "Settings")
 createToggle(togglesContainer, "FruitESP",   "Settings")
-createToggle(togglesContainer, "ShowBossHP", "Settings")
-createToggle(togglesContainer, "NoClip",     "Settings")
 createToggle(togglesContainer, "AutoRevive", "Settings")
 createToggle(togglesContainer, "ServerHop",  "Settings")
 
@@ -1388,9 +1358,7 @@ end)
 Players.PlayerRemoving:Connect(function(p)
     if espObjects[p] then
         pcall(function()
-            if espObjects[p].Highlight then espObjects[p].Highlight:Destroy() end
             if espObjects[p].Billboard then espObjects[p].Billboard:Destroy() end
-            if espObjects[p].Connection then espObjects[p].Connection:Disconnect() end
         end)
         espObjects[p] = nil
     end
