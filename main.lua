@@ -652,58 +652,28 @@ end
 containerLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(UpdateCanvasSize)
 togglesContainer:GetPropertyChangedSignal("AbsoluteSize"):Connect(UpdateCanvasSize)
 
--- ==================== MODERN CLOSE CONFIRMATION ====================
 local confirmFrame = Instance.new("Frame", mainWrapper)
 confirmFrame.Name = "ConfirmFrame"
 confirmFrame.Size = UDim2.new(1, 0, 1, 0)
 confirmFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-confirmFrame.BackgroundTransparency = 1
-confirmFrame.BorderSizePixel = 0
+confirmFrame.BackgroundTransparency = 0
 confirmFrame.Visible = false
 confirmFrame.ZIndex = 999
-confirmFrame.ClipsDescendants = true
 Instance.new("UICorner", confirmFrame).CornerRadius = UDim.new(0, 10)
 
-local modalContent = Instance.new("Frame", confirmFrame)
-modalContent.Name = "ModalContent"
-modalContent.Size = UDim2.new(1, 0, 1, 0)
-modalContent.BackgroundTransparency = 1
-modalContent.BorderSizePixel = 0
-modalContent.ZIndex = 1000
-
-local modalScale = Instance.new("UIScale", modalContent)
-modalScale.Scale = 0.92
-
-local confirmLabel = Instance.new("TextLabel", modalContent)
+local confirmLabel = Instance.new("TextLabel", confirmFrame)
 confirmLabel.Size = UDim2.new(1, 0, 0, 30)
-confirmLabel.AnchorPoint = Vector2.new(0.5, 0.5)
-confirmLabel.Position = UDim2.new(0.5, 0, 0.42, 0)
+confirmLabel.Position = UDim2.new(0, 0, 0.35, -10)
 confirmLabel.BackgroundTransparency = 1
 confirmLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
 confirmLabel.Font = Enum.Font.GothamBold
 confirmLabel.TextSize = 14
 confirmLabel.Text = UI_TEXT.ConfirmCloseTitle
-confirmLabel.TextXAlignment = Enum.TextXAlignment.Center
 confirmLabel.ZIndex = 1000
 
-local btnContainer = Instance.new("Frame", modalContent)
-btnContainer.Name = "ButtonsContainer"
-btnContainer.AnchorPoint = Vector2.new(0.5, 0.5)
-btnContainer.Position = UDim2.new(0.5, 0, 0.52, 0)
-btnContainer.Size = UDim2.new(0, 230, 0, 34)
-btnContainer.BackgroundTransparency = 1
-btnContainer.ZIndex = 1000
-
-local btnLayout = Instance.new("UIListLayout", btnContainer)
-btnLayout.FillDirection = Enum.FillDirection.Horizontal
-btnLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-btnLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-btnLayout.Padding = UDim.new(0, 10)
-btnLayout.SortOrder = Enum.SortOrder.LayoutOrder
-
-local btnYes = Instance.new("TextButton", btnContainer)
-btnYes.Name = "ConfirmBtn"
+local btnYes = Instance.new("TextButton", confirmFrame)
 btnYes.Size = UDim2.new(0, 110, 0, 34)
+btnYes.Position = UDim2.new(0.5, -115, 0.55, 0)
 btnYes.BackgroundColor3 = Color3.fromHex("#8B0000")
 btnYes.TextColor3 = Color3.fromRGB(255, 255, 255)
 btnYes.Font = Enum.Font.GothamMedium
@@ -712,9 +682,9 @@ btnYes.Text = UI_TEXT.ConfirmBtn
 btnYes.ZIndex = 1000
 Instance.new("UICorner", btnYes).CornerRadius = UDim.new(0, 6)
 
-local btnNo = Instance.new("TextButton", btnContainer)
-btnNo.Name = "CancelBtn"
+local btnNo = Instance.new("TextButton", confirmFrame)
 btnNo.Size = UDim2.new(0, 110, 0, 34)
+btnNo.Position = UDim2.new(0.5, 5, 0.55, 0)
 btnNo.BackgroundColor3 = Color3.fromRGB(26, 26, 26)
 btnNo.TextColor3 = Color3.fromRGB(180, 180, 180)
 btnNo.Font = Enum.Font.GothamMedium
@@ -723,422 +693,6 @@ btnNo.Text = UI_TEXT.CancelBtn
 btnNo.ZIndex = 1000
 Instance.new("UICorner", btnNo).CornerRadius = UDim.new(0, 6)
 
-local function AlternarConfirmacao(exibir)
-    if isConfirmOpen == exibir then return end
-    isConfirmOpen = exibir
-    local tempoAnim = 0.25
-
-    if exibir then
-        if not confirmBlur then
-            confirmBlur = Instance.new("BlurEffect")
-            confirmBlur.Size = 0
-            confirmBlur.Parent = Lighting
-        end
-
-        confirmFrame.Visible = true
-        confirmFrame.BackgroundTransparency = 1
-        TweenService:Create(confirmFrame, TweenInfo.new(tempoAnim, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {BackgroundTransparency = 0.35}):Play()
-        TweenService:Create(confirmBlur, TweenInfo.new(tempoAnim, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {Size = 24}):Play()
-
-        AplicarFadeSincronizado(modalContent, true, 0)
-        modalScale.Scale = 0.92
-        AplicarFadeSincronizado(modalContent, false, tempoAnim)
-        TweenService:Create(modalScale, TweenInfo.new(tempoAnim, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Scale = 1}):Play()
-    else
-        AplicarFadeSincronizado(modalContent, true, tempoAnim)
-        TweenService:Create(modalScale, TweenInfo.new(tempoAnim, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Scale = 0.92}):Play()
-        TweenService:Create(confirmFrame, TweenInfo.new(tempoAnim, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
-
-        if confirmBlur then
-            local blurTween = TweenService:Create(confirmBlur, TweenInfo.new(tempoAnim, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {Size = 0})
-            blurTween:Play()
-            blurTween.Completed:Connect(function()
-                if confirmBlur and confirmBlur.Size == 0 then
-                    confirmBlur:Destroy()
-                    confirmBlur = nil
-                end
-            end)
-        end
-
-        task.delay(tempoAnim, function()
-            if not isConfirmOpen then
-                confirmFrame.Visible = false
-            end
-        end)
-    end
-end
-
-CloseBtn.MouseButton1Click:Connect(function() 
-    PlayUI_Click()
-    AlternarConfirmacao(true) 
-end)
-
-btnNo.MouseButton1Click:Connect(function()
-    PlayUI_Click()
-    AlternarConfirmacao(false)
-end)
-
-btnYes.MouseButton1Click:Connect(function()
-    PlayUI_Click()
-    AlternarConfirmacao(false)
-
-    local syncTime = 0.25
-    task.delay(syncTime, function()
-        AplicarFadeSincronizado(mainWrapper, true, 0.2)
-        TweenService:Create(FloatBtn, TweenInfo.new(0.2, Enum.EasingStyle.Cubic, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 0)}):Play()
-        task.wait(0.2)
-        screenGui:Destroy()
-    end)
-end)
-
--- ==================== NOTIFICATION SYSTEM ====================
-local notificationGeneration = 0
-local currentNotification = nil
-local currentNotificationEntryTween = nil
-local currentNotificationScaleTween = nil
-local currentNotificationProgressTween = nil
-local currentNotificationTimer = nil
-
-local function BuildNotification(title, message, duration)
-    local notif = Instance.new("CanvasGroup")
-    notif.Name = "Notification"
-    notif.Parent = screenGui
-    notif.AnchorPoint = Vector2.new(1, 0)
-    notif.Position = UDim2.new(1, 40, 0, 10)
-    notif.Size = UDim2.new(0, 280, 0, 90)
-    notif.BackgroundColor3 = Color3.fromRGB(12, 2, 4)
-    notif.BackgroundTransparency = 0.12
-    notif.BorderSizePixel = 0
-    notif.ZIndex = 200
-    notif.GroupTransparency = 1
-    Instance.new("UICorner", notif).CornerRadius = UDim.new(0, 8)
-
-    local stroke = Instance.new("UIStroke", notif)
-    stroke.Color = Color3.fromRGB(160, 20, 30)
-    stroke.Transparency = 0.7
-    stroke.Thickness = 1.5
-    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-
-    local notifScale = Instance.new("UIScale", notif)
-    notifScale.Scale = 0.92
-
-    local Header = Instance.new("Frame", notif)
-    Header.Size = UDim2.new(1, -20, 0, 24)
-    Header.Position = UDim2.new(0, 10, 0, 8)
-    Header.BackgroundTransparency = 1
-    Header.ZIndex = 2
-
-    local Badge = Instance.new("Frame", Header)
-    Badge.Size = UDim2.new(0, 90, 0, 20)
-    Badge.Position = UDim2.new(0, 0, 0.5, -10)
-    Badge.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    Badge.BackgroundTransparency = 0
-    Badge.BorderSizePixel = 0
-    Badge.ZIndex = 3
-    Instance.new("UICorner", Badge).CornerRadius = UDim.new(1, 0)
-
-    local badgeGradNotif = Instance.new("UIGradient", Badge)
-    badgeGradNotif.Rotation = 45
-    badgeGradNotif.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(230, 20, 25)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 0, 0))
-    })
-
-    local BadgeTextNotif = Instance.new("TextLabel", Badge)
-    BadgeTextNotif.Size = UDim2.new(1, 0, 1, 0)
-    BadgeTextNotif.BackgroundTransparency = 1
-    BadgeTextNotif.Text = title
-    BadgeTextNotif.TextColor3 = Color3.fromRGB(255, 255, 255)
-    BadgeTextNotif.Font = Enum.Font.GothamBold
-    BadgeTextNotif.TextSize = 9
-    BadgeTextNotif.ZIndex = 4
-
-    local CloseNotifBtn = Instance.new("TextButton", Header)
-    CloseNotifBtn.Size = UDim2.new(0, 20, 0, 20)
-    CloseNotifBtn.Position = UDim2.new(1, -0, 0.5, -10)
-    CloseNotifBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-    CloseNotifBtn.BackgroundTransparency = 0.3
-    CloseNotifBtn.Text = ""
-    CloseNotifBtn.ZIndex = 3
-    Instance.new("UICorner", CloseNotifBtn).CornerRadius = UDim.new(0, 4)
-
-    local line1 = Instance.new("Frame", CloseNotifBtn)
-    line1.AnchorPoint = Vector2.new(0.5, 0.5)
-    line1.Position = UDim2.new(0.5, 0, 0.5, 0)
-    line1.Size = UDim2.new(0, 10, 0, 1.2)
-    line1.Rotation = 45
-    line1.BackgroundColor3 = Color3.fromHex("#A0A0A0")
-    line1.BorderSizePixel = 0
-    line1.ZIndex = 4
-
-    local line2 = Instance.new("Frame", CloseNotifBtn)
-    line2.AnchorPoint = Vector2.new(0.5, 0.5)
-    line2.Position = UDim2.new(0.5, 0, 0.5, 0)
-    line2.Size = UDim2.new(0, 10, 0, 1.2)
-    line2.Rotation = -45
-    line2.BackgroundColor3 = Color3.fromHex("#A0A0A0")
-    line2.BorderSizePixel = 0
-    line2.ZIndex = 4
-
-    CloseNotifBtn.MouseEnter:Connect(function()
-        TweenService:Create(CloseNotifBtn, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = Color3.fromRGB(40, 0, 0), BackgroundTransparency = 0.1}):Play()
-        TweenService:Create(line1, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
-        TweenService:Create(line2, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
-    end)
-
-    CloseNotifBtn.MouseLeave:Connect(function()
-        TweenService:Create(CloseNotifBtn, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = Color3.fromRGB(15, 15, 15), BackgroundTransparency = 0.3}):Play()
-        TweenService:Create(line1, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play()
-        TweenService:Create(line2, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play()
-    end)
-
-    CloseNotifBtn.MouseButton1Click:Connect(function()
-        PlayUI_Click()
-        HideNotification()
-    end)
-
-    local MessageLabel = Instance.new("TextLabel", notif)
-    MessageLabel.Size = UDim2.new(1, -20, 0, 30)
-    MessageLabel.Position = UDim2.new(0, 10, 0, 36)
-    MessageLabel.BackgroundTransparency = 1
-    MessageLabel.Text = message
-    MessageLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-    MessageLabel.Font = Enum.Font.Gotham
-    MessageLabel.TextSize = 11
-    MessageLabel.TextXAlignment = Enum.TextXAlignment.Left
-    MessageLabel.TextYAlignment = Enum.TextYAlignment.Top
-    MessageLabel.TextWrapped = true
-    MessageLabel.ZIndex = 3
-
-    local ProgressBg = Instance.new("Frame", notif)
-    ProgressBg.Size = UDim2.new(1, -20, 0, 2)
-    ProgressBg.Position = UDim2.new(0, 10, 1, -10)
-    ProgressBg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    ProgressBg.BackgroundTransparency = 0.4
-    ProgressBg.BorderSizePixel = 0
-    ProgressBg.ZIndex = 3
-    Instance.new("UICorner", ProgressBg).CornerRadius = UDim.new(1, 0)
-
-    local ProgressFill = Instance.new("Frame", ProgressBg)
-    ProgressFill.Size = UDim2.new(1, 0, 1, 0)
-    ProgressFill.BackgroundColor3 = Color3.fromHex("#8B0000")
-    ProgressFill.BorderSizePixel = 0
-    ProgressFill.ZIndex = 4
-    Instance.new("UICorner", ProgressFill).CornerRadius = UDim.new(1, 0)
-
-    currentNotification = notif
-
-    local entryInfo = TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-    local entryTween = TweenService:Create(notif, entryInfo, {
-        Position = UDim2.new(1, -20, 0, 10),
-        GroupTransparency = 0
-    })
-    local scaleTween = TweenService:Create(notifScale, entryInfo, {Scale = 1})
-    currentNotificationEntryTween = entryTween
-    currentNotificationScaleTween = scaleTween
-    entryTween:Play()
-    scaleTween:Play()
-
-    entryTween.Completed:Connect(function()
-        currentNotificationEntryTween = nil
-    end)
-    scaleTween.Completed:Connect(function()
-        currentNotificationScaleTween = nil
-    end)
-
-    local progressTween = TweenService:Create(ProgressFill, TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.Out), {Size = UDim2.new(0, 0, 1, 0)})
-    currentNotificationProgressTween = progressTween
-    progressTween:Play()
-
-    currentNotificationTimer = task.delay(duration, function()
-        HideNotification()
-    end)
-end
-
-local function HideNotification()
-    if not currentNotification then return end
-
-    local notif = currentNotification
-    currentNotification = nil
-
-    if currentNotificationEntryTween then
-        currentNotificationEntryTween:Cancel()
-        currentNotificationEntryTween = nil
-    end
-    if currentNotificationScaleTween then
-        currentNotificationScaleTween:Cancel()
-        currentNotificationScaleTween = nil
-    end
-    if currentNotificationProgressTween then
-        currentNotificationProgressTween:Cancel()
-        currentNotificationProgressTween = nil
-    end
-    if currentNotificationTimer then
-        task.cancel(currentNotificationTimer)
-        currentNotificationTimer = nil
-    end
-
-    local exitInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
-    local exitTween = TweenService:Create(notif, exitInfo, {
-        Position = UDim2.new(1, 340, 0, 10),
-        GroupTransparency = 1
-    })
-    exitTween:Play()
-    exitTween.Completed:Connect(function()
-        notif:Destroy()
-    end)
-end
-
-local function ShowNotification(title, message, duration)
-    duration = math.max(duration or 4, 0.1)
-    notificationGeneration = notificationGeneration + 1
-    local generation = notificationGeneration
-
-    if currentNotification then
-        HideNotification()
-        task.delay(0.25, function()
-            if generation == notificationGeneration then
-                BuildNotification(title, message, duration)
-            end
-        end)
-    else
-        BuildNotification(title, message, duration)
-    end
-end
-
--- ==================== RESTANTE DOS CONTROLES ====================
-local searchExpanded = false
-local searchInactivityTimer = nil
-
-local function resetSearchInactivityTimer()
-    if searchInactivityTimer then task.cancel(searchInactivityTimer) end
-    searchInactivityTimer = task.delay(4, function()
-        if searchExpanded and searchTextBox.Text == "" then
-            searchExpanded = false
-            local info = TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-            TweenService:Create(SearchBtn, info, {Size = UDim2.new(0, 24, 0, 24)}):Play()
-            searchTextBox:ReleaseFocus()
-            task.delay(0.2, function() searchTextBox.Visible = false end)
-            filterToggles(activeTab, "")
-        end
-    end)
-end
-
-SearchBtn.MouseButton1Click:Connect(function()
-    PlayUI_Click()
-    searchExpanded = not searchExpanded
-    local info = TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-    if searchExpanded then
-        TweenService:Create(SearchBtn, info, {Size = UDim2.new(0, 120, 0, 24)}):Play()
-        searchTextBox.Visible = true
-        searchTextBox:CaptureFocus()
-        resetSearchInactivityTimer()
-    else
-        TweenService:Create(SearchBtn, info, {Size = UDim2.new(0, 24, 0, 24)}):Play()
-        searchTextBox:ReleaseFocus()
-        searchTextBox.Text = ""
-        task.delay(0.2, function() if not searchExpanded then searchTextBox.Visible = false end end)
-        filterToggles(activeTab, "")
-    end
-end)
-
-searchTextBox:GetPropertyChangedSignal("Text"):Connect(function()
-    resetSearchInactivityTimer()
-    filterToggles(activeTab, searchTextBox.Text)
-end)
-
-searchTextBox.Focused:Connect(function() resetSearchInactivityTimer() end)
-
-UserInputService.InputBegan:Connect(function(input)
-    if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and searchExpanded then
-        local pos = input.Position
-        local btnPos = SearchBtn.AbsolutePosition
-        local btnSize = SearchBtn.AbsoluteSize
-        if pos.X < btnPos.X or pos.X > btnPos.X + btnSize.X or pos.Y < btnPos.Y or pos.Y > btnPos.Y + btnSize.Y then
-            if searchTextBox.Text == "" then
-                searchExpanded = false
-                local info = TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-                TweenService:Create(SearchBtn, info, {Size = UDim2.new(0, 24, 0, 24)}):Play()
-                searchTextBox:ReleaseFocus()
-                task.delay(0.2, function() searchTextBox.Visible = false end)
-                filterToggles(activeTab, "")
-            end
-        end
-    end
-end)
-
-ExpandBtn.MouseButton1Click:Connect(function()
-    PlayUI_Click()
-    isExpanded = not isExpanded
-    local newSize = isExpanded and UDim2.new(0, 800, 0, 480) or UDim2.new(0, 640, 0, 360)
-    TweenService:Create(mainWrapper, TweenInfo.new(0.3, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {Size = newSize}):Play()
-end)
-
-SetUIState = function(newState)
-    if UIState == newState or UIState == "OPENING" or UIState == "CLOSING" then return end
-    
-    UIState = (newState == "OPEN" and "OPENING") or (newState == "MINIMIZED" and "CLOSING") or (newState == "CLOSED" and "CLOSING") or newState
-    local tempoAnim = 0.25
-    local windowAnim = TweenInfo.new(tempoAnim, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-
-    if newState == "OPEN" then
-        mainWrapper.Visible = true
-        mainWrapper.Size = UDim2.new(0, 480, 0, 260)
-        AplicarFadeSincronizado(mainWrapper, true, 0)
-        AplicarFadeSincronizado(mainWrapper, false, tempoAnim)
-        
-        local openTween = TweenService:Create(mainWrapper, windowAnim, {Size = isExpanded and UDim2.new(0, 800, 0, 480) or UDim2.new(0, 640, 0, 360)})
-        openTween:Play()
-        openTween.Completed:Connect(function()
-            UIState = "OPEN"
-            filterToggles(activeTab, searchTextBox.Text)
-        end)
-
-    elseif newState == "MINIMIZED" or newState == "CLOSED" then
-        AplicarFadeSincronizado(mainWrapper, true, tempoAnim)
-        local closeTween = TweenService:Create(mainWrapper, windowAnim, {Size = UDim2.new(0, 480, 0, 260)})
-        closeTween:Play()
-        
-        closeTween.Completed:Connect(function()
-            mainWrapper.Visible = false
-            UIState = newState
-        end)
-    end
-end
-
-MinimizeBtn.MouseButton1Click:Connect(function() 
-    PlayUI_Click()
-    TweenService:Create(MinimizeBtn, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = Color3.fromRGB(15, 15, 15), BackgroundTransparency = 0.3}):Play()
-    TweenService:Create(MinimizeLine, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play()
-    SetUIState("MINIMIZED")
-end)
-
--- ==================== EFEITO FÍSICO DOS BOTÕES ====================
-local function AplicarEfeitoFisicoBotao(btn, hoverColor)
-    btn.MouseEnter:Connect(function()
-        if UIState ~= "OPEN" then return end 
-        TweenService:Create(btn, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = Color3.fromRGB(30, 30, 30), BackgroundTransparency = 0.1}):Play()
-        if btn.Name == "ExpandBtn" then TweenService:Create(ExpandStroke, TweenInfo.new(0.15), {Color = hoverColor}):Play()
-        elseif btn.Name == "MinimizeBtn" then TweenService:Create(MinimizeLine, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play()
-        elseif btn.Name == "SearchBtn" and not searchExpanded then TweenService:Create(circleStroke, TweenInfo.new(0.15), {Color = hoverColor}):Play(); TweenService:Create(SearchHandle, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play()
-        elseif btn.Name == "CloseBtn" then TweenService:Create(CloseLine1, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play(); TweenService:Create(CloseLine2, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play() end
-    end)
-    btn.MouseLeave:Connect(function()
-        if UIState ~= "OPEN" then return end 
-        TweenService:Create(btn, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = Color3.fromRGB(15, 15, 15), BackgroundTransparency = 0.3}):Play()
-        if btn.Name == "ExpandBtn" then TweenService:Create(ExpandStroke, TweenInfo.new(0.15), {Color = Color3.fromHex("#A0A0A0")}):Play()
-        elseif btn.Name == "MinimizeBtn" then TweenService:Create(MinimizeLine, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play()
-        elseif btn.Name == "SearchBtn" then TweenService:Create(circleStroke, TweenInfo.new(0.15), {Color = Color3.fromHex("#A0A0A0")}):Play(); TweenService:Create(SearchHandle, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play()
-        elseif btn.Name == "CloseBtn" then TweenService:Create(CloseLine1, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play(); TweenService:Create(CloseLine2, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play() end
-    end)
-end
-
-AplicarEfeitoFisicoBotao(SearchBtn, Color3.fromRGB(255, 255, 255))
-AplicarEfeitoFisicoBotao(MinimizeBtn, Color3.fromRGB(255, 255, 255))
-AplicarEfeitoFisicoBotao(ExpandBtn, Color3.fromRGB(255, 255, 255))
-AplicarEfeitoFisicoBotao(CloseBtn, Color3.fromRGB(255, 60, 60))
-
--- ==================== CRIAÇÃO DAS ABAS E TOGGLES ====================
 local function filterToggles(currentActiveTab, query)
     local searchQuery = (query or ""):lower()
     local itemIndex = 0
@@ -1335,6 +889,171 @@ local function createToggle(parent, configKey, tabCategory)
     end)
 end
 
+local searchExpanded = false
+local searchInactivityTimer = nil
+
+local function resetSearchInactivityTimer()
+    if searchInactivityTimer then task.cancel(searchInactivityTimer) end
+    searchInactivityTimer = task.delay(4, function()
+        if searchExpanded and searchTextBox.Text == "" then
+            searchExpanded = false
+            local info = TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+            TweenService:Create(SearchBtn, info, {Size = UDim2.new(0, 24, 0, 24)}):Play()
+            searchTextBox:ReleaseFocus()
+            task.delay(0.2, function() searchTextBox.Visible = false end)
+            filterToggles(activeTab, "")
+        end
+    end)
+end
+
+SearchBtn.MouseButton1Click:Connect(function()
+    PlayUI_Click()
+    searchExpanded = not searchExpanded
+    local info = TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    if searchExpanded then
+        TweenService:Create(SearchBtn, info, {Size = UDim2.new(0, 120, 0, 24)}):Play()
+        searchTextBox.Visible = true
+        searchTextBox:CaptureFocus()
+        resetSearchInactivityTimer()
+    else
+        TweenService:Create(SearchBtn, info, {Size = UDim2.new(0, 24, 0, 24)}):Play()
+        searchTextBox:ReleaseFocus()
+        searchTextBox.Text = ""
+        task.delay(0.2, function() if not searchExpanded then searchTextBox.Visible = false end end)
+        filterToggles(activeTab, "")
+    end
+end)
+
+searchTextBox:GetPropertyChangedSignal("Text"):Connect(function()
+    resetSearchInactivityTimer()
+    filterToggles(activeTab, searchTextBox.Text)
+end)
+
+searchTextBox.Focused:Connect(function() resetSearchInactivityTimer() end)
+
+UserInputService.InputBegan:Connect(function(input)
+    if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and searchExpanded then
+        local pos = input.Position
+        local btnPos = SearchBtn.AbsolutePosition
+        local btnSize = SearchBtn.AbsoluteSize
+        if pos.X < btnPos.X or pos.X > btnPos.X + btnSize.X or pos.Y < btnPos.Y or pos.Y > btnPos.Y + btnSize.Y then
+            if searchTextBox.Text == "" then
+                searchExpanded = false
+                local info = TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+                TweenService:Create(SearchBtn, info, {Size = UDim2.new(0, 24, 0, 24)}):Play()
+                searchTextBox:ReleaseFocus()
+                task.delay(0.2, function() searchTextBox.Visible = false end)
+                filterToggles(activeTab, "")
+            end
+        end
+    end
+end)
+
+ExpandBtn.MouseButton1Click:Connect(function()
+    PlayUI_Click()
+    isExpanded = not isExpanded
+    local newSize = isExpanded and UDim2.new(0, 800, 0, 480) or UDim2.new(0, 640, 0, 360)
+    TweenService:Create(mainWrapper, TweenInfo.new(0.3, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {Size = newSize}):Play()
+end)
+
+SetUIState = function(newState)
+    if UIState == newState or UIState == "OPENING" or UIState == "CLOSING" then return end
+    
+    UIState = (newState == "OPEN" and "OPENING") or (newState == "MINIMIZED" and "CLOSING") or (newState == "CLOSED" and "CLOSING") or newState
+    local tempoAnim = 0.25
+    local windowAnim = TweenInfo.new(tempoAnim, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+
+    if newState == "OPEN" then
+        mainWrapper.Visible = true
+        mainWrapper.Size = UDim2.new(0, 480, 0, 260)
+        AplicarFadeSincronizado(mainWrapper, true, 0)
+        AplicarFadeSincronizado(mainWrapper, false, tempoAnim)
+        
+        local openTween = TweenService:Create(mainWrapper, windowAnim, {Size = isExpanded and UDim2.new(0, 800, 0, 480) or UDim2.new(0, 640, 0, 360)})
+        openTween:Play()
+        openTween.Completed:Connect(function()
+            UIState = "OPEN"
+            filterToggles(activeTab, searchTextBox.Text)
+        end)
+
+    elseif newState == "MINIMIZED" or newState == "CLOSED" then
+        AplicarFadeSincronizado(mainWrapper, true, tempoAnim)
+        local closeTween = TweenService:Create(mainWrapper, windowAnim, {Size = UDim2.new(0, 480, 0, 260)})
+        closeTween:Play()
+        
+        closeTween.Completed:Connect(function()
+            mainWrapper.Visible = false
+            UIState = newState
+        end)
+    end
+end
+
+MinimizeBtn.MouseButton1Click:Connect(function() 
+    PlayUI_Click()
+    TweenService:Create(MinimizeBtn, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = Color3.fromRGB(15, 15, 15), BackgroundTransparency = 0.3}):Play()
+    TweenService:Create(MinimizeLine, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play()
+    SetUIState("MINIMIZED")
+end)
+
+local function AlternarConfirmacao(exibir)
+    isConfirmOpen = exibir
+    local tempoAnim = 0.15
+    if exibir then
+        if not confirmBlur then confirmBlur = Instance.new("BlurEffect"); confirmBlur.Size = 0; confirmBlur.Parent = Lighting end
+        confirmFrame.Visible = true
+        AplicarFadeSincronizado(confirmFrame, true, 0)
+        AplicarFadeSincronizado(confirmFrame, false, tempoAnim)
+        TweenService:Create(confirmBlur, TweenInfo.new(tempoAnim, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {Size = 56}):Play() 
+    else
+        AplicarFadeSincronizado(confirmFrame, true, tempoAnim)
+        if confirmBlur then 
+            local blurTween = TweenService:Create(confirmBlur, TweenInfo.new(tempoAnim, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {Size = 0})
+            blurTween:Play()
+            blurTween.Completed:Connect(function() if confirmBlur and confirmBlur.Size == 0 then confirmBlur:Destroy(); confirmBlur = nil end end)
+        end
+        task.delay(tempoAnim, function() if not isConfirmOpen then confirmFrame.Visible = false end end)
+    end
+end
+
+CloseBtn.MouseButton1Click:Connect(function() 
+    PlayUI_Click()
+    AlternarConfirmacao(true) 
+end)
+
+btnNo.MouseButton1Click:Connect(function() AlternarConfirmacao(false) end)
+btnYes.MouseButton1Click:Connect(function()
+    local syncTime = 0.2
+    if confirmBlur then TweenService:Create(confirmBlur, TweenInfo.new(syncTime, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {Size = 0}):Play() end
+    AplicarFadeSincronizado(mainWrapper, true, syncTime)
+    TweenService:Create(FloatBtn, TweenInfo.new(syncTime, Enum.EasingStyle.Cubic, Enum.EasingDirection.In), {Size = UDim2.new(0,0,0,0)}):Play()
+    task.wait(syncTime)
+    screenGui:Destroy()
+end)
+
+local function AplicarEfeitoFisicoBotao(btn, hoverColor)
+    btn.MouseEnter:Connect(function()
+        if UIState ~= "OPEN" then return end 
+        TweenService:Create(btn, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = Color3.fromRGB(30, 30, 30), BackgroundTransparency = 0.1}):Play()
+        if btn.Name == "ExpandBtn" then TweenService:Create(ExpandStroke, TweenInfo.new(0.15), {Color = hoverColor}):Play()
+        elseif btn.Name == "MinimizeBtn" then TweenService:Create(MinimizeLine, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play()
+        elseif btn.Name == "SearchBtn" and not searchExpanded then TweenService:Create(circleStroke, TweenInfo.new(0.15), {Color = hoverColor}):Play(); TweenService:Create(SearchHandle, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play()
+        elseif btn.Name == "CloseBtn" then TweenService:Create(CloseLine1, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play(); TweenService:Create(CloseLine2, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play() end
+    end)
+    btn.MouseLeave:Connect(function()
+        if UIState ~= "OPEN" then return end 
+        TweenService:Create(btn, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = Color3.fromRGB(15, 15, 15), BackgroundTransparency = 0.3}):Play()
+        if btn.Name == "ExpandBtn" then TweenService:Create(ExpandStroke, TweenInfo.new(0.15), {Color = Color3.fromHex("#A0A0A0")}):Play()
+        elseif btn.Name == "MinimizeBtn" then TweenService:Create(MinimizeLine, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play()
+        elseif btn.Name == "SearchBtn" then TweenService:Create(circleStroke, TweenInfo.new(0.15), {Color = Color3.fromHex("#A0A0A0")}):Play(); TweenService:Create(SearchHandle, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play()
+        elseif btn.Name == "CloseBtn" then TweenService:Create(CloseLine1, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play(); TweenService:Create(CloseLine2, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play() end
+    end)
+end
+
+AplicarEfeitoFisicoBotao(SearchBtn, Color3.fromRGB(255, 255, 255))
+AplicarEfeitoFisicoBotao(MinimizeBtn, Color3.fromRGB(255, 255, 255))
+AplicarEfeitoFisicoBotao(ExpandBtn, Color3.fromRGB(255, 255, 255))
+AplicarEfeitoFisicoBotao(CloseBtn, Color3.fromRGB(255, 60, 60))
+
 createTabBtn("Player")
 createTabBtn("Combat")
 createTabBtn("Visuals")
@@ -1387,7 +1106,6 @@ local function ExecutarIntroAkat()
     openScale.Completed:Connect(function() 
         selectTab("Player") 
         MainScale:Destroy(); IntroFrame:Destroy(); Blur:Destroy()
-        ShowNotification("AKATSUKI", "Script loaded successfully.", 4)
     end)
 end
 
