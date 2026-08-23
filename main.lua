@@ -1,4 +1,6 @@
 -- [[ AKATSUKI UI ONLY [v3.6] - FIXED & IMPROVED (SOLID LIQUID RED EDITION) ]]
+-- Updated with floating multi-layer shadows, refined user badge, interactive search bar with gradient on focus,
+-- optimized taller toggles with scale animation, and clean styling.
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -49,7 +51,6 @@ local activeTab = "Player"
 local tabButtons = {}
 local isExpanded = false
 local originalTrans = {}
-local confirmBlur = nil
 local isConfirmOpen = false
 
 local screenGui = Instance.new("ScreenGui")
@@ -218,8 +219,29 @@ UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragUIToggle = false end
 end)
 
--- ==================== SOLID LIQUID RED BACKGROUND SYSTEM ====================
+-- ==================== SOLID LIQUID RED BACKGROUND SYSTEM WITH FLOATING SHADOWS ====================
 local function CreateGradientPanel(parent, size, pos, name)
+    -- Sombra flutuante (dupla camada extremamente suave, deslocada 2-4px)
+    local shadow1 = Instance.new("Frame", parent)
+    shadow1.Name = name .. "_Shadow1"
+    shadow1.Size = size
+    shadow1.Position = pos + UDim2.new(0, 2, 0, 3)
+    shadow1.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    shadow1.BackgroundTransparency = 0.65
+    shadow1.BorderSizePixel = 0
+    shadow1.ZIndex = 4
+    Instance.new("UICorner", shadow1).CornerRadius = UDim.new(0, 12)
+
+    local shadow2 = Instance.new("Frame", parent)
+    shadow2.Name = name .. "_Shadow2"
+    shadow2.Size = size + UDim2.new(0, 4, 0, 4)
+    shadow2.Position = pos + UDim2.new(0, -2, 0, -2) + UDim2.new(0, 3, 0, 5)
+    shadow2.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    shadow2.BackgroundTransparency = 0.85
+    shadow2.BorderSizePixel = 0
+    shadow2.ZIndex = 3
+    Instance.new("UICorner", shadow2).CornerRadius = UDim.new(0, 14)
+
     local panel = Instance.new("Frame", parent)
     panel.Name = name
     panel.Size = size
@@ -320,20 +342,27 @@ subtitle.Font = Enum.Font.Gotham
 subtitle.TextXAlignment = Enum.TextXAlignment.Center
 subtitle.ZIndex = 11
 
--- ==================== NEW STATIC SEARCH BAR (LEFT PANEL) ====================
+-- ==================== NEW SEARCH BAR (ALTURA 34-36PX, RAIO 9-10PX, STROKE DISCRETO, ANIMAÇÃO AO CLICAR) ====================
 local SearchContainer = Instance.new("Frame", LeftPanel.InnerBg)
 SearchContainer.Name = "SearchContainer"
-SearchContainer.Size = UDim2.new(1, -16, 0, 32)
+SearchContainer.Size = UDim2.new(1, -16, 0, 35)
 SearchContainer.Position = UDim2.new(0, 8, 0, 44)
-SearchContainer.BackgroundColor3 = Color3.fromRGB(15, 5, 5)
-SearchContainer.BackgroundTransparency = 0.4
+SearchContainer.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
+SearchContainer.BackgroundTransparency = 0.3
 SearchContainer.ZIndex = 10
-Instance.new("UICorner", SearchContainer).CornerRadius = UDim.new(0, 6)
+Instance.new("UICorner", SearchContainer).CornerRadius = UDim.new(0, 9)
 
 local searchStroke = Instance.new("UIStroke", SearchContainer)
-searchStroke.Color = Color3.fromRGB(80, 20, 20)
-searchStroke.Transparency = 0.5
+searchStroke.Color = Color3.fromRGB(60, 20, 20)
+searchStroke.Transparency = 0.75
 searchStroke.Thickness = 1
+
+local searchStrokeGrad = Instance.new("UIGradient", searchStroke)
+searchStrokeGrad.Enabled = false
+searchStrokeGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 20, 30)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(100, 0, 0))
+})
 
 local SearchIconFrame = Instance.new("Frame", SearchContainer)
 SearchIconFrame.Size = UDim2.new(0, 14, 0, 14)
@@ -346,14 +375,14 @@ scCircle.Size = UDim2.new(0, 8, 0, 8)
 scCircle.BackgroundTransparency = 1
 Instance.new("UICorner", scCircle).CornerRadius = UDim.new(1, 0)
 local scCStroke = Instance.new("UIStroke", scCircle)
-scCStroke.Color = Color3.fromHex("#A0A0A0")
+scCStroke.Color = Color3.fromRGB(140, 140, 140)
 scCStroke.Thickness = 1.2
 
 local scHandle = Instance.new("Frame", SearchIconFrame)
 scHandle.Size = UDim2.new(0, 1.2, 0, 5)
 scHandle.Position = UDim2.new(0, 9, 0, 8)
 scHandle.Rotation = -45
-scHandle.BackgroundColor3 = Color3.fromHex("#A0A0A0")
+scHandle.BackgroundColor3 = Color3.fromRGB(140, 140, 140)
 scHandle.BorderSizePixel = 0
 
 local searchTextBox = Instance.new("TextBox", SearchContainer)
@@ -397,6 +426,7 @@ end
 TabsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(UpdateTabsCanvas)
 TabsContainer:GetPropertyChangedSignal("AbsoluteSize"):Connect(UpdateTabsCanvas)
 
+-- ==================== REFINED USER BADGE ====================
 local UserProfileFrame = Instance.new("Frame", LeftPanel.InnerBg)
 UserProfileFrame.Size = UDim2.new(1, -16, 0, 55)
 UserProfileFrame.Position = UDim2.new(0, 8, 1, -63)
@@ -406,7 +436,6 @@ UserProfileFrame.BorderSizePixel = 0
 UserProfileFrame.ZIndex = 10
 Instance.new("UICorner", UserProfileFrame).CornerRadius = UDim.new(0, 8)
 
--- ANIMATED BADGE STROKE
 local userStroke = Instance.new("UIStroke", UserProfileFrame)
 userStroke.Thickness = 1.2
 userStroke.Color = Color3.fromRGB(255, 255, 255)
@@ -426,15 +455,15 @@ userGrad.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(1, Color3.fromRGB(5, 5, 5))
 })
 
+-- Avatar um pouco menor (34x34)
 local AvatarImage = Instance.new("ImageLabel", UserProfileFrame)
-AvatarImage.Size = UDim2.new(0, 38, 0, 38)
-AvatarImage.Position = UDim2.new(0, 8, 0.5, -19)
+AvatarImage.Size = UDim2.new(0, 34, 0, 34)
+AvatarImage.Position = UDim2.new(0, 10, 0.5, -17)
 AvatarImage.BackgroundTransparency = 1
 AvatarImage.Image = "rbxthumb://type=AvatarHeadShot&id=" .. player.UserId .. "&w=150&h=150"
 AvatarImage.ZIndex = 11
 Instance.new("UICorner", AvatarImage).CornerRadius = UDim.new(1, 0)
 
--- Contorno circular fino com gradient animado na foto do avatar
 local AvatarStroke = Instance.new("UIStroke", AvatarImage)
 AvatarStroke.Thickness = 1.2
 AvatarStroke.Color = Color3.fromRGB(255, 255, 255)
@@ -447,45 +476,58 @@ RunService.RenderStepped:Connect(function()
     avGrad.Rotation = (os.clock() * 30) % 360
 end)
 
+-- Pequena indicação visual de status (ponto verde online)
+local StatusIndicator = Instance.new("Frame", AvatarImage)
+StatusIndicator.Size = UDim2.new(0, 9, 0, 9)
+StatusIndicator.Position = UDim2.new(1, -7, 1, -7)
+StatusIndicator.BackgroundColor3 = Color3.fromRGB(40, 220, 80)
+StatusIndicator.BorderSizePixel = 0
+StatusIndicator.ZIndex = 14
+Instance.new("UICorner", StatusIndicator).CornerRadius = UDim.new(1, 0)
+local statusStroke = Instance.new("UIStroke", StatusIndicator)
+statusStroke.Color = Color3.fromRGB(15, 5, 5)
+statusStroke.Thickness = 1.5
+
+-- Mais espaço entre avatar e texto (início em X=52) e nome ligeiramente maior (13.5 pt)
 local DisplayNameLabel = Instance.new("TextLabel", UserProfileFrame)
-DisplayNameLabel.Size = UDim2.new(1, -84, 0, 16)
+DisplayNameLabel.Size = UDim2.new(1, -82, 0, 16)
 DisplayNameLabel.Position = UDim2.new(0, 54, 0.5, -16)
 DisplayNameLabel.BackgroundTransparency = 1
 DisplayNameLabel.Text = player.DisplayName
-DisplayNameLabel.TextColor3 = Color3.fromRGB(235, 235, 235)
+DisplayNameLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
 DisplayNameLabel.Font = Enum.Font.GothamBold
-DisplayNameLabel.TextSize = 13
+DisplayNameLabel.TextSize = 13.5
 DisplayNameLabel.TextXAlignment = Enum.TextXAlignment.Left
 DisplayNameLabel.TextTruncate = Enum.TextTruncate.AtEnd
 DisplayNameLabel.ZIndex = 11
 
+-- Username mais escuro
 local UsernameLabel = Instance.new("TextLabel", UserProfileFrame)
-UsernameLabel.Size = UDim2.new(1, -84, 0, 14)
-UsernameLabel.Position = UDim2.new(0, 54, 0.5, 1)
+UsernameLabel.Size = UDim2.new(1, -82, 0, 14)
+UsernameLabel.Position = UDim2.new(0, 54, 0.5, 2)
 UsernameLabel.BackgroundTransparency = 1
 UsernameLabel.Text = "@" .. player.Name
-UsernameLabel.TextColor3 = Color3.fromRGB(140, 140, 140)
+UsernameLabel.TextColor3 = Color3.fromRGB(110, 110, 110)
 UsernameLabel.Font = Enum.Font.Gotham
 UsernameLabel.TextSize = 11.5
 UsernameLabel.TextXAlignment = Enum.TextXAlignment.Left
 UsernameLabel.TextTruncate = Enum.TextTruncate.AtEnd
 UsernameLabel.ZIndex = 11
 
+-- Botão de privacidade menor (~20x20), fundo quase preto, ícone branco, sem gradiente constante
 local PrivacyBtn = Instance.new("ImageButton", UserProfileFrame)
-PrivacyBtn.Size = UDim2.new(0, 22, 0, 22)
-PrivacyBtn.Position = UDim2.new(1, -28, 0.5, -11)
-PrivacyBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-PrivacyBtn.BackgroundTransparency = 0.4
+PrivacyBtn.Size = UDim2.new(0, 20, 0, 20)
+PrivacyBtn.Position = UDim2.new(1, -26, 0.5, -10)
+PrivacyBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+PrivacyBtn.BackgroundTransparency = 0.2
 PrivacyBtn.BorderSizePixel = 0
 PrivacyBtn.ZIndex = 12
-Instance.new("UICorner", PrivacyBtn).CornerRadius = UDim.new(0, 6)
+Instance.new("UICorner", PrivacyBtn).CornerRadius = UDim.new(0, 5)
 
-local privGrad = Instance.new("UIGradient", PrivacyBtn)
-privGrad.Rotation = 45
-privGrad.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(230, 20, 25)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 0, 0))
-})
+local privStroke = Instance.new("UIStroke", PrivacyBtn)
+privStroke.Color = Color3.fromRGB(60, 20, 20)
+privStroke.Thickness = 1
+privStroke.Transparency = 0.5
 
 local PrivacyIcon = Instance.new("ImageLabel", PrivacyBtn)
 PrivacyIcon.Size = UDim2.new(1, -6, 1, -6)
@@ -513,7 +555,7 @@ PrivacyBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ==================== RIGHT PANEL HEADER & BADGE ====================
+-- ==================== RIGHT PANEL HEADER & BADGE (V3.6: 44x18, 8-9px, sem stroke forte) ====================
 local topButtons = Instance.new("Frame", RightPanel.InnerBg)
 topButtons.Size = UDim2.new(1, -12, 0, 36)
 topButtons.Position = UDim2.new(0, 0, 0, 0)
@@ -547,7 +589,7 @@ MinimizeLine.Name = "Line"
 MinimizeLine.AnchorPoint = Vector2.new(0.5, 0.5)
 MinimizeLine.Position = UDim2.new(0.5, 0, 0.5, 0)
 MinimizeLine.Size = UDim2.new(0, 9, 0, 1.2)
-MinimizeLine.BackgroundColor3 = Color3.fromHex("#A0A0A0")
+MinimizeLine.BackgroundColor3 = Color3.fromRGB(160, 160, 160)
 MinimizeLine.BorderSizePixel = 0
 MinimizeLine.ZIndex = 12
 
@@ -569,7 +611,7 @@ ExpandSquare.Position = UDim2.new(0.5, 0, 0.5, 0)
 ExpandSquare.BackgroundTransparency = 1
 ExpandSquare.ZIndex = 12
 local ExpandStroke = Instance.new("UIStroke", ExpandSquare)
-ExpandStroke.Color = Color3.fromHex("#A0A0A0")
+ExpandStroke.Color = Color3.fromRGB(160, 160, 160)
 ExpandStroke.Thickness = 1 
 
 local CloseBtn = Instance.new("TextButton", ControlsFrame)
@@ -587,7 +629,7 @@ CloseLine1.AnchorPoint = Vector2.new(0.5, 0.5)
 CloseLine1.Position = UDim2.new(0.5, 0, 0.5, 0)
 CloseLine1.Size = UDim2.new(0, 10, 0, 1.2)
 CloseLine1.Rotation = 45
-CloseLine1.BackgroundColor3 = Color3.fromHex("#A0A0A0")
+CloseLine1.BackgroundColor3 = Color3.fromRGB(160, 160, 160)
 CloseLine1.BorderSizePixel = 0
 CloseLine1.ZIndex = 12
 local CloseLine2 = Instance.new("Frame", CloseBtn)
@@ -596,7 +638,7 @@ CloseLine2.AnchorPoint = Vector2.new(0.5, 0.5)
 CloseLine2.Position = UDim2.new(0.5, 0, 0.5, 0)
 CloseLine2.Size = UDim2.new(0, 10, 0, 1.2)
 CloseLine2.Rotation = -45
-CloseLine2.BackgroundColor3 = Color3.fromHex("#A0A0A0")
+CloseLine2.BackgroundColor3 = Color3.fromRGB(160, 160, 160)
 CloseLine2.BorderSizePixel = 0
 CloseLine2.ZIndex = 12
 
@@ -610,7 +652,7 @@ RightSeparatorLine.ZIndex = 10
 
 local BadgeFrame = Instance.new("Frame", RightPanel.InnerBg)
 BadgeFrame.Name = "BadgeFrame"
-BadgeFrame.Size = UDim2.new(0, 50, 0, 18)
+BadgeFrame.Size = UDim2.new(0, 44, 0, 18)
 BadgeFrame.Position = UDim2.new(0, 12, 0, 9)
 BadgeFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 BadgeFrame.BorderSizePixel = 0
@@ -630,13 +672,13 @@ BadgeText.BackgroundTransparency = 1
 BadgeText.Text = "V3.6"
 BadgeText.TextColor3 = Color3.fromRGB(255, 255, 255)
 BadgeText.Font = Enum.Font.GothamBold
-BadgeText.TextSize = 9
+BadgeText.TextSize = 8.5
 BadgeText.ZIndex = 16
 
 local BadgeStroke = Instance.new("UIStroke", BadgeFrame)
 BadgeStroke.Color = Color3.fromRGB(230, 20, 25)
-BadgeStroke.Transparency = 0.7
-BadgeStroke.Thickness = 1.5
+BadgeStroke.Transparency = 0.9
+BadgeStroke.Thickness = 1
 BadgeStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
 local togglesContainer = Instance.new("ScrollingFrame", RightPanel.InnerBg)
@@ -661,7 +703,7 @@ local uiPadding = Instance.new("UIPadding", togglesContainer)
 uiPadding.PaddingTop = UDim.new(0, 8)
 uiPadding.PaddingBottom = UDim.new(0, 8)
 uiPadding.PaddingLeft = UDim.new(0, 4)
-uiPadding.PaddingRight = UDim.new(0, 8)
+uiPadding.PaddingRight = UDim.new(0, 12) -- Espaço extra à direita para afastar da scrollbar
 
 local function UpdateCanvasSize()
     local contentHeight = containerLayout.AbsoluteContentSize.Y + 24
@@ -672,7 +714,7 @@ end
 containerLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(UpdateCanvasSize)
 togglesContainer:GetPropertyChangedSignal("AbsoluteSize"):Connect(UpdateCanvasSize)
 
--- ==================== CONFIRM FRAME (REDESIGNED) ====================
+-- ==================== CONFIRM FRAME ====================
 local confirmOverlay = Instance.new("Frame", mainWrapper)
 confirmOverlay.Name = "ConfirmOverlay"
 confirmOverlay.Size = UDim2.new(1, 0, 1, 0)
@@ -695,7 +737,6 @@ confirmCard.BorderSizePixel = 0
 confirmCard.ZIndex = 995
 Instance.new("UICorner", confirmCard).CornerRadius = UDim.new(0, 14)
 
--- Contorno com gradiente animado para a tela de confirmação
 local confirmStroke = Instance.new("UIStroke", confirmCard)
 confirmStroke.Thickness = 1.5
 confirmStroke.Color = Color3.fromRGB(255, 255, 255)
@@ -738,7 +779,7 @@ Instance.new("UICorner", confirmSep).CornerRadius = UDim.new(1, 0)
 local btnYes = Instance.new("TextButton", confirmCard)
 btnYes.Size = UDim2.new(0, 118, 0, 32)
 btnYes.Position = UDim2.new(0.5, -124, 0, 62)
-btnYes.BackgroundColor3 = Color3.fromHex("#8B0000")
+btnYes.BackgroundColor3 = Color3.fromRGB(139, 0, 0)
 btnYes.TextColor3 = Color3.fromRGB(255, 255, 255)
 btnYes.Font = Enum.Font.GothamMedium
 btnYes.TextSize = 11
@@ -770,14 +811,13 @@ btnNoStroke.Thickness = 1
 btnNoStroke.Transparency = 0.3
 
 btnYes.MouseEnter:Connect(function() TweenService:Create(btnYes, TweenInfo.new(0.12, Enum.EasingStyle.Quad), {BackgroundColor3 = Color3.fromRGB(180, 20, 20)}):Play() end)
-btnYes.MouseLeave:Connect(function() TweenService:Create(btnYes, TweenInfo.new(0.12, Enum.EasingStyle.Quad), {BackgroundColor3 = Color3.fromHex("#8B0000")}):Play() end)
+btnYes.MouseLeave:Connect(function() TweenService:Create(btnYes, TweenInfo.new(0.12, Enum.EasingStyle.Quad), {BackgroundColor3 = Color3.fromRGB(139, 0, 0)}):Play() end)
 btnNo.MouseEnter:Connect(function() TweenService:Create(btnNo, TweenInfo.new(0.12, Enum.EasingStyle.Quad), {BackgroundColor3 = Color3.fromRGB(45, 45, 45)}):Play() end)
 btnNo.MouseLeave:Connect(function() TweenService:Create(btnNo, TweenInfo.new(0.12, Enum.EasingStyle.Quad), {BackgroundColor3 = Color3.fromRGB(30, 30, 30)}):Play() end)
 
--- Ensure initial correct transparencies map immediately 
 AplicarFadeSincronizado(confirmCard, true, 0) 
 
--- ==================== SISTEMA DE NOTIFICAÇÃO ====================
+-- ==================== SISTEMA DE NOTIFICAÇÃO COM SOMBRAS FLUTUANTES ====================
 local NOTIF_DURATION = 6 
 
 local function CriarNotificacao(titulo, descricao, icone)
@@ -789,6 +829,27 @@ local function CriarNotificacao(titulo, descricao, icone)
     notifHolder.BackgroundTransparency = 1
     notifHolder.ZIndex = 200
     notifHolder.ClipsDescendants = false
+
+    -- Sombra flutuante dupla extremamente suave para a notificação
+    local shadow1 = Instance.new("Frame", notifHolder)
+    shadow1.Name = "Shadow1"
+    shadow1.Size = UDim2.new(1, 0, 1, 0)
+    shadow1.Position = UDim2.new(0, 2, 0, 3)
+    shadow1.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    shadow1.BackgroundTransparency = 0.65
+    shadow1.BorderSizePixel = 0
+    shadow1.ZIndex = 199
+    Instance.new("UICorner", shadow1).CornerRadius = UDim.new(0, 16)
+
+    local shadow2 = Instance.new("Frame", notifHolder)
+    shadow2.Name = "Shadow2"
+    shadow2.Size = UDim2.new(1, 4, 1, 4)
+    shadow2.Position = UDim2.new(0, -2, 0, -2) + UDim2.new(0, 3, 0, 5)
+    shadow2.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    shadow2.BackgroundTransparency = 0.88
+    shadow2.BorderSizePixel = 0
+    shadow2.ZIndex = 198
+    Instance.new("UICorner", shadow2).CornerRadius = UDim.new(0, 18)
 
     local notifCard = Instance.new("Frame", notifHolder)
     notifCard.Name = "NotifCard"
@@ -813,27 +874,6 @@ local function CriarNotificacao(titulo, descricao, icone)
         ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 30, 30))
     })
 
-    -- Sombra corrigida para não vazar a caixa incorretamente
-    local shadowFrame = Instance.new("Frame", notifHolder)
-    shadowFrame.Name = "Shadow"
-    shadowFrame.Size = UDim2.new(1, 0, 1, 0)
-    shadowFrame.Position = UDim2.new(0, 4, 0, 4)
-    shadowFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    shadowFrame.BackgroundTransparency = 0.5
-    shadowFrame.BorderSizePixel = 0
-    shadowFrame.ZIndex = 199
-    Instance.new("UICorner", shadowFrame).CornerRadius = UDim.new(0, 16)
-
-    local shadowFrame2 = Instance.new("Frame", notifHolder)
-    shadowFrame2.Name = "Shadow2"
-    shadowFrame2.Size = UDim2.new(1, 0, 1, 0)
-    shadowFrame2.Position = UDim2.new(0, 7, 0, 7)
-    shadowFrame2.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    shadowFrame2.BackgroundTransparency = 0.7
-    shadowFrame2.BorderSizePixel = 0
-    shadowFrame2.ZIndex = 198
-    Instance.new("UICorner", shadowFrame2).CornerRadius = UDim.new(0, 16)
-
     local accentBar = Instance.new("Frame", notifCard)
     accentBar.Size = UDim2.new(0, 3, 0, 40)
     accentBar.Position = UDim2.new(0, 12, 0.5, -20)
@@ -855,7 +895,7 @@ local function CriarNotificacao(titulo, descricao, icone)
     notifTitle.Text = titulo or "AKATSUKI"
     notifTitle.TextColor3 = Color3.fromRGB(240, 240, 240)
     notifTitle.Font = Enum.Font.GothamBold
-    notifTitle.TextSize = 13 -- Aumentado
+    notifTitle.TextSize = 13
     notifTitle.TextXAlignment = Enum.TextXAlignment.Left
     notifTitle.ZIndex = 203
 
@@ -866,7 +906,7 @@ local function CriarNotificacao(titulo, descricao, icone)
     notifDesc.Text = descricao or ""
     notifDesc.TextColor3 = Color3.fromRGB(150, 150, 155)
     notifDesc.Font = Enum.Font.Gotham
-    notifDesc.TextSize = 11.5 -- Aumentado
+    notifDesc.TextSize = 11.5
     notifDesc.TextXAlignment = Enum.TextXAlignment.Left
     notifDesc.TextYAlignment = Enum.TextYAlignment.Top
     notifDesc.TextWrapped = true
@@ -934,7 +974,6 @@ local function CriarNotificacao(titulo, descricao, icone)
     progressBar.ZIndex = 203
     Instance.new("UICorner", progressBar).CornerRadius = UDim.new(1, 0)
     local progressGrad = Instance.new("UIGradient", progressBar)
-    progressGrad.Rotation = 0
     progressGrad.Color = ColorSequence.new({
         ColorSequenceKeypoint.new(0, Color3.fromRGB(200, 30, 30)),
         ColorSequenceKeypoint.new(0.5, Color3.fromRGB(230, 60, 40)),
@@ -950,8 +989,8 @@ local function CriarNotificacao(titulo, descricao, icone)
         local slideOut = TweenInfo.new(0.38, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
         TweenService:Create(notifHolder, slideOut, {Position = UDim2.new(1, 340, 1, -24)}):Play()
         TweenService:Create(notifCard, slideOut, {BackgroundTransparency = 1}):Play()
-        TweenService:Create(shadowFrame, slideOut, {BackgroundTransparency = 1}):Play()
-        TweenService:Create(shadowFrame2, slideOut, {BackgroundTransparency = 1}):Play()
+        TweenService:Create(shadow1, slideOut, {BackgroundTransparency = 1}):Play()
+        TweenService:Create(shadow2, slideOut, {BackgroundTransparency = 1}):Play()
         task.delay(0.4, function()
             if notifHolder and notifHolder.Parent then
                 notifHolder:Destroy()
@@ -997,7 +1036,7 @@ local function filterToggles(currentActiveTab, query)
                     task.delay((itemIndex - 1) * 0.02, function()
                         if not child or not child.Parent then return end
                         TweenService:Create(child, TweenInfo.new(0.2, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {
-                            Size = UDim2.new(1, -30, 0, 52), BackgroundTransparency = 0.45
+                            Size = UDim2.new(1, -30, 0, 60), BackgroundTransparency = 0.45
                         }):Play()
                         if t then TweenService:Create(t, TweenInfo.new(0.15), {TextTransparency = 0}):Play() end
                         if d then TweenService:Create(d, TweenInfo.new(0.15), {TextTransparency = 0}):Play() end
@@ -1049,9 +1088,10 @@ local function createTabBtn(tabName)
     tabBtn.ZIndex = 11
     Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 8)
 
+    -- Barra lateral com apenas 2 px de espessura
     local activeBar = Instance.new("Frame", tabBtn)
     activeBar.Name = "ActiveBar"
-    activeBar.Size = UDim2.new(0, 3, 0, 20)
+    activeBar.Size = UDim2.new(0, 2, 0, 20)
     activeBar.Position = UDim2.new(0, 2, 0.5, -10)
     activeBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     activeBar.BorderSizePixel = 0
@@ -1059,7 +1099,6 @@ local function createTabBtn(tabName)
     activeBar.ZIndex = 13 
     Instance.new("UICorner", activeBar).CornerRadius = UDim.new(1, 0)
 
-    -- Adiciona o gradiente animado à barra lateral vermelha 
     local actGrad = Instance.new("UIGradient", activeBar)
     actGrad.Color = ColorSequence.new({
         ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 10, 15)),
@@ -1095,7 +1134,7 @@ local function createTabBtn(tabName)
     tabLabel.BackgroundTransparency = 1
     tabLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
     tabLabel.Font = Enum.Font.GothamMedium
-    tabLabel.TextSize = 13 -- Aumentado
+    tabLabel.TextSize = 13
     tabLabel.TextXAlignment = Enum.TextXAlignment.Left
     tabLabel.Text = UI_TEXT.Tabs[tabName] or tabName
     tabLabel.ZIndex = 12
@@ -1107,7 +1146,8 @@ end
 local function createToggle(parent, configKey, tabCategory)
     local toggleFrame = Instance.new("Frame")
     toggleFrame.Name = configKey
-    toggleFrame.Size = UDim2.new(1, -30, 0, 52)
+    -- Tamanho ajustado (altura 60px e espaçamento melhorado à direita)
+    toggleFrame.Size = UDim2.new(1, -26, 0, 60)
     toggleFrame.BackgroundColor3 = Color3.fromRGB(15, 5, 5)
     toggleFrame.BackgroundTransparency = 0.45
     toggleFrame.ZIndex = 11
@@ -1115,18 +1155,22 @@ local function createToggle(parent, configKey, tabCategory)
     toggleFrame:SetAttribute("Tab", tabCategory)
     toggleFrame:SetAttribute("ConfigKey", configKey)
     toggleFrame.Parent = parent
-    Instance.new("UICorner", toggleFrame).CornerRadius = UDim.new(0, 6)
+    
+    local toggleScale = Instance.new("UIScale", toggleFrame)
+    toggleScale.Scale = 1
+
+    Instance.new("UICorner", toggleFrame).CornerRadius = UDim.new(0, 8)
     local stroke = Instance.new("UIStroke", toggleFrame)
-    stroke.Color = Color3.fromHex("#141414")
+    stroke.Color = Color3.fromRGB(20, 20, 20)
     stroke.Thickness = 1
     
     local optData = UI_TEXT.Options[configKey]
     local titleLabel = Instance.new("TextLabel", toggleFrame)
     titleLabel.Name = "Title"
-    titleLabel.Size = UDim2.new(0.7, 0, 0, 16)
-    titleLabel.Position = UDim2.new(0, 10, 0, 6)
+    titleLabel.Size = UDim2.new(0.7, 0, 0, 18)
+    titleLabel.Position = UDim2.new(0, 12, 0, 9)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.TextColor3 = Color3.fromHex("#CCCCCC")
+    titleLabel.TextColor3 = Color3.fromRGB(210, 210, 210)
     titleLabel.Font = Enum.Font.GothamBold
     titleLabel.TextSize = 13
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -1135,28 +1179,29 @@ local function createToggle(parent, configKey, tabCategory)
     
     local descLabel = Instance.new("TextLabel", toggleFrame)
     descLabel.Name = "Description"
-    descLabel.Size = UDim2.new(0.7, 0, 0, 26)
-    descLabel.Position = UDim2.new(0, 10, 0, 22)
+    descLabel.Size = UDim2.new(0.7, 0, 0, 28)
+    descLabel.Position = UDim2.new(0, 12, 0, 28)
     descLabel.BackgroundTransparency = 1
     descLabel.TextColor3 = Color3.fromRGB(130, 130, 130)
     descLabel.Font = Enum.Font.Gotham
-    descLabel.TextSize = 10
+    descLabel.TextSize = 10.5
     descLabel.TextXAlignment = Enum.TextXAlignment.Left
     descLabel.TextYAlignment = Enum.TextYAlignment.Top
     descLabel.TextWrapped = true
     descLabel.Text = optData and optData.Desc or ""
     descLabel.ZIndex = 11
     
+    -- Track ativo em vermelho escuro (#8B0000) e círculo branco
     local switchTrack = Instance.new("Frame", toggleFrame)
-    switchTrack.Size = UDim2.new(0, 46, 0, 22) -- Botão de power maior
-    switchTrack.Position = UDim2.new(1, -54, 0.5, -11)
+    switchTrack.Size = UDim2.new(0, 48, 0, 24)
+    switchTrack.Position = UDim2.new(1, -58, 0.5, -12)
     switchTrack.BackgroundColor3 = Configs[configKey] and Color3.fromHex("#8B0000") or Color3.fromRGB(30, 30, 30)
     switchTrack.ZIndex = 11
     Instance.new("UICorner", switchTrack).CornerRadius = UDim.new(1, 0)
     
     local switchCircle = Instance.new("Frame", switchTrack)
-    switchCircle.Size = UDim2.new(0, 16, 0, 16) -- Botão de power maior
-    switchCircle.Position = Configs[configKey] and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
+    switchCircle.Size = UDim2.new(0, 18, 0, 18)
+    switchCircle.Position = Configs[configKey] and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)
     switchCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     switchCircle.ZIndex = 12
     Instance.new("UICorner", switchCircle).CornerRadius = UDim.new(1, 0)
@@ -1168,16 +1213,33 @@ local function createToggle(parent, configKey, tabCategory)
     triggerBtn.ZIndex = 13
     
     triggerBtn.MouseButton1Click:Connect(function()
+        PlayUI_Click()
         Configs[configKey] = not Configs[configKey]
-        local targetPos   = Configs[configKey] and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
+        local targetPos   = Configs[configKey] and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)
         local targetColor = Configs[configKey] and Color3.fromHex("#8B0000") or Color3.fromRGB(30, 30, 30)
         local anim = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
         TweenService:Create(switchCircle, anim, {Position = targetPos}):Play()
         TweenService:Create(switchTrack, anim, {BackgroundColor3 = targetColor}):Play()
+        
+        -- Animação de scale 0.96 → 1 ao clicar
+        toggleScale.Scale = 0.96
+        TweenService:Create(toggleScale, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Scale = 1}):Play()
     end)
 end
 
--- Funcionalidade nova da barra de busca sem precisar clicar pra expandir
+-- ==================== SEARCH BAR INTERACTIVE FOCUS / BLUR LOGIC ====================
+searchTextBox.Focused:Connect(function()
+    TweenService:Create(SearchContainer, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, -16, 0, 37)}):Play()
+    searchStroke.Transparency = 0.1
+    searchStrokeGrad.Enabled = true
+end)
+
+searchTextBox.FocusLost:Connect(function()
+    TweenService:Create(SearchContainer, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, -16, 0, 35)}):Play()
+    searchStroke.Transparency = 0.75
+    searchStrokeGrad.Enabled = false
+end)
+
 searchTextBox:GetPropertyChangedSignal("Text"):Connect(function()
     filterToggles(activeTab, searchTextBox.Text)
 end)
@@ -1224,29 +1286,23 @@ end
 MinimizeBtn.MouseButton1Click:Connect(function() 
     PlayUI_Click()
     TweenService:Create(MinimizeBtn, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = Color3.fromRGB(15, 15, 15), BackgroundTransparency = 0.3}):Play()
-    TweenService:Create(MinimizeLine, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play()
+    TweenService:Create(MinimizeLine, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(160, 160, 160)}):Play()
     SetUIState("MINIMIZED")
 end)
 
--- ==================== CONFIRM DIALOG LOGIC (REDESIGNED & SYNCED) ====================
 local function AlternarConfirmacao(exibir)
     isConfirmOpen = exibir
     local tempoAnim = 0.22
 
     if exibir then
         confirmOverlay.Visible = true
-        
         confirmCard.Size = UDim2.new(0, 280, 0, 115)
         local cardScale = Instance.new("UIScale", confirmCard)
         cardScale.Scale = 0.88
         TweenService:Create(cardScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
-        
-        -- Aproveitando nossa função para fazer o FadeIn perfeito junto de tudo que tem dentro
         AplicarFadeSincronizado(confirmCard, false, tempoAnim)
     else
-        -- FadeOut sincronizado
         AplicarFadeSincronizado(confirmCard, true, tempoAnim)
-        
         local sc = confirmCard:FindFirstChildOfClass("UIScale")
         if sc then
             TweenService:Create(sc, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Scale = 0.88}):Play()
@@ -1287,9 +1343,9 @@ local function AplicarEfeitoFisicoBotao(btn, hoverColor)
     btn.MouseLeave:Connect(function()
         if UIState ~= "OPEN" then return end 
         TweenService:Create(btn, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = Color3.fromRGB(15, 15, 15), BackgroundTransparency = 0.3}):Play()
-        if btn.Name == "ExpandBtn" then TweenService:Create(ExpandStroke, TweenInfo.new(0.15), {Color = Color3.fromHex("#A0A0A0")}):Play()
-        elseif btn.Name == "MinimizeBtn" then TweenService:Create(MinimizeLine, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play()
-        elseif btn.Name == "CloseBtn" then TweenService:Create(CloseLine1, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play(); TweenService:Create(CloseLine2, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromHex("#A0A0A0")}):Play() end
+        if btn.Name == "ExpandBtn" then TweenService:Create(ExpandStroke, TweenInfo.new(0.15), {Color = Color3.fromRGB(160, 160, 160)}):Play()
+        elseif btn.Name == "MinimizeBtn" then TweenService:Create(MinimizeLine, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(160, 160, 160)}):Play()
+        elseif btn.Name == "CloseBtn" then TweenService:Create(CloseLine1, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(160, 160, 160)}):Play(); TweenService:Create(CloseLine2, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(160, 160, 160)}):Play() end
     end)
 end
 
