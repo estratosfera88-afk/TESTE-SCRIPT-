@@ -220,20 +220,51 @@ UserInputService.InputEnded:Connect(function(input)
 end)
 
 -- ==================== SOLID LIQUID RED BACKGROUND SYSTEM WITH REAL 3D SHADOW ====================
+-- Sombra 3D refinada: multi-camada, difusa, mais concentrada embaixo, quase invisível em cima,
+-- sem halo uniforme e sem caixa preta atrás do painel. Estática em relação ao painel (só
+-- reage a mudanças reais de tamanho/posição via GetPropertyChangedSignal, sem RenderStepped).
+local SHADOW_TEXTURE = "rbxassetid://5554831957"
+local SHADOW_SLICE = Rect.new(36, 36, 114, 114)
+
+local function BuildShadowLayer(parent, cornerRadius, layerName, zIndex)
+    local layer = Instance.new("ImageLabel", parent)
+    layer.Name = layerName
+    layer.BackgroundTransparency = 1
+    layer.Image = SHADOW_TEXTURE
+    layer.ImageColor3 = Color3.fromRGB(0, 0, 0)
+    layer.ScaleType = Enum.ScaleType.Slice
+    layer.SliceCenter = SHADOW_SLICE
+    layer.AnchorPoint = Vector2.new(0.5, 0.5)
+    layer.ZIndex = zIndex
+    layer.BorderSizePixel = 0
+    return layer
+end
+
 local function CreateGradientPanel(parent, size, pos, name)
-    -- Sombra 3D realista usando textura dispersa (elimina caixa preta)
-    local shadow = Instance.new("ImageLabel", parent)
-    shadow.Name = name .. "_Shadow"
-    shadow.AnchorPoint = Vector2.new(0.5, 0.5)
-    shadow.Position = pos + UDim2.new(0.5, 0, 0.5, 4)
-    shadow.Size = size + UDim2.new(0, 24, 0, 24)
-    shadow.BackgroundTransparency = 1
-    shadow.Image = "rbxassetid://5554831957"
-    shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
-    shadow.ImageTransparency = 0.45
-    shadow.ScaleType = Enum.ScaleType.Slice
-    shadow.SliceCenter = Rect.new(36, 36, 114, 114)
-    shadow.ZIndex = 3
+    -- Container dedicado da sombra: fica atrás do painel e nunca cria uma "caixa preta"
+    -- porque cada camada usa transparências baixas e offsets pequenos, com o grosso do
+    -- efeito concentrado abaixo do painel.
+    local shadowHolder = Instance.new("Frame", parent)
+    shadowHolder.Name = name .. "_ShadowHolder"
+    shadowHolder.BackgroundTransparency = 1
+    shadowHolder.BorderSizePixel = 0
+    shadowHolder.Size = size
+    shadowHolder.Position = pos
+    shadowHolder.ZIndex = 3
+
+    -- Camada 1: sombra ampla e bem difusa (profundidade geral, quase imperceptível nas laterais/topo)
+    local shadowWide = BuildShadowLayer(shadowHolder, 10, name .. "_ShadowWide", 3)
+    shadowWide.AnchorPoint = Vector2.new(0.5, 0.5)
+    shadowWide.Position = UDim2.new(0.5, 0, 0.5, 6)
+    shadowWide.Size = UDim2.new(1, 20, 1, 20)
+    shadowWide.ImageTransparency = 0.72
+
+    -- Camada 2: sombra mais fechada e concentrada embaixo, dando a sensação de elevação real
+    local shadowTight = BuildShadowLayer(shadowHolder, 10, name .. "_ShadowTight", 4)
+    shadowTight.AnchorPoint = Vector2.new(0.5, 0.5)
+    shadowTight.Position = UDim2.new(0.5, 1, 0.5, 7)
+    shadowTight.Size = UDim2.new(1, 8, 1, 12)
+    shadowTight.ImageTransparency = 0.6
 
     local panel = Instance.new("Frame", parent)
     panel.Name = name
@@ -245,6 +276,15 @@ local function CreateGradientPanel(parent, size, pos, name)
     panel.ClipsDescendants = false
 
     Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 10)
+
+    -- Sombra acompanha o painel apenas quando há mudança real de tamanho/posição
+    -- (ex: botão ExpandBtn), sem usar RenderStepped nem conexões por frame.
+    panel:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+        shadowHolder.Size = UDim2.new(0, panel.AbsoluteSize.X, 0, panel.AbsoluteSize.Y)
+    end)
+    panel:GetPropertyChangedSignal("AbsolutePosition"):Connect(function()
+        shadowHolder.Position = UDim2.new(0, panel.AbsolutePosition.X - panel.Parent.AbsolutePosition.X, 0, panel.AbsolutePosition.Y - panel.Parent.AbsolutePosition.Y)
+    end)
 
     local outerStroke = Instance.new("UIStroke", panel)
     outerStroke.Name = "OuterStroke"
@@ -663,12 +703,6 @@ BadgeText.Font = Enum.Font.GothamBold
 BadgeText.TextSize = 8.5
 BadgeText.ZIndex = 16
 
-local BadgeStroke = Instance.new("UIStroke", BadgeFrame)
-BadgeStroke.Color = Color3.fromRGB(230, 20, 25)
-BadgeStroke.Transparency = 0.9
-BadgeStroke.Thickness = 1
-BadgeStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-
 local togglesContainer = Instance.new("ScrollingFrame", RightPanel.InnerBg)
 togglesContainer.Name = "TogglesContainer"
 togglesContainer.Size = UDim2.new(1, -6, 1, -48)
@@ -1079,8 +1113,8 @@ local function createTabBtn(tabName)
 
     local iconContainer = Instance.new("Frame", tabBtn)
     iconContainer.Name = "Icon"
-    iconContainer.Size = UDim2.new(0, 18, 0, 18) 
-    iconContainer.Position = UDim2.new(0, 12, 0.5, -9)
+    iconContainer.Size = UDim2.new(0, 14, 0, 14) 
+    iconContainer.Position = UDim2.new(0, 14, 0.5, -7)
     iconContainer.BackgroundTransparency = 1
     iconContainer.ZIndex = 12
     local imageLabel = Instance.new("ImageLabel", iconContainer)
@@ -1322,8 +1356,8 @@ AplicarEfeitoFisicoBotao(CloseBtn, Color3.fromRGB(255, 60, 60))
 
 createTabBtn("Player")
 createTabBtn("Combat")
-createTabBtn("Visuals")
 createTabBtn("Teleports")
+createTabBtn("Visuals")
 createTabBtn("Settings")
 
 createToggle(togglesContainer, "Speed",       "Player")
