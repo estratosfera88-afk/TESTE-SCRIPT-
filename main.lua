@@ -284,8 +284,8 @@ local RightPanel = CreateGradientPanel(mainFrame, UDim2.new(1, -235, 1, 0), UDim
 local LeftSeparatorLine = Instance.new("Frame", LeftPanel.InnerBg)
 LeftSeparatorLine.Size = UDim2.new(1, 0, 0, 1)
 LeftSeparatorLine.Position = UDim2.new(0, 0, 0, 36)
-LeftSeparatorLine.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-LeftSeparatorLine.BackgroundTransparency = 0.5
+LeftSeparatorLine.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+LeftSeparatorLine.BackgroundTransparency = 0
 LeftSeparatorLine.BorderSizePixel = 0
 LeftSeparatorLine.ZIndex = 10
 
@@ -434,6 +434,19 @@ AvatarImage.Image = "rbxthumb://type=AvatarHeadShot&id=" .. player.UserId .. "&w
 AvatarImage.ZIndex = 11
 Instance.new("UICorner", AvatarImage).CornerRadius = UDim.new(1, 0)
 
+-- Contorno circular fino com gradient animado na foto do avatar
+local AvatarStroke = Instance.new("UIStroke", AvatarImage)
+AvatarStroke.Thickness = 1.2
+AvatarStroke.Color = Color3.fromRGB(255, 255, 255)
+local avGrad = Instance.new("UIGradient", AvatarStroke)
+avGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 10, 15)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 0, 0))
+})
+RunService.RenderStepped:Connect(function()
+    avGrad.Rotation = (os.clock() * 30) % 360
+end)
+
 local DisplayNameLabel = Instance.new("TextLabel", UserProfileFrame)
 DisplayNameLabel.Size = UDim2.new(1, -84, 0, 16)
 DisplayNameLabel.Position = UDim2.new(0, 54, 0.5, -16)
@@ -441,7 +454,7 @@ DisplayNameLabel.BackgroundTransparency = 1
 DisplayNameLabel.Text = player.DisplayName
 DisplayNameLabel.TextColor3 = Color3.fromRGB(235, 235, 235)
 DisplayNameLabel.Font = Enum.Font.GothamBold
-DisplayNameLabel.TextSize = 11
+DisplayNameLabel.TextSize = 13
 DisplayNameLabel.TextXAlignment = Enum.TextXAlignment.Left
 DisplayNameLabel.TextTruncate = Enum.TextTruncate.AtEnd
 DisplayNameLabel.ZIndex = 11
@@ -453,7 +466,7 @@ UsernameLabel.BackgroundTransparency = 1
 UsernameLabel.Text = "@" .. player.Name
 UsernameLabel.TextColor3 = Color3.fromRGB(140, 140, 140)
 UsernameLabel.Font = Enum.Font.Gotham
-UsernameLabel.TextSize = 10
+UsernameLabel.TextSize = 11.5
 UsernameLabel.TextXAlignment = Enum.TextXAlignment.Left
 UsernameLabel.TextTruncate = Enum.TextTruncate.AtEnd
 UsernameLabel.ZIndex = 11
@@ -682,6 +695,19 @@ confirmCard.BorderSizePixel = 0
 confirmCard.ZIndex = 995
 Instance.new("UICorner", confirmCard).CornerRadius = UDim.new(0, 14)
 
+-- Contorno com gradiente animado para a tela de confirmação
+local confirmStroke = Instance.new("UIStroke", confirmCard)
+confirmStroke.Thickness = 1.5
+confirmStroke.Color = Color3.fromRGB(255, 255, 255)
+local confStrokeGrad = Instance.new("UIGradient", confirmStroke)
+confStrokeGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 10, 15)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 0, 0))
+})
+RunService.RenderStepped:Connect(function()
+    confStrokeGrad.Rotation = (os.clock() * 30) % 360
+end)
+
 local confirmCardGrad = Instance.new("UIGradient", confirmCard)
 confirmCardGrad.Rotation = 135
 confirmCardGrad.Color = ColorSequence.new({
@@ -787,26 +813,26 @@ local function CriarNotificacao(titulo, descricao, icone)
         ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 30, 30))
     })
 
-    -- Fixed Drop Shadows
+    -- Sombra corrigida para não vazar a caixa incorretamente
     local shadowFrame = Instance.new("Frame", notifHolder)
     shadowFrame.Name = "Shadow"
-    shadowFrame.Size = UDim2.new(1, 4, 1, 4)
-    shadowFrame.Position = UDim2.new(0, 2, 0, 2)
+    shadowFrame.Size = UDim2.new(1, 0, 1, 0)
+    shadowFrame.Position = UDim2.new(0, 4, 0, 4)
     shadowFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    shadowFrame.BackgroundTransparency = 0.55
+    shadowFrame.BackgroundTransparency = 0.5
     shadowFrame.BorderSizePixel = 0
     shadowFrame.ZIndex = 199
-    Instance.new("UICorner", shadowFrame).CornerRadius = UDim.new(0, 18)
+    Instance.new("UICorner", shadowFrame).CornerRadius = UDim.new(0, 16)
 
     local shadowFrame2 = Instance.new("Frame", notifHolder)
     shadowFrame2.Name = "Shadow2"
-    shadowFrame2.Size = UDim2.new(1, 8, 1, 8)
-    shadowFrame2.Position = UDim2.new(0, 4, 0, 4)
+    shadowFrame2.Size = UDim2.new(1, 0, 1, 0)
+    shadowFrame2.Position = UDim2.new(0, 7, 0, 7)
     shadowFrame2.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    shadowFrame2.BackgroundTransparency = 0.72
+    shadowFrame2.BackgroundTransparency = 0.7
     shadowFrame2.BorderSizePixel = 0
     shadowFrame2.ZIndex = 198
-    Instance.new("UICorner", shadowFrame2).CornerRadius = UDim.new(0, 18)
+    Instance.new("UICorner", shadowFrame2).CornerRadius = UDim.new(0, 16)
 
     local accentBar = Instance.new("Frame", notifCard)
     accentBar.Size = UDim2.new(0, 3, 0, 40)
@@ -829,7 +855,7 @@ local function CriarNotificacao(titulo, descricao, icone)
     notifTitle.Text = titulo or "AKATSUKI"
     notifTitle.TextColor3 = Color3.fromRGB(240, 240, 240)
     notifTitle.Font = Enum.Font.GothamBold
-    notifTitle.TextSize = 11
+    notifTitle.TextSize = 13 -- Aumentado
     notifTitle.TextXAlignment = Enum.TextXAlignment.Left
     notifTitle.ZIndex = 203
 
@@ -840,7 +866,7 @@ local function CriarNotificacao(titulo, descricao, icone)
     notifDesc.Text = descricao or ""
     notifDesc.TextColor3 = Color3.fromRGB(150, 150, 155)
     notifDesc.Font = Enum.Font.Gotham
-    notifDesc.TextSize = 9.5
+    notifDesc.TextSize = 11.5 -- Aumentado
     notifDesc.TextXAlignment = Enum.TextXAlignment.Left
     notifDesc.TextYAlignment = Enum.TextYAlignment.Top
     notifDesc.TextWrapped = true
@@ -1027,11 +1053,21 @@ local function createTabBtn(tabName)
     activeBar.Name = "ActiveBar"
     activeBar.Size = UDim2.new(0, 3, 0, 20)
     activeBar.Position = UDim2.new(0, 2, 0.5, -10)
-    activeBar.BackgroundColor3 = Color3.fromHex("#8B0000")
+    activeBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     activeBar.BorderSizePixel = 0
     activeBar.Visible = false
     activeBar.ZIndex = 13 
     Instance.new("UICorner", activeBar).CornerRadius = UDim.new(1, 0)
+
+    -- Adiciona o gradiente animado à barra lateral vermelha 
+    local actGrad = Instance.new("UIGradient", activeBar)
+    actGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 10, 15)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 0, 0))
+    })
+    RunService.RenderStepped:Connect(function()
+        actGrad.Rotation = (os.clock() * 30) % 360
+    end)
 
     local iconContainer = Instance.new("Frame", tabBtn)
     iconContainer.Name = "Icon"
@@ -1059,7 +1095,7 @@ local function createTabBtn(tabName)
     tabLabel.BackgroundTransparency = 1
     tabLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
     tabLabel.Font = Enum.Font.GothamMedium
-    tabLabel.TextSize = 11
+    tabLabel.TextSize = 13 -- Aumentado
     tabLabel.TextXAlignment = Enum.TextXAlignment.Left
     tabLabel.Text = UI_TEXT.Tabs[tabName] or tabName
     tabLabel.ZIndex = 12
@@ -1112,14 +1148,15 @@ local function createToggle(parent, configKey, tabCategory)
     descLabel.ZIndex = 11
     
     local switchTrack = Instance.new("Frame", toggleFrame)
-    switchTrack.Size = UDim2.new(0, 38, 0, 18)
-    switchTrack.Position = UDim2.new(1, -44, 0.5, -9)
+    switchTrack.Size = UDim2.new(0, 46, 0, 22) -- Botão de power maior
+    switchTrack.Position = UDim2.new(1, -54, 0.5, -11)
     switchTrack.BackgroundColor3 = Configs[configKey] and Color3.fromHex("#8B0000") or Color3.fromRGB(30, 30, 30)
     switchTrack.ZIndex = 11
     Instance.new("UICorner", switchTrack).CornerRadius = UDim.new(1, 0)
+    
     local switchCircle = Instance.new("Frame", switchTrack)
-    switchCircle.Size = UDim2.new(0, 12, 0, 12)
-    switchCircle.Position = Configs[configKey] and UDim2.new(1, -15, 0.5, -6) or UDim2.new(0, 3, 0.5, -6)
+    switchCircle.Size = UDim2.new(0, 16, 0, 16) -- Botão de power maior
+    switchCircle.Position = Configs[configKey] and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
     switchCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     switchCircle.ZIndex = 12
     Instance.new("UICorner", switchCircle).CornerRadius = UDim.new(1, 0)
@@ -1132,7 +1169,7 @@ local function createToggle(parent, configKey, tabCategory)
     
     triggerBtn.MouseButton1Click:Connect(function()
         Configs[configKey] = not Configs[configKey]
-        local targetPos   = Configs[configKey] and UDim2.new(1, -15, 0.5, -6) or UDim2.new(0, 3, 0.5, -6)
+        local targetPos   = Configs[configKey] and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
         local targetColor = Configs[configKey] and Color3.fromHex("#8B0000") or Color3.fromRGB(30, 30, 30)
         local anim = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
         TweenService:Create(switchCircle, anim, {Position = targetPos}):Play()
