@@ -1,10 +1,7 @@
---[[
-    AKATSUKI BLOX FRUITS SCRIPT - v2.0.0
-    Reestruturado e corrigido por Zeni
-    Arquitetura modular, sistemas reais e controle de threads.
---]]
+-- =====================================================================
+-- [[ AKATSUKI BLOX FRUITS SCRIPT [v1.1.1] - AUTO FARM | PVP | RAID | TP ]]
+-- =====================================================================
 
--- ==================== SERVICES ====================
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
@@ -15,1154 +12,465 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
-local VirtualInputManager = game:GetService("VirtualInputManager")
 
 local player = Players.LocalPlayer
-local camera = Workspace.CurrentCamera
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+local humanoid = character:WaitForChild("Humanoid")
 
--- ==================== CONFIGURATION ====================
-local Config = {
-    -- Auto Farm
+-- ==================== CONFIGURAÇÕES PRINCIPAIS ====================
+local Configs = {
     AutoFarm = false,
+    AutoFarmMob = false,
     AutoFarmBoss = false,
     AutoCollectChest = false,
     AutoStats = false,
-    SelectedMob = "Lowest Level Mob",
-    SelectedBoss = "None",
-    SelectedStat = "Melee",
-    FarmSafeDistance = 14,
 
-    -- PvP
     AimbotPvP = false,
-    AimFOV = 300,
+    AntiFlinch = false,
+    PvPAutoBlock = false,
     FruitSniper = false,
 
-    -- Raid
     AutoRaid = false,
+    RaidInstant = false,
 
-    -- Visual
     PlayerESP = false,
     FruitESP = false,
 
-    -- Extras
     AutoRevive = false,
     ServerHop = false,
 }
 
--- ==================== CHARACTER SYSTEM ====================
-local CharacterSystem = {}
-CharacterSystem.__index = CharacterSystem
+-- ==================== VARIÁVEIS ====================
+local farmLoop = nil
+local selectedMob = "Lowest Level Mob"
+local selectedBoss = "None"
+local farmSafeDistance = 12
+local pvpTarget = nil
+local aimbotConnection = nil
+local antiFlinchConn = nil
+local camera = Workspace.CurrentCamera
+local espObjects = {}
 
-function CharacterSystem.new()
-    local self = setmetatable({}, CharacterSystem)
-    self.Character = nil
-    self.HumanoidRootPart = nil
-    self.Humanoid = nil
-    self.OnCharacterAdded = nil
-    self:Connect()
-    return self
+-- ==================== LISTA DE TELEPORTES ====================
+local Teleports = {
+    { Name = "Cidade do Povo",     Sea = 1, Position = Vector3.new(-1245, 40, 1380) },
+    { Name = "Marine Starter",     Sea = 1, Position = Vector3.new(975, 122, 1596) },
+    { Name = "Baú Misterioso",     Sea = 1, Position = Vector3.new(-3000, 15, 1000) },
+    { Name = "Ilha Cozinha",       Sea = 1, Position = Vector3.new(-471, 7, -1120) },
+    { Name = "Ilha Espadas",       Sea = 1, Position = Vector3.new(-938, 9, -1254) },
+    { Name = "Floresta",           Sea = 1, Position = Vector3.new(-2100, 10, -120) },
+    { Name = "Ilha Pirata",        Sea = 1, Position = Vector3.new(-1500, 7, 200) },
+    { Name = "Deserto",            Sea = 1, Position = Vector3.new(922, 9, 1000) },
+    { Name = "Ilha Zoro",          Sea = 1, Position = Vector3.new(2022, 8, -700) },
+    { Name = "Ilha Skypea",        Sea = 1, Position = Vector3.new(-5074, 2000, 200) },
+    { Name = "Café (Mar 2)",       Sea = 2, Position = Vector3.new(-2600, 6, -830) },
+    { Name = "Floresta Mar 2",     Sea = 2, Position = Vector3.new(-1060, 8, -4360) },
+    { Name = "Ilha Snow",          Sea = 2, Position = Vector3.new(1660, 8, 570) },
+    { Name = "Ilha Colosseum",     Sea = 2, Position = Vector3.new(925, 10, -1830) },
+    { Name = "Ilha Zou",           Sea = 2, Position = Vector3.new(-4200, 80, -400) },
+    { Name = "Sand Kingdom",       Sea = 2, Position = Vector3.new(4380, 10, -3280) },
+    { Name = "Assassin Hideout",   Sea = 2, Position = Vector3.new(-3680, 10, -4080) },
+    { Name = "Port Town",          Sea = 3, Position = Vector3.new(-2640, 72, -3735) },
+    { Name = "Hydra Island",       Sea = 3, Position = Vector3.new(4700, 350, 8600) },
+    { Name = "Floating Turtle",    Sea = 3, Position = Vector3.new(-11950, 800, -6025) },
+    { Name = "Great Tree",         Sea = 3, Position = Vector3.new(-14150, 250, -6025) },
+    { Name = "Castle on the Sea",  Sea = 3, Position = Vector3.new(-6700, 250, 8200) },
+    { Name = "Raid Island",        Sea = 0, Position = Vector3.new(-15970, 700, 3800) },
+    { Name = "Marineford",         Sea = 0, Position = Vector3.new(-28000, 11, 2375) },
+    { Name = "Fountain City",      Sea = 0, Position = Vector3.new(-5000, 350, 9800) },
+}
+
+-- ==================== UTILITÁRIOS ====================
+local function CharacterReady()
+    character = player.Character
+    if not character then return false end
+    humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    humanoid = character:FindFirstChild("Humanoid")
+    return humanoidRootPart ~= nil and humanoid ~= nil and humanoid.Health > 0
 end
 
-function CharacterSystem:Connect()
-    self:UpdateCharacter(player.Character)
-    player.CharacterAdded:Connect(function(char)
-        self:UpdateCharacter(char)
-        if self.OnCharacterAdded then
-            self.OnCharacterAdded(char)
-        end
-    end)
-    player.CharacterRemoving:Connect(function()
-        self:UpdateCharacter(nil)
-    end)
-end
-
-function CharacterSystem:UpdateCharacter(char)
-    self.Character = char
-    self.HumanoidRootPart = char and char:FindFirstChild("HumanoidRootPart") or nil
-    self.Humanoid = char and char:FindFirstChild("Humanoid") or nil
-end
-
-function CharacterSystem:IsAlive()
-    return self.Character ~= nil and self.HumanoidRootPart ~= nil and self.Humanoid ~= nil and self.Humanoid.Health > 0
-end
-
-function CharacterSystem:WaitForCharacter(timeout)
-    timeout = timeout or 5
-    local start = os.clock()
-    while not self:IsAlive() do
-        if os.clock() - start > timeout then return false end
-        task.wait(0.2)
-    end
-    return true
-end
-
-function CharacterSystem:GetPosition()
-    return self.HumanoidRootPart and self.HumanoidRootPart.Position or Vector3.zero
-end
-
-function CharacterSystem:TeleportTo(pos, safeDistance)
-    if not self:IsAlive() then return false end
+local function SafeTeleport(pos)
+    if not CharacterReady() then return end
     pcall(function()
-        self.HumanoidRootPart.AssemblyLinearVelocity = Vector3.zero
-        self.HumanoidRootPart.AssemblyAngularVelocity = Vector3.zero
-        local targetPos = pos
-        if safeDistance and safeDistance > 0 then
-            targetPos = pos + Vector3.new(0, safeDistance, 0)
-        end
-        self.Character:PivotTo(CFrame.new(targetPos))
+        humanoidRootPart.AssemblyLinearVelocity = Vector3.zero
+        humanoidRootPart.AssemblyAngularVelocity = Vector3.zero
+        character:PivotTo(CFrame.new(pos))
         task.wait(0.05)
-        self.HumanoidRootPart.AssemblyLinearVelocity = Vector3.zero
-    end)
-    return true
-end
-
--- ==================== TASK MANAGER ====================
-local TaskManager = {}
-TaskManager.__index = TaskManager
-
-function TaskManager.new(name)
-    local self = setmetatable({}, TaskManager)
-    self.Name = name or "Task"
-    self.Token = nil
-    self.Thread = nil
-    return self
-end
-
-function TaskManager:IsRunning()
-    return self.Token ~= nil
-end
-
-function TaskManager:Start(func, ...)
-    self:Stop()
-    self.Token = {}
-    local token = self.Token
-    self.Thread = task.spawn(function()
-        local ok, err = pcall(func, token, ...)
-        if not ok then
-            warn("[TaskManager] Erro em", self.Name, ":", err)
-        end
-        if self.Token == token then
-            self.Token = nil
-            self.Thread = nil
-        end
+        humanoidRootPart.AssemblyLinearVelocity = Vector3.zero
     end)
 end
 
-function TaskManager:Stop()
-    if self.Token then
-        self.Token = nil
-        self.Thread = nil
-    end
-end
-
--- ==================== UTILITY FUNCTIONS ====================
-local Utility = {}
-
-function Utility.IsAliveModel(model, checkHumanoid)
-    if not model or not model:IsA("Model") then return false end
-    local hum = model:FindFirstChildOfClass("Humanoid")
-    local hrp = model:FindFirstChild("HumanoidRootPart")
-    if not hum or not hrp then return false end
-    if checkHumanoid and hum.Health <= 0 then return false end
-    return true
-end
-
-function Utility.IsNPC(model)
-    return Utility.IsAliveModel(model) and not Players:GetPlayerFromCharacter(model)
-end
-
-function Utility.GetClosestPlayer(maxDist)
-    local char = CharacterSystemInstance
-    if not char:IsAlive() then return nil end
-    local closest, minDist = nil, maxDist or math.huge
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 then
-            local hrp = plr.Character.HumanoidRootPart
-            local dist = (hrp.Position - char:GetPosition()).Magnitude
-            if dist < minDist then
-                minDist = dist
-                closest = plr
+local function GetClosestPlayer(maxDist)
+    local closest, dist = nil, maxDist or math.huge
+    if not CharacterReady() then return nil end
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= player and p.Character then
+            local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+            local hum = p.Character:FindFirstChild("Humanoid")
+            if hrp and hum and hum.Health > 0 then
+                local d = (hrp.Position - humanoidRootPart.Position).Magnitude
+                if d < dist then dist = d; closest = p end
             end
         end
     end
     return closest
 end
 
-function Utility.GetClosestEnemy(maxDist, filterFunc)
-    local char = CharacterSystemInstance
-    if not char:IsAlive() then return nil end
-    local closest, minDist = nil, maxDist or math.huge
-    for _, model in ipairs(Workspace:GetChildren()) do
-        if model:IsA("Model") and model ~= char.Character and Utility.IsNPC(model) then
-            if filterFunc and not filterFunc(model) then continue end
-            local hrp = model.HumanoidRootPart
-            local dist = (hrp.Position - char:GetPosition()).Magnitude
-            if dist < minDist then
-                minDist = dist
-                closest = model
+local function GetClosestEnemy(maxDistance)
+    local closest, dist = nil, maxDistance or 300
+    if not CharacterReady() then return nil end
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("Model") and obj ~= character then
+            local hum = obj:FindFirstChild("Humanoid")
+            local hrp = obj:FindFirstChild("HumanoidRootPart")
+            if hum and hrp and hum.Health > 0 and not Players:GetPlayerFromCharacter(obj) then
+                local d = (hrp.Position - humanoidRootPart.Position).Magnitude
+                if d < dist then
+                    dist = d
+                    closest = { Model = obj, HRP = hrp, Humanoid = hum }
+                end
             end
         end
     end
     return closest
 end
 
--- ==================== COMBAT SYSTEM ====================
-local CombatSystem = {}
-
-function CombatSystem.EquipBestWeapon()
-    local char = CharacterSystemInstance
-    if not char:IsAlive() then return nil end
-    local backpack = player.Backpack
-    local currentTool = char.Character:FindFirstChildOfClass("Tool")
-    if currentTool then
-        return currentTool
-    end
-    local bestTool = nil
-    local bestScore = -1
-    for _, tool in ipairs(backpack:GetChildren()) do
-        if tool:IsA("Tool") then
-            local score = 0
-            if tool:FindFirstChild("Melee") or tool.Name:lower():find("combat") then score = 3
-            elseif tool:FindFirstChild("Sword") then score = 2
-            elseif tool:FindFirstChild("Fruit") then score = 1
-            end
-            if score > bestScore then
-                bestScore = score
-                bestTool = tool
-            end
-        end
-    end
-    if bestTool then
-        char.Humanoid:EquipTool(bestTool)
-        return bestTool
-    end
-    return nil
-end
-
-function CombatSystem.AttackTarget(target)
-    local char = CharacterSystemInstance
-    if not char:IsAlive() or not target or not target:IsA("Model") then return end
-    local tool = CombatSystem.EquipBestWeapon()
-    if tool then
-        pcall(function()
-            tool:Activate()
-        end)
-    end
-    pcall(function()
-        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
-        task.wait(0.05)
-        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
-    end)
-end
-
--- ==================== QUEST SYSTEM ====================
-local QuestSystem = {}
-QuestSystem.__index = QuestSystem
-
-local QuestData = {
-    [1] = {
-        { Level = 0, NPC = "Bandit", QuestName = "BanditQuest1", QuestID = 1 },
-        { Level = 10, NPC = "Monkey", QuestName = "MonkeyQuest1", QuestID = 2 },
-        { Level = 15, NPC = "Pirate", QuestName = "PirateQuest1", QuestID = 3 },
-        { Level = 20, NPC = "Brute", QuestName = "BruteQuest1", QuestID = 4 },
-        { Level = 30, NPC = "Desert Bandit", QuestName = "DesertBanditQuest1", QuestID = 5 },
-    },
-    [2] = {
-        { Level = 700, NPC = "Raider", QuestName = "RaiderQuest1", QuestID = 101 },
-        { Level = 750, NPC = "Mercenary", QuestName = "MercenaryQuest1", QuestID = 102 },
-    },
-    [3] = {
-        { Level = 1500, NPC = "Pirate Millionaire", QuestName = "PirateMillionaireQuest1", QuestID = 201 },
-    },
-}
-
-function QuestSystem.new()
-    local self = setmetatable({}, QuestSystem)
-    self.CurrentQuest = nil
-    self.QuestRemote = nil
-    self:InitRemotes()
-    return self
-end
-
-function QuestSystem:InitRemotes()
-    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-    if remotes then
-        self.QuestRemote = remotes:FindFirstChild("CommF_")
-    end
-end
-
-function QuestSystem:GetSea()
-    local char = CharacterSystemInstance
-    if not char:IsAlive() then return 1 end
-    local pos = char:GetPosition()
-    if pos.Y > 1000 then return 3 end
-    if pos.Magnitude > 10000 then return 3 end
-    if pos.X < -5000 and pos.Z < 5000 and pos.Y < 500 then return 2 end
-    if pos.X < -10000 then return 3 end
-    return 1
-end
-
-function QuestSystem:GetLevel()
-    if not CharacterSystemInstance:IsAlive() then return 0 end
-    return CharacterSystemInstance.Humanoid.Level or 0
-end
-
-function QuestSystem:FindAppropriateQuest()
-    local sea = self:GetSea()
-    local level = self:GetLevel()
-    local questList = QuestData[sea] or {}
-    local bestQuest = nil
-    for _, q in ipairs(questList) do
-        if q.Level <= level then
-            bestQuest = q
-        else
-            break
-        end
-    end
-    return bestQuest
-end
-
-function QuestSystem:GetCurrentQuestRemote()
-    if not self.QuestRemote then return nil end
-    local ok, current = pcall(function()
-        return self.QuestRemote:InvokeServer("GetQuestData")
-    end)
-    if ok and current and current ~= "" then
-        return current
-    end
-    return nil
-end
-
-function QuestSystem:AbandonCurrentQuest()
-    if self.QuestRemote then
-        pcall(function()
-            self.QuestRemote:InvokeServer("AbandonQuest")
-        end)
-    end
-end
-
-function QuestSystem:StartQuest(questData)
-    if not questData or not self.QuestRemote then return false end
-    local ok, err = pcall(function()
-        self.QuestRemote:InvokeServer("StartQuest", questData.QuestName, questData.QuestID)
-    end)
-    return ok
-end
-
-function QuestSystem:GetQuestNPC(questData)
-    if not questData then return nil end
-    for _, model in ipairs(Workspace:GetChildren()) do
-        if model:IsA("Model") and Utility.IsNPC(model) then
-            local npcName = model.Name
-            if npcName:lower():find(questData.NPC:lower()) then
-                return model
-            end
-        end
-    end
-    return nil
-end
-
-function QuestSystem:IsQuestCompleted()
-    if not self.QuestRemote then return false end
-    local ok, completed = pcall(function()
-        return self.QuestRemote:InvokeServer("CheckQuestCompleted")
-    end)
-    return ok and completed
-end
-
--- ==================== MOB SYSTEM ====================
-local MobSystem = {}
-
-function MobSystem.GetMobName(model)
-    return model and model.Name or "Unknown"
-end
-
-function MobSystem.IsMobForQuest(model, questData)
-    if not questData then return false end
-    local mobName = MobSystem.GetMobName(model)
-    return mobName:lower():find(questData.NPC:lower()) ~= nil
-end
-
-function MobSystem.GetClosestMobForQuest(questData, maxDist)
-    return Utility.GetClosestEnemy(maxDist, function(model)
-        return MobSystem.IsMobForQuest(model, questData)
-    end)
-end
-
--- ==================== BOSS SYSTEM ====================
-local BossSystem = {}
-
-local BossList = {
-    { Name = "Gorilla King", Sea = 1, ModelName = "Gorilla King", Level = 25 },
-    { Name = "Bobby", Sea = 1, ModelName = "Bobby", Level = 55 },
-    { Name = "Yeti", Sea = 1, ModelName = "Yeti", Level = 105 },
-    { Name = "Mob Leader", Sea = 1, ModelName = "Mob Leader", Level = 120 },
-    { Name = "Vice Admiral", Sea = 1, ModelName = "Vice Admiral", Level = 130 },
-    { Name = "Diamond", Sea = 2, ModelName = "Diamond", Level = 750 },
-    { Name = "Jeremy", Sea = 2, ModelName = "Jeremy", Level = 850 },
-    { Name = "Fajita", Sea = 2, ModelName = "Fajita", Level = 900 },
-    { Name = "Don Swan", Sea = 2, ModelName = "Don Swan", Level = 1000 },
-    { Name = "Smoke Admiral", Sea = 2, ModelName = "Smoke Admiral", Level = 1150 },
-    { Name = "Stone", Sea = 3, ModelName = "Stone", Level = 1500 },
-    { Name = "Island Empress", Sea = 3, ModelName = "Island Empress", Level = 1600 },
-    { Name = "Kilo Admiral", Sea = 3, ModelName = "Kilo Admiral", Level = 1750 },
-    { Name = "Captain Elephant", Sea = 3, ModelName = "Captain Elephant", Level = 1900 },
-    { Name = "Beautiful Pirate", Sea = 3, ModelName = "Beautiful Pirate", Level = 2000 },
-}
-
-function BossSystem.GetBossByName(name)
-    for _, boss in ipairs(BossList) do
-        if boss.Name:lower() == name:lower() then
-            return boss
-        end
-    end
-    return nil
-end
-
-function BossSystem.FindBossModel(bossData)
-    for _, model in ipairs(Workspace:GetChildren()) do
-        if model:IsA("Model") and model.Name:lower() == bossData.ModelName:lower() then
-            if Utility.IsAliveModel(model) then
-                return model
-            end
-        end
-    end
-    return nil
-end
-
--- ==================== AUTO FARM SYSTEM ====================
-local AutoFarm = {}
-AutoFarm.__index = AutoFarm
-
-function AutoFarm.new()
-    local self = setmetatable({}, AutoFarm)
-    self.TaskManager = TaskManager.new("AutoFarm")
-    self.QuestSystem = QuestSystem.new()
-    return self
-end
-
-function AutoFarm:Start()
-    if self.TaskManager:IsRunning() then return end
-    self.TaskManager:Start(function(token)
-        while token == self.TaskManager.Token and Config.AutoFarm do
-            if not CharacterSystemInstance:WaitForCharacter(2) then task.wait(1); continue end
-
-            local targetQuest = self.QuestSystem:FindAppropriateQuest()
-            if not targetQuest then
-                task.wait(2)
-                continue
-            end
-
-            local currentQuest = self.QuestSystem:GetCurrentQuestRemote()
-            if currentQuest ~= targetQuest.QuestName then
-                self.QuestSystem:AbandonCurrentQuest()
-                self.QuestSystem:StartQuest(targetQuest)
+-- ==================== AUTO FARM (MOBS) ====================
+local function StartAutoFarm()
+    if farmLoop then farmLoop = false; task.wait(0.1) end
+    farmLoop = true
+    task.spawn(function()
+        local equippedTool = nil
+        while farmLoop and Configs.AutoFarm do
+            if not CharacterReady() then
                 task.wait(1)
-            end
-
-            local npc = self.QuestSystem:GetQuestNPC(targetQuest)
-            if npc then
-                local npcHRP = npc:FindFirstChild("HumanoidRootPart")
-                if npcHRP then
-                    CharacterSystemInstance:TeleportTo(npcHRP.Position, Config.FarmSafeDistance)
-                    task.wait(0.5)
-                    pcall(function()
-                        if npc:FindFirstChild("ProximityPrompt") then
-                            fireproximityprompt(npc.ProximityPrompt)
-                        end
-                    end)
-                    task.wait(0.5)
-                end
-            end
-
-            while Config.AutoFarm and CharacterSystemInstance:IsAlive() do
-                if self.QuestSystem:IsQuestCompleted() then break end
-
-                local target = nil
-                if Config.SelectedMob == "Lowest Level Mob" then
-                    target = MobSystem.GetClosestMobForQuest(targetQuest, 300)
-                else
-                    target = Utility.GetClosestEnemy(300, function(model)
-                        return model.Name:lower() == Config.SelectedMob:lower()
-                    end)
-                end
-
-                if target then
-                    local targetHRP = target:FindFirstChild("HumanoidRootPart")
-                    if targetHRP then
-                        CharacterSystemInstance:TeleportTo(targetHRP.Position, Config.FarmSafeDistance)
-                        task.wait(0.1)
-                        for _ = 1, 5 do
-                            if not Config.AutoFarm then break end
-                            CombatSystem.AttackTarget(target)
-                            task.wait(0.15)
-                        end
+            else
+                -- Tentar pegar missão (protegido)
+                pcall(function()
+                    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+                    if remotes and remotes:FindFirstChild("CommF_") then
+                        remotes.CommF_:InvokeServer("StartQuest", "BanditQuest1", 1)
                     end
-                else
-                    task.wait(0.5)
-                end
-                task.wait(0.2)
-            end
+                end)
 
-            task.wait(0.5)
-        end
-    end)
-end
-
-function AutoFarm:Stop()
-    self.TaskManager:Stop()
-end
-
--- ==================== BOSS FARM SYSTEM ====================
-local BossFarm = {}
-BossFarm.__index = BossFarm
-
-function BossFarm.new()
-    local self = setmetatable({}, BossFarm)
-    self.TaskManager = TaskManager.new("BossFarm")
-    return self
-end
-
-function BossFarm:Start()
-    if self.TaskManager:IsRunning() then return end
-    self.TaskManager:Start(function(token)
-        while token == self.TaskManager.Token and Config.AutoFarmBoss do
-            if not CharacterSystemInstance:IsAlive() then task.wait(1); continue end
-            local bossData = BossSystem.GetBossByName(Config.SelectedBoss)
-            if not bossData then task.wait(2); continue end
-
-            local bossModel = BossSystem.FindBossModel(bossData)
-            if not bossModel then
-                task.wait(5)
-                continue
-            end
-
-            local bossHRP = bossModel:FindFirstChild("HumanoidRootPart")
-            if bossHRP then
-                CharacterSystemInstance:TeleportTo(bossHRP.Position, Config.FarmSafeDistance)
-                task.wait(0.1)
-                while Config.AutoFarmBoss and CharacterSystemInstance:IsAlive() do
-                    if not BossSystem.FindBossModel(bossData) then break end
-                    if bossModel:FindFirstChild("Humanoid") and bossModel.Humanoid.Health <= 0 then break end
-                    CombatSystem.AttackTarget(bossModel)
-                    task.wait(0.15)
-                end
-                task.wait(2)
-            end
-        end
-    end)
-end
-
-function BossFarm:Stop()
-    self.TaskManager:Stop()
-end
-
--- ==================== AUTO STATS SYSTEM ====================
-local AutoStatsSystem = {}
-AutoStatsSystem.__index = AutoStatsSystem
-
-function AutoStatsSystem.new()
-    local self = setmetatable({}, AutoStatsSystem)
-    self.TaskManager = TaskManager.new("AutoStats")
-    self.StatRemote = nil
-    self:InitRemote()
-    return self
-end
-
-function AutoStatsSystem:InitRemote()
-    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-    if remotes then
-        self.StatRemote = remotes:FindFirstChild("CommF_")
-    end
-end
-
-function AutoStatsSystem:GetAvailablePoints()
-    if not CharacterSystemInstance:IsAlive() then return 0 end
-    return CharacterSystemInstance.Humanoid:GetAttribute("StatPoints") or 0
-end
-
-function AutoStatsSystem:DistributePoints(stat)
-    if not self.StatRemote then return false end
-    local success = pcall(function()
-        self.StatRemote:InvokeServer("AddPoint", stat)
-    end)
-    return success
-end
-
-function AutoStatsSystem:Start()
-    if self.TaskManager:IsRunning() then return end
-    self.TaskManager:Start(function(token)
-        while token == self.TaskManager.Token and Config.AutoStats do
-            if CharacterSystemInstance:IsAlive() then
-                local points = self:GetAvailablePoints()
-                while points > 0 and Config.AutoStats do
-                    local stat = Config.SelectedStat or "Melee"
-                    if not self:DistributePoints(stat) then break end
-                    points = points - 1
-                    task.wait(0.05)
-                end
-            end
-            task.wait(2)
-        end
-    end)
-end
-
-function AutoStatsSystem:Stop()
-    self.TaskManager:Stop()
-end
-
--- ==================== AUTO CHEST SYSTEM ====================
-local AutoChest = {}
-AutoChest.__index = AutoChest
-
-function AutoChest.new()
-    local self = setmetatable({}, AutoChest)
-    self.TaskManager = TaskManager.new("AutoChest")
-    return self
-end
-
-function AutoChest:FindChest()
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if not obj:IsA("Model") then continue end
-        local name = obj.Name:lower()
-        if name:find("chest") or name:find("treasure") or name:find("box") then
-            local pp = obj.PrimaryPart or obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChildOfClass("BasePart")
-            if pp then
-                return obj, pp
-            end
-        end
-    end
-    return nil, nil
-end
-
-function AutoChest:Start()
-    if self.TaskManager:IsRunning() then return end
-    self.TaskManager:Start(function(token)
-        while token == self.TaskManager.Token and Config.AutoCollectChest do
-            if CharacterSystemInstance:IsAlive() then
-                local chest, part = self:FindChest()
-                if chest and part then
-                    CharacterSystemInstance:TeleportTo(part.Position, 3)
-                    task.wait(0.5)
-                    pcall(function()
-                        if part.Parent and part.Parent:FindFirstChild("ProximityPrompt") then
-                            fireproximityprompt(part.Parent.ProximityPrompt)
-                        end
-                    end)
-                    task.wait(1)
-                end
-            end
-            task.wait(2)
-        end
-    end)
-end
-
-function AutoChest:Stop()
-    self.TaskManager:Stop()
-end
-
--- ==================== AIMBOT SYSTEM ====================
-local Aimbot = {}
-Aimbot.__index = Aimbot
-
-function Aimbot.new()
-    local self = setmetatable({}, Aimbot)
-    self.Connection = nil
-    self.Target = nil
-    return self
-end
-
-function Aimbot:Start()
-    self:Stop()
-    self.Connection = RunService.RenderStepped:Connect(function()
-        if not Config.AimbotPvP then
-            self:Stop()
-            return
-        end
-        if not CharacterSystemInstance:IsAlive() then return end
-        local target = Utility.GetClosestPlayer(Config.AimFOV)
-        if target and target.Character and target.Character:FindFirstChild("Head") then
-            local head = target.Character.Head
-            camera.CFrame = CFrame.new(camera.CFrame.Position, head.Position)
-            self.Target = target
-        else
-            self.Target = nil
-        end
-    end)
-end
-
-function Aimbot:Stop()
-    if self.Connection then
-        self.Connection:Disconnect()
-        self.Connection = nil
-    end
-end
-
--- ==================== FRUIT SNIPER SYSTEM ====================
-local FruitSniper = {}
-FruitSniper.__index = FruitSniper
-
-function FruitSniper.new()
-    local self = setmetatable({}, FruitSniper)
-    self.TaskManager = TaskManager.new("FruitSniper")
-    return self
-end
-
-function FruitSniper:FindRealFruit()
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("Model") and obj.Name:lower():find("fruit") then
-            local pp = obj.PrimaryPart or obj:FindFirstChildOfClass("BasePart")
-            if pp and obj:FindFirstChild("ProximityPrompt") then
-                return obj, pp
-            end
-        end
-    end
-    return nil, nil
-end
-
-function FruitSniper:Start()
-    if self.TaskManager:IsRunning() then return end
-    self.TaskManager:Start(function(token)
-        while token == self.TaskManager.Token and Config.FruitSniper do
-            if CharacterSystemInstance:IsAlive() then
-                local fruit, part = self:FindRealFruit()
-                if fruit and part then
-                    CharacterSystemInstance:TeleportTo(part.Position, 3)
-                    task.wait(0.3)
-                    pcall(function()
-                        if part.Parent and part.Parent:FindFirstChild("ProximityPrompt") then
-                            fireproximityprompt(part.Parent.ProximityPrompt)
-                        end
-                    end)
-                    task.wait(1)
-                end
-            end
-            task.wait(2)
-        end
-    end)
-end
-
-function FruitSniper:Stop()
-    self.TaskManager:Stop()
-end
-
--- ==================== AUTO RAID SYSTEM ====================
-local AutoRaidSystem = {}
-AutoRaidSystem.__index = AutoRaidSystem
-
-function AutoRaidSystem.new()
-    local self = setmetatable({}, AutoRaidSystem)
-    self.TaskManager = TaskManager.new("AutoRaid")
-    self.RaidRemote = nil
-    self:InitRemote()
-    return self
-end
-
-function AutoRaidSystem:InitRemote()
-    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-    if remotes then
-        self.RaidRemote = remotes:FindFirstChild("Raid") or remotes:FindFirstChild("StartRaid")
-    end
-end
-
-function AutoRaidSystem:Start()
-    if self.TaskManager:IsRunning() then return end
-    self.TaskManager:Start(function(token)
-        while token == self.TaskManager.Token and Config.AutoRaid do
-            if CharacterSystemInstance:IsAlive() then
-                local sea = QuestSystemInstance:GetSea()
-                if sea == 1 then
-                    CharacterSystemInstance:TeleportTo(Vector3.new(-5000, 10, -2000))
-                elseif sea == 2 then
-                    CharacterSystemInstance:TeleportTo(Vector3.new(-3000, 20, 5000))
-                elseif sea == 3 then
-                    CharacterSystemInstance:TeleportTo(Vector3.new(-12000, 300, 8000))
-                end
-                task.wait(2)
-                if self.RaidRemote then
-                    pcall(function()
-                        self.RaidRemote:FireServer()
-                    end)
-                end
-                task.wait(5)
-                while Config.AutoRaid and CharacterSystemInstance:IsAlive() do
-                    local enemy = Utility.GetClosestEnemy(100)
-                    if enemy then
-                        local hrp = enemy:FindFirstChild("HumanoidRootPart")
-                        if hrp then
-                            CharacterSystemInstance:TeleportTo(hrp.Position, Config.FarmSafeDistance)
-                            task.wait(0.1)
-                            for _ = 1, 10 do
-                                if not Config.AutoRaid then break end
-                                CombatSystem.AttackTarget(enemy)
-                                task.wait(0.1)
+                local enemy = GetClosestEnemy(300)
+                if enemy then
+                    -- Equipar ferramenta se necessário
+                    if not equippedTool or equippedTool.Parent ~= character then
+                        equippedTool = character:FindFirstChildOfClass("Tool")
+                        if not equippedTool then
+                            for _, t in ipairs(player.Backpack:GetChildren()) do
+                                if t:IsA("Tool") then
+                                    humanoid:EquipTool(t)
+                                    equippedTool = t
+                                    break
+                                end
                             end
                         end
-                    else
-                        task.wait(0.5)
                     end
+
+                    -- Flutuar acima do inimigo (suavizado)
+                    local targetCFrame = enemy.HRP.CFrame * CFrame.new(0, farmSafeDistance, 0)
+                    humanoidRootPart.CFrame = humanoidRootPart.CFrame:Lerp(targetCFrame, 0.4)
+                    humanoidRootPart.AssemblyLinearVelocity = Vector3.zero
+
+                    -- Atacar
+                    if equippedTool then
+                        pcall(function()
+                            equippedTool:Activate()
+                        end)
+                        task.wait(0.08)
+                    end
+                else
+                    task.wait(0.5)
+                end
+            end
+            RunService.Heartbeat:Wait()
+        end
+    end)
+end
+
+local function StopAutoFarm()
+    farmLoop = false
+end
+
+-- ==================== AUTO FARM (BOSS) ====================
+local function StartAutoFarmBoss()
+    task.spawn(function()
+        while Configs.AutoFarmBoss do
+            if not CharacterReady() then
+                task.wait(1)
+            else
+                -- Procurar boss (nome contém "boss" ou health alto)
+                local boss = nil
+                for _, obj in ipairs(Workspace:GetDescendants()) do
+                    if obj:IsA("Model") and obj ~= character then
+                        local hum = obj:FindFirstChild("Humanoid")
+                        local hrp = obj:FindFirstChild("HumanoidRootPart")
+                        if hum and hrp and hum.Health > 0 and not Players:GetPlayerFromCharacter(obj) then
+                            local name = obj.Name:lower()
+                            if name:find("boss") or hum.MaxHealth >= 5000 then
+                                boss = { Model = obj, HRP = hrp, Humanoid = hum }
+                                break
+                            end
+                        end
+                    end
+                end
+                if boss then
+                    local equippedTool = character:FindFirstChildOfClass("Tool")
+                    if not equippedTool then
+                        for _, t in ipairs(player.Backpack:GetChildren()) do
+                            if t:IsA("Tool") then
+                                humanoid:EquipTool(t)
+                                equippedTool = t
+                                break
+                            end
+                        end
+                    end
+                    local targetCFrame = boss.HRP.CFrame * CFrame.new(0, farmSafeDistance, 0)
+                    humanoidRootPart.CFrame = humanoidRootPart.CFrame:Lerp(targetCFrame, 0.3)
+                    humanoidRootPart.AssemblyLinearVelocity = Vector3.zero
+                    if equippedTool then
+                        pcall(function() equippedTool:Activate() end)
+                        task.wait(0.1)
+                    end
+                else
                     task.wait(1)
                 end
+            end
+            RunService.Heartbeat:Wait()
+        end
+    end)
+end
+
+-- ==================== AUTO COLETAR CHEST ====================
+local collectedChests = {}
+local function StartAutoChest()
+    task.spawn(function()
+        while Configs.AutoCollectChest do
+            if CharacterReady() then
+                for _, obj in ipairs(Workspace:GetDescendants()) do
+                    if not Configs.AutoCollectChest then break end
+                    local name = obj.Name:lower()
+                    if (name:find("chest") or name:find("bag") or name:find("box")) and obj:IsA("Model") then
+                        if not collectedChests[obj] then
+                            collectedChests[obj] = true
+                            local hrp = obj:FindFirstChild("HumanoidRootPart") or obj.PrimaryPart
+                            if hrp then
+                                SafeTeleport(hrp.Position + Vector3.new(0, 3, 0))
+                                task.wait(0.4)
+                            end
+                        end
+                    end
+                end
+            end
+            task.wait(2)
+        end
+    end)
+end
+
+-- ==================== AUTO STATS ====================
+local function StartAutoStats()
+    task.spawn(function()
+        while Configs.AutoStats do
+            if CharacterReady() then
+                pcall(function()
+                    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+                    if remotes then
+                        -- Exemplo: distribuir pontos em Melee/Defense/Blox Fruit
+                        local statsRemote = remotes:FindFirstChild("Stats") or remotes:FindFirstChild("AddPoint")
+                        if statsRemote then
+                            -- Ajuste conforme o remote real
+                            statsRemote:FireServer("Melee")
+                            statsRemote:FireServer("Defense")
+                            statsRemote:FireServer("BloxFruit")
+                        end
+                    end
+                end)
             end
             task.wait(5)
         end
     end)
 end
 
-function AutoRaidSystem:Stop()
-    self.TaskManager:Stop()
-end
-
--- ==================== PLAYER ESP SYSTEM ====================
-local PlayerESP = {}
-PlayerESP.__index = PlayerESP
-
-function PlayerESP.new()
-    local self = setmetatable({}, PlayerESP)
-    self.Objects = {}
-    self.UpdateConnection = nil
-    return self
-end
-
-function PlayerESP:CreateESP(plr)
-    if self.Objects[plr] then return end
-    local char = plr.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-    local hrp = char.HumanoidRootPart
-    local billboard = Instance.new("BillboardGui")
-    billboard.Name = "ESP_" .. plr.Name
-    billboard.Adornee = hrp
-    billboard.Size = UDim2.new(0, 200, 0, 50)
-    billboard.StudsOffset = Vector3.new(0, 4, 0)
-    billboard.AlwaysOnTop = true
-    billboard.Parent = Workspace
-
-    local label = Instance.new("TextLabel", billboard)
-    label.Size = UDim2.new(1, 0, 1, 0)
-    label.BackgroundTransparency = 1
-    label.TextColor3 = Color3.fromRGB(100, 0, 0)
-    label.TextStrokeTransparency = 0.2
-    label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    label.Font = Enum.Font.GothamBold
-    label.TextSize = 14
-    label.Text = plr.Name .. " • " .. math.floor((hrp.Position - CharacterSystemInstance:GetPosition()).Magnitude) .. " studs"
-
-    self.Objects[plr] = {
-        Billboard = billboard,
-        Label = label,
-        HRP = hrp
-    }
-
-    task.spawn(function()
-        while self.Objects[plr] do
-            if not plr.Parent or not plr.Character or plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health <= 0 then
-                self:RemoveESP(plr)
-                break
-            end
-            local currentHRP = plr.Character:FindFirstChild("HumanoidRootPart")
-            if currentHRP then
-                local dist = math.floor((currentHRP.Position - CharacterSystemInstance:GetPosition()).Magnitude)
-                label.Text = plr.Name .. " • " .. dist .. " studs"
-            end
-            task.wait(0.5)
-        end
-    end)
-end
-
-function PlayerESP:RemoveESP(plr)
-    if self.Objects[plr] then
-        pcall(function()
-            self.Objects[plr].Billboard:Destroy()
-        end)
-        self.Objects[plr] = nil
-    end
-end
-
-function PlayerESP:ClearAll()
-    for plr, _ in pairs(self.Objects) do
-        self:RemoveESP(plr)
-    end
-end
-
-function PlayerESP:Update()
-    self:ClearAll()
-    if not Config.PlayerESP then return end
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= player and plr.Character then
-            self:CreateESP(plr)
-        end
-    end
-end
-
-function PlayerESP:Start()
-    self:Update()
-    self.UpdateConnection = RunService.Heartbeat:Connect(function()
-        if not Config.PlayerESP then
-            self:Stop()
+-- ==================== AIMBOT PVP ====================
+local function StartAimbot()
+    if aimbotConnection then aimbotConnection:Disconnect(); aimbotConnection = nil end
+    aimbotConnection = RunService.RenderStepped:Connect(function()
+        if not Configs.AimbotPvP then
+            if aimbotConnection then aimbotConnection:Disconnect(); aimbotConnection = nil end
             return
         end
-        for _, plr in ipairs(Players:GetPlayers()) do
-            if plr ~= player and plr.Character and not self.Objects[plr] then
-                self:CreateESP(plr)
+        if not CharacterReady() then return end
+        local target = GetClosestPlayer(300)
+        if target and target.Character then
+            local head = target.Character:FindFirstChild("Head")
+            if head then
+                camera.CFrame = CFrame.lookAt(camera.CFrame.Position, head.Position)
             end
         end
     end)
 end
 
-function PlayerESP:Stop()
-    if self.UpdateConnection then
-        self.UpdateConnection:Disconnect()
-        self.UpdateConnection = nil
-    end
-    self:ClearAll()
-end
-
--- ==================== FRUIT ESP SYSTEM ====================
-local FruitESP = {}
-FruitESP.__index = FruitESP
-
-function FruitESP.new()
-    local self = setmetatable({}, FruitESP)
-    self.Objects = {}
-    self.UpdateConnection = nil
-    return self
-end
-
-function FruitESP:CreateFruitESP(model)
-    if self.Objects[model] then return end
-    local part = model.PrimaryPart or model:FindFirstChildOfClass("BasePart")
-    if not part then return end
-    local billboard = Instance.new("BillboardGui")
-    billboard.Name = "FruitESP_" .. model.Name
-    billboard.Adornee = part
-    billboard.Size = UDim2.new(0, 200, 0, 40)
-    billboard.StudsOffset = Vector3.new(0, 2, 0)
-    billboard.AlwaysOnTop = true
-    billboard.Parent = Workspace
-
-    local label = Instance.new("TextLabel", billboard)
-    label.Size = UDim2.new(1, 0, 1, 0)
-    label.BackgroundTransparency = 1
-    label.TextColor3 = Color3.fromRGB(100, 0, 0)
-    label.TextStrokeTransparency = 0.2
-    label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    label.Font = Enum.Font.GothamBold
-    label.TextSize = 12
-    label.Text = model.Name .. " • " .. math.floor((part.Position - CharacterSystemInstance:GetPosition()).Magnitude) .. " studs"
-
-    self.Objects[model] = {
-        Billboard = billboard,
-        Label = label,
-        Part = part
-    }
-
-    task.spawn(function()
-        while self.Objects[model] do
-            if not model.Parent then
-                self:RemoveFruitESP(model)
-                break
-            end
-            local currentPart = model.PrimaryPart or model:FindFirstChildOfClass("BasePart")
-            if currentPart then
-                local dist = math.floor((currentPart.Position - CharacterSystemInstance:GetPosition()).Magnitude)
-                label.Text = model.Name .. " • " .. dist .. " studs"
-            end
-            task.wait(0.5)
-        end
-    end)
-end
-
-function FruitESP:RemoveFruitESP(model)
-    if self.Objects[model] then
+-- ==================== PLAYER ESP ====================
+local function ClearESP()
+    for p, data in pairs(espObjects) do
         pcall(function()
-            self.Objects[model].Billboard:Destroy()
+            if data.Billboard then data.Billboard:Destroy() end
         end)
-        self.Objects[model] = nil
+    end
+    espObjects = {}
+end
+
+local function UpdateESP()
+    ClearESP()
+    if not Configs.PlayerESP then return end
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= player and p.Character then
+            local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local billboard = Instance.new("BillboardGui")
+                billboard.Adornee = hrp
+                billboard.Size = UDim2.new(0, 150, 0, 40)
+                billboard.StudsOffset = Vector3.new(0, 4, 0)
+                billboard.AlwaysOnTop = true
+                billboard.Parent = Workspace
+
+                local label = Instance.new("TextLabel", billboard)
+                label.Size = UDim2.new(1, 0, 1, 0)
+                label.BackgroundTransparency = 1
+                label.TextColor3 = Color3.fromRGB(0, 255, 255)
+                label.TextStrokeTransparency = 0
+                label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+                label.Font = Enum.Font.GothamBold
+                label.TextSize = 14
+                label.Text = p.Name
+
+                espObjects[p] = { Billboard = billboard }
+            end
+        end
     end
 end
 
-function FruitESP:ClearAll()
-    for model, _ in pairs(self.Objects) do
-        self:RemoveFruitESP(model)
+-- ==================== FRUIT ESP ====================
+local fruitESPObjects = {}
+local function UpdateFruitESP()
+    -- Limpa ESP de frutas antigas
+    for obj, data in pairs(fruitESPObjects) do
+        pcall(function() data.Billboard:Destroy() end)
     end
-end
+    fruitESPObjects = {}
 
-function FruitESP:Update()
-    self:ClearAll()
-    if not Config.FruitESP then return end
+    if not Configs.FruitESP then return end
     for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("Model") and obj.Name:lower():find("fruit") and obj:FindFirstChild("ProximityPrompt") then
-            self:CreateFruitESP(obj)
-        end
-    end
-end
+        local name = obj.Name:lower()
+        if (name:find("fruit") or name:find("devil")) and obj:IsA("Model") then
+            local pp = obj.PrimaryPart or obj:FindFirstChildOfClass("BasePart")
+            if pp then
+                local billboard = Instance.new("BillboardGui")
+                billboard.Adornee = pp
+                billboard.Size = UDim2.new(0, 120, 0, 30)
+                billboard.StudsOffset = Vector3.new(0, 3, 0)
+                billboard.AlwaysOnTop = true
+                billboard.Parent = Workspace
 
-function FruitESP:Start()
-    self:Update()
-    self.UpdateConnection = RunService.Heartbeat:Connect(function()
-        if not Config.FruitESP then
-            self:Stop()
-            return
-        end
-        for _, obj in ipairs(Workspace:GetDescendants()) do
-            if obj:IsA("Model") and obj.Name:lower():find("fruit") and obj:FindFirstChild("ProximityPrompt") and not self.Objects[obj] then
-                self:CreateFruitESP(obj)
-            end
-        end
-    end)
-end
+                local label = Instance.new("TextLabel", billboard)
+                label.Size = UDim2.new(1, 0, 1, 0)
+                label.BackgroundTransparency = 1
+                label.TextColor3 = Color3.fromRGB(255, 100, 100)
+                label.TextStrokeTransparency = 0
+                label.Font = Enum.Font.GothamBold
+                label.TextSize = 12
+                label.Text = "Fruta 🍈"
 
-function FruitESP:Stop()
-    if self.UpdateConnection then
-        self.UpdateConnection:Disconnect()
-        self.UpdateConnection = nil
-    end
-    self:ClearAll()
-end
-
--- ==================== SERVER HOP SYSTEM ====================
-local ServerHopSystem = {}
-ServerHopSystem.__index = ServerHopSystem
-
-function ServerHopSystem.new()
-    local self = setmetatable({}, ServerHopSystem)
-    self.TaskManager = TaskManager.new("ServerHop")
-    return self
-end
-
-function ServerHopSystem:FindServer()
-    local success, servers = pcall(function()
-        return HttpService:JSONDecode(
-            game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")
-        )
-    end)
-    if success and servers and servers.data then
-        for _, server in ipairs(servers.data) do
-            if server.id ~= game.JobId and server.playing < server.maxPlayers then
-                return server.id
+                fruitESPObjects[obj] = { Billboard = billboard }
             end
         end
     end
-    return nil
 end
 
-function ServerHopSystem:Hop()
-    local serverId = self:FindServer()
-    if serverId then
-        TeleportService:TeleportToPlaceInstance(game.PlaceId, serverId)
-    end
-end
-
-function ServerHopSystem:Start()
-    if self.TaskManager:IsRunning() then return end
-    self.TaskManager:Start(function(token)
-        while token == self.TaskManager.Token and Config.ServerHop do
-            self:Hop()
-            task.wait(30)
-        end
-    end)
-end
-
-function ServerHopSystem:Stop()
-    self.TaskManager:Stop()
-end
-
--- ==================== AUTO REVIVE (Recovery) ====================
-local AutoReviveSystem = {}
-AutoReviveSystem.__index = AutoReviveSystem
-
-function AutoReviveSystem.new()
-    local self = setmetatable({}, AutoReviveSystem)
-    self.Connection = nil
-    return self
-end
-
-function AutoReviveSystem:Start()
-    self:Stop()
-    self.Connection = player.CharacterAdded:Connect(function(char)
-        if not Config.AutoRevive then return end
+-- ==================== AUTO REVIVE ====================
+player.CharacterAdded:Connect(function(char)
+    character = char
+    humanoidRootPart = char:WaitForChild("HumanoidRootPart")
+    humanoid = char:WaitForChild("Humanoid")
+    if Configs.AutoRevive then
         task.wait(1)
-        if not CharacterSystemInstance:IsAlive() then return end
-        if Config.AutoFarm then AutoFarmInstance:Start() end
-        if Config.AutoFarmBoss then BossFarmInstance:Start() end
-        if Config.AutoCollectChest then AutoChestInstance:Start() end
-        if Config.AutoStats then AutoStatsInstance:Start() end
-        if Config.FruitSniper then FruitSniperInstance:Start() end
-        if Config.AutoRaid then AutoRaidInstance:Start() end
-        if Config.PlayerESP then PlayerESPInstance:Start() end
-        if Config.FruitESP then FruitESPInstance:Start() end
-    end)
-end
+        if Configs.AutoFarm then StartAutoFarm() end
+        if Configs.AutoFarmBoss then StartAutoFarmBoss() end
+    end
+end)
 
-function AutoReviveSystem:Stop()
-    if self.Connection then
-        self.Connection:Disconnect()
-        self.Connection = nil
+-- ==================== SERVER HOP ====================
+local function HttpGet(url)
+    if game.HttpGet then
+        return game.HttpGet(url)
+    else
+        return HttpService:GetAsync(url)
     end
 end
 
--- ==================== TELEPORT SYSTEM ====================
-local TeleportSystem = {}
-TeleportSystem.__index = TeleportSystem
-
-TeleportSystem.Locations = {
-    -- First Sea
-    { Name = "Middle Town", Sea = 1, Position = Vector3.new(-700, 15, 1300) },
-    { Name = "Jungle", Sea = 1, Position = Vector3.new(-2100, 15, -120) },
-    { Name = "Pirate Village", Sea = 1, Position = Vector3.new(-1500, 15, 200) },
-    { Name = "Desert", Sea = 1, Position = Vector3.new(900, 15, 1000) },
-    { Name = "Frozen Village", Sea = 1, Position = Vector3.new(1200, 15, -1000) },
-    { Name = "Marine Fortress", Sea = 1, Position = Vector3.new(975, 15, 1596) },
-    { Name = "Skylands", Sea = 1, Position = Vector3.new(-5000, 1000, -200) },
-    { Name = "Prison", Sea = 1, Position = Vector3.new(3000, 15, -2000) },
-    { Name = "Colosseum", Sea = 1, Position = Vector3.new(1000, 15, 3000) },
-    { Name = "Magma Village", Sea = 1, Position = Vector3.new(2000, 15, 2000) },
-    { Name = "Underwater City", Sea = 1, Position = Vector3.new(-3000, -100, 3000) },
-    { Name = "Fountain City", Sea = 1, Position = Vector3.new(-5000, 15, 3000) },
-
-    -- Second Sea
-    { Name = "Kingdom of Rose", Sea = 2, Position = Vector3.new(-2600, 15, -830) },
-    { Name = "Green Zone", Sea = 2, Position = Vector3.new(-1060, 15, -4360) },
-    { Name = "Graveyard", Sea = 2, Position = Vector3.new(-2000, 15, -3000) },
-    { Name = "Snow Mountain", Sea = 2, Position = Vector3.new(1660, 15, 570) },
-    { Name = "Hot and Cold", Sea = 2, Position = Vector3.new(1000, 15, 1000) },
-    { Name = "Cursed Ship", Sea = 2, Position = Vector3.new(500, 15, -2000) },
-    { Name = "Ice Castle", Sea = 2, Position = Vector3.new(3000, 15, 3000) },
-    { Name = "Forgotten Island", Sea = 2, Position = Vector3.new(-4200, 15, -400) },
-    { Name = "Café", Sea = 2, Position = Vector3.new(-2500, 15, -1000) },
-
-    -- Third Sea
-    { Name = "Port Town", Sea = 3, Position = Vector3.new(-2640, 72, -3735) },
-    { Name = "Hydra Island", Sea = 3, Position = Vector3.new(4700, 350, 8600) },
-    { Name = "Great Tree", Sea = 3, Position = Vector3.new(-14150, 250, -6025) },
-    { Name = "Floating Turtle", Sea = 3, Position = Vector3.new(-11950, 800, -6025) },
-    { Name = "Haunted Castle", Sea = 3, Position = Vector3.new(-6700, 250, 8200) },
-    { Name = "Sea of Treats", Sea = 3, Position = Vector3.new(1000, 200, 3000) },
-    { Name = "Tiki Outpost", Sea = 3, Position = Vector3.new(5000, 200, 5000) },
-    { Name = "Castle on the Sea", Sea = 3, Position = Vector3.new(-6700, 250, 8200) },
-}
-
-function TeleportSystem:Teleport(location)
-    if not location then return end
-    CharacterSystemInstance:TeleportTo(location.Position)
+local function ServerHop()
+    local success, result = pcall(function()
+        return HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")
+    end)
+    if success and result then
+        local servers = HttpService:JSONDecode(result)
+        if servers and servers.data then
+            for _, server in ipairs(servers.data) do
+                if server.id ~= game.JobId and server.playing < server.maxPlayers then
+                    TeleportService:TeleportToPlaceInstance(game.PlaceId, server.id)
+                    return
+                end
+            end
+        end
+    end
 end
 
--- ==================== INSTANCIAÇÃO DOS SISTEMAS ====================
-local CharacterSystemInstance = CharacterSystem.new()
-local QuestSystemInstance = QuestSystem.new()
-local AutoFarmInstance = AutoFarm.new()
-local BossFarmInstance = BossFarm.new()
-local AutoStatsInstance = AutoStatsSystem.new()
-local AutoChestInstance = AutoChest.new()
-local AimbotInstance = Aimbot.new()
-local FruitSniperInstance = FruitSniper.new()
-local AutoRaidInstance = AutoRaidSystem.new()
-local PlayerESPInstance = PlayerESP.new()
-local FruitESPInstance = FruitESP.new()
-local ServerHopInstance = ServerHopSystem.new()
-local AutoReviveInstance = AutoReviveSystem.new()
+-- ==================== AUTO RAID ====================
+local function StartAutoRaid()
+    task.spawn(function()
+        while Configs.AutoRaid do
+            if CharacterReady() then
+                SafeTeleport(Vector3.new(-15970, 700, 3800))
+                task.wait(2)
+                pcall(function()
+                    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+                    if remotes then
+                        local raidRemote = remotes:FindFirstChild("StartRaid") or remotes:FindFirstChild("Raid")
+                        if raidRemote then raidRemote:FireServer() end
+                    end
+                end)
+                task.wait(3)
+                for i = 1, 60 do
+                    if not Configs.AutoRaid then break end
+                    if CharacterReady() then
+                        local enemy = GetClosestEnemy(100)
+                        if enemy then
+                            SafeTeleport(enemy.HRP.Position + Vector3.new(0, 10, 0))
+                            task.wait(0.1)
+                            if Configs.RaidInstant and enemy.Humanoid.Health > 0 then
+                                pcall(function() enemy.Humanoid.Health = 0 end)
+                            end
+                            local tool = character:FindFirstChildOfClass("Tool")
+                            if tool then pcall(function() tool:Activate() end) end
+                        end
+                    end
+                    task.wait(0.5)
+                end
+            end
+            task.wait(1)
+        end
+    end)
+end
 
+-- =====================================================================
 -- ==================== UI SYSTEM ====================
+-- =====================================================================
+
+local UIState = "CLOSED"
+
 local UI_TEXT = {
     SearchPlaceholder = "Pesquisar...",
     ConfirmCloseTitle = "Deseja fechar o script?",
@@ -1170,11 +478,11 @@ local UI_TEXT = {
     CancelBtn = "Cancelar",
     Intro = '<font color="#FFFFFF">Blox Fruits | </font><font color="#8B0000">AKATSUKI</font>',
     Tabs = {
-        AutoFarm   = "Auto Farm",
-        PvP        = "PvP",
-        Raids      = "Raids",
-        Teleports  = "Teleportes",
-        Settings   = "Extras",
+        AutoFarm = "Auto Farm",
+        PvP = "PvP",
+        Raids = "Raids",
+        Teleports = "Teleportes",
+        Settings = "Extras",
     },
     Options = {
         AutoFarm        = { Title = "Auto Farm",          Desc = "Flutua sobre mobs e ataca até a morte." },
@@ -1182,8 +490,11 @@ local UI_TEXT = {
         AutoCollectChest= { Title = "Auto Chest",         Desc = "Coleta baús e drops no mapa automaticamente." },
         AutoStats       = { Title = "Auto Stats",         Desc = "Distribui atributos automaticamente ao upar." },
         AimbotPvP       = { Title = "Aimbot PvP",         Desc = "Mira na cabeça de jogadores próximos." },
+        AntiFlinch      = { Title = "Anti-Flinch",        Desc = "Impede que você tome knockback de ataques." },
+        PvPAutoBlock    = { Title = "Auto Block",         Desc = "Bloqueia automaticamente quando atacado." },
         FruitSniper     = { Title = "Fruit Sniper",       Desc = "Teleporta até frutas que caem no mapa." },
         AutoRaid        = { Title = "Auto Raid",          Desc = "Inicia e completa raids automaticamente." },
+        RaidInstant     = { Title = "Raid Instant Kill",  Desc = "Elimina inimigos de raid muito mais rápido." },
         PlayerESP       = { Title = "Player ESP",         Desc = "Mostra o nome colorido de todos no mapa." },
         FruitESP        = { Title = "Fruit ESP",          Desc = "Mostra frutas spawnadas no mapa." },
         AutoRevive      = { Title = "Auto Revive",        Desc = "Reinicia farms automaticamente após morrer." },
@@ -1191,7 +502,6 @@ local UI_TEXT = {
     }
 }
 
-local UIState = "CLOSED"
 local activeTab = "AutoFarm"
 local tabButtons = {}
 local isExpanded = false
@@ -1636,7 +946,7 @@ badgeGrad.Color = ColorSequence.new({
 })
 local BadgeText = Instance.new("TextLabel", BadgeFrame)
 BadgeText.Size = UDim2.new(1, 0, 1, 0); BadgeText.BackgroundTransparency = 1
-BadgeText.Text = "v2.0.0"; BadgeText.TextColor3 = Color3.fromRGB(255, 255, 255)
+BadgeText.Text = "v1.1.1"; BadgeText.TextColor3 = Color3.fromRGB(255, 255, 255)
 BadgeText.Font = Enum.Font.GothamBold; BadgeText.TextSize = 10; BadgeText.ZIndex = 16
 
 -- ==================== TOGGLES CONTAINER ====================
@@ -1716,7 +1026,7 @@ local tpPad = Instance.new("UIPadding", teleportScrollFrame)
 tpPad.PaddingTop = UDim.new(0, 8); tpPad.PaddingBottom = UDim.new(0, 8)
 tpPad.PaddingLeft = UDim.new(0, 4); tpPad.PaddingRight = UDim.new(0, 8)
 
-local seaLabels = { [1] = "Primeiro Mar", [2] = "Segundo Mar", [3] = "Terceiro Mar" }
+local seaLabels = { [0] = "Especiais", [1] = "Primeiro Mar", [2] = "Segundo Mar", [3] = "Terceiro Mar" }
 local createdSections = {}
 
 local function GetOrCreateSection(seaNum)
@@ -1735,7 +1045,7 @@ local function GetOrCreateSection(seaNum)
     return section
 end
 
-for _, tp in ipairs(TeleportSystem.Locations) do
+for _, tp in ipairs(Teleports) do
     GetOrCreateSection(tp.Sea)
     local btn = Instance.new("TextButton", teleportScrollFrame)
     btn.Name = "TP_" .. tp.Name
@@ -1763,7 +1073,7 @@ for _, tp in ipairs(TeleportSystem.Locations) do
         t:Play(); t.Completed:Connect(function()
             TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundTransparency = 0.45}):Play()
         end)
-        TeleportSystem:Teleport(tp)
+        SafeTeleport(tpPos)
     end)
     btn.MouseEnter:Connect(function()
         TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundTransparency = 0.25}):Play()
@@ -1792,24 +1102,27 @@ local function filterToggles(currentActiveTab, query)
             local shouldBeVisible = false
             if searchQuery ~= "" then
                 local titleLabel = child:FindFirstChild("Title")
-                local descLabel = child:FindFirstChild("Description")
-                local text = ""
-                if titleLabel then text = titleLabel.Text end
-                shouldBeVisible = text:lower():find(searchQuery) ~= nil
+                shouldBeVisible = titleLabel and titleLabel.Text:lower():find(searchQuery) ~= nil
             else
                 shouldBeVisible = (itemTab == currentActiveTab)
             end
             if shouldBeVisible then
                 child.Visible = true
                 itemIndex = itemIndex + 1
-                if child:FindFirstChild("Title") then
-                    child.Size = UDim2.new(1, -12, 0, 52)
-                end
-                child.BackgroundTransparency = 0.45
+                child.Size = UDim2.new(1, -12, 0, 0)
+                child.BackgroundTransparency = 1
                 local t = child:FindFirstChild("Title")
                 local d = child:FindFirstChild("Description")
-                if t then t.TextTransparency = 0 end
-                if d then d.TextTransparency = 0 end
+                if t then t.TextTransparency = 1 end
+                if d then d.TextTransparency = 1 end
+                task.delay((itemIndex - 1) * 0.02, function()
+                    if not child or not child.Parent then return end
+                    TweenService:Create(child, TweenInfo.new(0.2, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {
+                        Size = UDim2.new(1, -12, 0, 52), BackgroundTransparency = 0.45
+                    }):Play()
+                    if t then TweenService:Create(t, TweenInfo.new(0.15), {TextTransparency = 0}):Play() end
+                    if d then TweenService:Create(d, TweenInfo.new(0.15), {TextTransparency = 0}):Play() end
+                end)
             else
                 child.Visible = false
             end
@@ -1923,116 +1236,103 @@ local function createToggle(parent, configKey, tabCategory)
     descLabel.Text = optData and optData.Desc or ""; descLabel.ZIndex = 11
     local switchTrack = Instance.new("Frame", toggleFrame)
     switchTrack.Size = UDim2.new(0, 38, 0, 18); switchTrack.Position = UDim2.new(1, -48, 0.5, -9)
-    switchTrack.BackgroundColor3 = Config[configKey] and Color3.fromHex("#8B0000") or Color3.fromRGB(30, 30, 30)
+    switchTrack.BackgroundColor3 = Configs[configKey] and Color3.fromHex("#8B0000") or Color3.fromRGB(30, 30, 30)
     switchTrack.ZIndex = 11
     Instance.new("UICorner", switchTrack).CornerRadius = UDim.new(1, 0)
     local switchCircle = Instance.new("Frame", switchTrack)
     switchCircle.Size = UDim2.new(0, 12, 0, 12)
-    switchCircle.Position = Config[configKey] and UDim2.new(1, -15, 0.5, -6) or UDim2.new(0, 3, 0.5, -6)
+    switchCircle.Position = Configs[configKey] and UDim2.new(1, -15, 0.5, -6) or UDim2.new(0, 3, 0.5, -6)
     switchCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255); switchCircle.ZIndex = 12
     Instance.new("UICorner", switchCircle).CornerRadius = UDim.new(1, 0)
     local triggerBtn = Instance.new("TextButton", toggleFrame)
-    triggerBtn.Name = "TriggerButton"
     triggerBtn.Size = UDim2.new(1, 0, 1, 0); triggerBtn.BackgroundTransparency = 1
     triggerBtn.Text = ""; triggerBtn.ZIndex = 13
 
     triggerBtn.MouseButton1Click:Connect(function()
-        Config[configKey] = not Config[configKey]
-        local on = Config[configKey]
+        Configs[configKey] = not Configs[configKey]
+        local on = Configs[configKey]
         local targetPos   = on and UDim2.new(1, -15, 0.5, -6) or UDim2.new(0, 3, 0.5, -6)
         local targetColor = on and Color3.fromHex("#8B0000") or Color3.fromRGB(30, 30, 30)
         local anim = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
         TweenService:Create(switchCircle, anim, {Position = targetPos}):Play()
         TweenService:Create(switchTrack, anim, {BackgroundColor3 = targetColor}):Play()
 
-        -- Conectar aos sistemas
         if configKey == "AutoFarm" then
-            if on then AutoFarmInstance:Start() else AutoFarmInstance:Stop() end
+            if on then StartAutoFarm() else StopAutoFarm() end
         elseif configKey == "AutoFarmBoss" then
-            if on then BossFarmInstance:Start() else BossFarmInstance:Stop() end
+            if on then StartAutoFarmBoss() end
         elseif configKey == "AutoCollectChest" then
-            if on then AutoChestInstance:Start() else AutoChestInstance:Stop() end
+            if on then StartAutoChest() end
         elseif configKey == "AutoStats" then
-            if on then AutoStatsInstance:Start() else AutoStatsInstance:Stop() end
+            if on then StartAutoStats() end
         elseif configKey == "AimbotPvP" then
-            if on then AimbotInstance:Start() else AimbotInstance:Stop() end
-        elseif configKey == "FruitSniper" then
-            if on then FruitSniperInstance:Start() else FruitSniperInstance:Stop() end
-        elseif configKey == "AutoRaid" then
-            if on then AutoRaidInstance:Start() else AutoRaidInstance:Stop() end
+            if on then StartAimbot() end
         elseif configKey == "PlayerESP" then
-            if on then PlayerESPInstance:Start() else PlayerESPInstance:Stop() end
+            UpdateESP()
+            if not on then ClearESP() end
         elseif configKey == "FruitESP" then
-            if on then FruitESPInstance:Start() else FruitESPInstance:Stop() end
+            UpdateFruitESP()
+        elseif configKey == "AutoRaid" then
+            if on then StartAutoRaid() end
         elseif configKey == "ServerHop" then
-            if on then ServerHopInstance:Start() else ServerHopInstance:Stop() end
-        elseif configKey == "AutoRevive" then
-            if on then AutoReviveInstance:Start() else AutoReviveInstance:Stop() end
+            if on then pcall(ServerHop) end
+        elseif configKey == "FruitSniper" then
+            if on then
+                task.spawn(function()
+                    while Configs.FruitSniper do
+                        if CharacterReady() then
+                            for _, obj in ipairs(Workspace:GetDescendants()) do
+                                if not Configs.FruitSniper then break end
+                                local n = obj.Name:lower()
+                                if (n:find("fruit") or n:find("devil")) and obj:IsA("Model") then
+                                    local pp = obj.PrimaryPart or obj:FindFirstChildOfClass("BasePart")
+                                    if pp then
+                                        SafeTeleport(pp.Position + Vector3.new(0, 3, 0))
+                                        task.wait(0.5)
+                                    end
+                                end
+                            end
+                        end
+                        task.wait(1)
+                    end
+                end)
+            end
+        elseif configKey == "AntiFlinch" then
+            if antiFlinchConn then antiFlinchConn:Disconnect(); antiFlinchConn = nil end
+            if on then
+                antiFlinchConn = RunService.Stepped:Connect(function()
+                    if not Configs.AntiFlinch then
+                        if antiFlinchConn then antiFlinchConn:Disconnect(); antiFlinchConn = nil end
+                        return
+                    end
+                    if character then
+                        local hrp = character:FindFirstChild("HumanoidRootPart")
+                        if hrp then hrp.AssemblyLinearVelocity = Vector3.new(0, hrp.AssemblyLinearVelocity.Y, 0) end
+                    end
+                end)
+            end
+        elseif configKey == "PvPAutoBlock" then
+            if on then
+                task.spawn(function()
+                    local lastHealth = humanoid.Health
+                    while Configs.PvPAutoBlock do
+                        task.wait(0.1)
+                        if humanoid.Health < lastHealth then
+                            local tool = character:FindFirstChildOfClass("Tool")
+                            if tool and tool:IsA("Tool") and tool:FindFirstChild("Handle") then
+                                pcall(function()
+                                    humanoid:EquipTool(tool)
+                                    -- Simular bloqueio (depende do jogo)
+                                    -- Pode ser necessário pressionar uma tecla ou usar remote
+                                end)
+                            end
+                        end
+                        lastHealth = humanoid.Health
+                    end
+                end)
+            end
         end
     end)
-end
-
--- ==================== CREATE SELECTORS ====================
-local function createCycleSelector(parent, labelText, configKey, options, tabCategory)
-    local frame = Instance.new("Frame")
-    frame.Name = configKey .. "Selector"
-    frame.Size = UDim2.new(1, -12, 0, 36)
-    frame.BackgroundColor3 = Color3.fromRGB(15, 5, 5)
-    frame.BackgroundTransparency = 0.45
-    frame.ZIndex = 11
-    frame.ClipsDescendants = true
-    frame:SetAttribute("Tab", tabCategory)
-    frame:SetAttribute("ConfigKey", configKey)
-    frame.Parent = togglesContainer
-    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
-    local stroke = Instance.new("UIStroke", frame); stroke.Color = Color3.fromHex("#141414"); stroke.Thickness = 1
-
-    local label = Instance.new("TextLabel", frame)
-    label.Size = UDim2.new(0, 80, 1, 0)
-    label.Position = UDim2.new(0, 10, 0, 0)
-    label.BackgroundTransparency = 1
-    label.Text = labelText
-    label.TextColor3 = Color3.fromRGB(200, 200, 200)
-    label.Font = Enum.Font.GothamBold
-    label.TextSize = 10
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.ZIndex = 12
-
-    local btn = Instance.new("TextButton", frame)
-    btn.Size = UDim2.new(1, -95, 1, -8)
-    btn.Position = UDim2.new(0, 90, 0, 4)
-    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    btn.BackgroundTransparency = 0.5
-    btn.Text = Config[configKey] or options[1]
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 10
-    btn.ZIndex = 13
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
-
-    local currentIndex = 1
-    for i, opt in ipairs(options) do
-        if opt == Config[configKey] then currentIndex = i break end
-    end
-
-    btn.MouseButton1Click:Connect(function()
-        currentIndex = currentIndex % #options + 1
-        btn.Text = options[currentIndex]
-        Config[configKey] = options[currentIndex]
-        if configKey == "SelectedBoss" and Config.AutoFarmBoss then
-            BossFarmInstance:Stop()
-            BossFarmInstance:Start()
-        end
-        -- Para SelectedMob, se AutoFarm estiver rodando, reinicia para aplicar novo filtro
-        if configKey == "SelectedMob" and Config.AutoFarm then
-            AutoFarmInstance:Stop()
-            AutoFarmInstance:Start()
-        end
-    end)
-
-    -- Garante que o valor inicial esteja correto
-    Config[configKey] = btn.Text
-    return frame
 end
 
 -- ==================== SEARCH ====================
@@ -2122,19 +1422,11 @@ end
 CloseBtn.MouseButton1Click:Connect(function() PlayUI_Click(); AlternarConfirmacao(true) end)
 btnNo.MouseButton1Click:Connect(function() AlternarConfirmacao(false) end)
 btnYes.MouseButton1Click:Connect(function()
-    -- Parar todos os sistemas
-    AutoFarmInstance:Stop()
-    BossFarmInstance:Stop()
-    AutoStatsInstance:Stop()
-    AutoChestInstance:Stop()
-    AimbotInstance:Stop()
-    FruitSniperInstance:Stop()
-    AutoRaidInstance:Stop()
-    PlayerESPInstance:Stop()
-    FruitESPInstance:Stop()
-    ServerHopInstance:Stop()
-    AutoReviveInstance:Stop()
-
+    StopAutoFarm()
+    Configs.AimbotPvP = false; Configs.AutoRaid = false; Configs.AntiFlinch = false; Configs.PlayerESP = false
+    ClearESP()
+    if aimbotConnection then aimbotConnection:Disconnect() end
+    if antiFlinchConn then antiFlinchConn:Disconnect() end
     local s = 0.2
     if confirmBlur then TweenService:Create(confirmBlur, TweenInfo.new(s, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {Size = 0}):Play() end
     AplicarFadeSincronizado(mainWrapper, true, s)
@@ -2170,39 +1462,42 @@ createTabBtn("Raids")
 createTabBtn("Teleports")
 createTabBtn("Settings")
 
--- Auto Farm tab
 createToggle(togglesContainer, "AutoFarm",         "AutoFarm")
 createToggle(togglesContainer, "AutoFarmBoss",     "AutoFarm")
 createToggle(togglesContainer, "AutoCollectChest", "AutoFarm")
 createToggle(togglesContainer, "AutoStats",        "AutoFarm")
-
--- Seletor de Mob e Boss (somente AutoFarm)
-local mobOptions = {"Lowest Level Mob", "Bandit", "Monkey", "Pirate", "Brute", "Desert Bandit", "Raider", "Mercenary", "Pirate Millionaire"}
-createCycleSelector(togglesContainer, "Mob:", "SelectedMob", mobOptions, "AutoFarm")
-
-local bossOptions = {"None"}
-for _, boss in ipairs(BossList) do
-    table.insert(bossOptions, boss.Name)
-end
-createCycleSelector(togglesContainer, "Boss:", "SelectedBoss", bossOptions, "AutoFarm")
-
--- PvP tab
-createToggle(togglesContainer, "AimbotPvP",   "PvP")
-createToggle(togglesContainer, "FruitSniper", "PvP")
-
--- Raids tab
-createToggle(togglesContainer, "AutoRaid", "Raids")
-
--- Settings tab
+createToggle(togglesContainer, "AimbotPvP",    "PvP")
+createToggle(togglesContainer, "AntiFlinch",   "PvP")
+createToggle(togglesContainer, "PvPAutoBlock", "PvP")
+createToggle(togglesContainer, "FruitSniper",  "PvP")
+createToggle(togglesContainer, "AutoRaid",    "Raids")
+createToggle(togglesContainer, "RaidInstant", "Raids")
 createToggle(togglesContainer, "PlayerESP",  "Settings")
 createToggle(togglesContainer, "FruitESP",   "Settings")
 createToggle(togglesContainer, "AutoRevive", "Settings")
 createToggle(togglesContainer, "ServerHop",  "Settings")
 
 -- ==================== ESP UPDATE LOOP ====================
+RunService.Heartbeat:Connect(function()
+    if Configs.PlayerESP then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= player and not espObjects[p] and p.Character then
+                UpdateESP()
+                break
+            end
+        end
+    end
+    if Configs.FruitESP then
+        UpdateFruitESP()
+    end
+end)
+
 Players.PlayerRemoving:Connect(function(p)
-    if PlayerESPInstance.Objects[p] then
-        PlayerESPInstance:RemoveESP(p)
+    if espObjects[p] then
+        pcall(function()
+            if espObjects[p].Billboard then espObjects[p].Billboard:Destroy() end
+        end)
+        espObjects[p] = nil
     end
 end)
 
