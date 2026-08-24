@@ -52,6 +52,11 @@ local isExpanded = false
 local originalTrans = {}
 local isConfirmOpen = false
 
+-- Tabelas para cancelamento de tweens
+local activeBarTween = nil
+local filterTweens = {}   -- mapeia child -> tween
+local debounceTimer = nil
+
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "DeltaAkatUniversalUI"
 screenGui.ResetOnSpawn = false
@@ -201,6 +206,23 @@ mainWrapper.Visible = false
 mainWrapper.ClipsDescendants = false
 mainWrapper.ZIndex = 1
 
+-- UIScale para responsividade (corrige mobile/resoluções menores sem alterar design)
+local mainScale = Instance.new("UIScale", mainWrapper)
+mainScale.Name = "MainScale"
+mainScale.Scale = 1
+
+local function updateMainScale()
+    local viewport = workspace.CurrentCamera.ViewportSize
+    local baseWidth = isExpanded and 820 or 660   -- margem
+    local baseHeight = isExpanded and 500 or 380
+    local scale = math.min(1, viewport.X / baseWidth, viewport.Y / baseHeight)
+    mainScale.Scale = math.clamp(scale, 0.5, 1)
+end
+
+updateMainScale()
+UserInputService:GetPropertyChangedSignal("CameraViewportSize"):Connect(updateMainScale)
+workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateMainScale)
+
 local mainFrame = Instance.new("Frame", mainWrapper)
 mainFrame.Name = "MainFrame"
 mainFrame.Size = UDim2.new(1, 0, 1, 0)
@@ -235,8 +257,6 @@ UserInputService.InputEnded:Connect(function(input)
 end)
 
 -- ==================== BACKGROUND SYSTEM ====================
--- Cria a moldura externa única da janela: sombra, borda arredondada e UIStroke com gradiente.
--- Isso substitui strokes/sombras individuais por painel, eliminando qualquer "parede" central.
 local function CreateOuterFrame(parent, size, pos, name)
     local shadow = Instance.new("ImageLabel", parent)
     shadow.Name = name .. "_Shadow"
@@ -278,9 +298,6 @@ local function CreateOuterFrame(parent, size, pos, name)
     return outer
 end
 
--- Cria um painel de conteúdo (sem stroke e sem sombra própria - a moldura externa cuida disso).
--- roundLeft/roundRight controlam se aquele lado do painel deve ter cantos arredondados
--- (apenas os lados que tocam a borda externa da janela devem arredondar).
 local function CreateGradientPanel(parent, size, pos, name, roundLeft, roundRight)
     local panel = Instance.new("Frame", parent)
     panel.Name = name
@@ -300,12 +317,9 @@ local function CreateGradientPanel(parent, size, pos, name, roundLeft, roundRigh
     InnerBg.ClipsDescendants = true
     InnerBg.ZIndex = 5
 
-    -- Corner só nos cantos que tocam a borda externa da janela; internos ficam retos.
     if roundLeft or roundRight then
         local corner = Instance.new("UICorner", InnerBg)
         corner.CornerRadius = UDim.new(0, 10)
-        -- UICorner do Roblox arredonda os 4 cantos; para deixar só um lado reto,
-        -- cobrimos o lado interno com um frame reto do mesmo tamanho do raio.
         if not (roundLeft and roundRight) then
             local straightener = Instance.new("Frame", InnerBg)
             straightener.Name = "CornerStraightener"
@@ -344,20 +358,20 @@ local function CreateGradientPanel(parent, size, pos, name, roundLeft, roundRigh
     return panel
 end
 
--- Moldura externa única: cobre a janela inteira, dá a silhueta/borda/sombra únicas.
 local OuterWindowFrame = CreateOuterFrame(mainFrame, UDim2.new(1, 0, 1, 0), UDim2.new(0, 0, 0, 0), "OuterWindowFrame")
 
 local LeftPanel = CreateGradientPanel(mainFrame, UDim2.new(0, 220, 1, 0), UDim2.new(0, 0, 0, 0), "LeftPanel", true, false)
 local RightPanel = CreateGradientPanel(mainFrame, UDim2.new(1, -220, 1, 0), UDim2.new(0, 220, 0, 0), "RightPanel", false, true)
 
-local LeftSeparatorLine = Instance.new("Frame", LeftPanel.InnerBg)
-LeftSeparatorLine.Size = UDim2.new(1, 0, 0, 1)
-LeftSeparatorLine.Position = UDim2.new(0, 0, 0, 36)
-LeftSeparatorLine.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-LeftSeparatorLine.BackgroundTransparency = 0
-LeftSeparatorLine.BorderSizePixel = 0
-LeftSeparatorLine.ZIndex = 10
-LeftSeparatorLine.Visible = false
+-- Linha horizontal única (substitui as separadoras individuais)
+local UnifiedHeaderLine = Instance.new("Frame", mainFrame)
+UnifiedHeaderLine.Name = "UnifiedHeaderLine"
+UnifiedHeaderLine.Size = UDim2.new(1, 0, 0, 1)
+UnifiedHeaderLine.Position = UDim2.new(0, 0, 0, 36)
+UnifiedHeaderLine.BackgroundColor3 = Color3.fromRGB(60, 20, 20)
+UnifiedHeaderLine.BackgroundTransparency = 0.35
+UnifiedHeaderLine.BorderSizePixel = 0
+UnifiedHeaderLine.ZIndex = 12
 
 local HeaderLeft = Instance.new("Frame", LeftPanel.InnerBg)
 HeaderLeft.Size = UDim2.new(1, 0, 0, 36)
@@ -514,8 +528,8 @@ barGlow.ZIndex = 14
 local UserProfileFrame = Instance.new("Frame", LeftPanel.InnerBg)
 UserProfileFrame.Size = UDim2.new(1, -16, 0, 55)
 UserProfileFrame.Position = UDim2.new(0, 8, 1, -63)
-UserProfileFrame.BackgroundColor3 = Color3.fromRGB(20, 12, 12) -- Dark glass translúcido
-UserProfileFrame.BackgroundTransparency = 0.35 -- Transparência perceptível, contraste preservado
+UserProfileFrame.BackgroundColor3 = Color3.fromRGB(20, 12, 12)
+UserProfileFrame.BackgroundTransparency = 0.35
 UserProfileFrame.BorderSizePixel = 0
 UserProfileFrame.ZIndex = 10
 Instance.new("UICorner", UserProfileFrame).CornerRadius = UDim.new(0, 8)
@@ -712,26 +726,6 @@ CloseLine2.BackgroundColor3 = Color3.fromRGB(160, 160, 160)
 CloseLine2.BorderSizePixel = 0
 CloseLine2.ZIndex = 12
 
-local RightSeparatorLine = Instance.new("Frame", RightPanel.InnerBg)
-RightSeparatorLine.Size = UDim2.new(1, 0, 0, 1)
-RightSeparatorLine.Position = UDim2.new(0, 0, 0, 36)
-RightSeparatorLine.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-RightSeparatorLine.BackgroundTransparency = 0.5
-RightSeparatorLine.BorderSizePixel = 0
-RightSeparatorLine.ZIndex = 10
-RightSeparatorLine.Visible = false
-
--- Linha horizontal única, cor sólida baseada no RightPanel, cobrindo toda a largura da janela
--- (substitui as duas linhas separadas por painel, eliminando a divisão visual central)
-local UnifiedHeaderLine = Instance.new("Frame", mainFrame)
-UnifiedHeaderLine.Name = "UnifiedHeaderLine"
-UnifiedHeaderLine.Size = UDim2.new(1, 0, 0, 1)
-UnifiedHeaderLine.Position = UDim2.new(0, 0, 0, 36)
-UnifiedHeaderLine.BackgroundColor3 = Color3.fromRGB(60, 20, 20)
-UnifiedHeaderLine.BackgroundTransparency = 0.35
-UnifiedHeaderLine.BorderSizePixel = 0
-UnifiedHeaderLine.ZIndex = 12
-
 local BadgeFrame = Instance.new("Frame", RightPanel.InnerBg)
 BadgeFrame.Name = "BadgeFrame"
 BadgeFrame.Size = UDim2.new(0, 44, 0, 18)
@@ -811,6 +805,11 @@ confirmCard.BackgroundTransparency = 0
 confirmCard.BorderSizePixel = 0
 confirmCard.ZIndex = 995
 Instance.new("UICorner", confirmCard).CornerRadius = UDim.new(0, 14)
+
+-- UIScale persistente para o confirmCard (reutilizado)
+local confirmCardScale = Instance.new("UIScale", confirmCard)
+confirmCardScale.Name = "ConfirmCardScale"
+confirmCardScale.Scale = 1
 
 local confirmStroke = Instance.new("UIStroke", confirmCard)
 confirmStroke.Thickness = 1.5
@@ -1064,45 +1063,60 @@ local function CriarNotificacao(titulo, descricao, icone)
 end
 
 local function filterToggles(currentActiveTab, query)
-    local searchQuery = (query or ""):lower()
-    local itemIndex = 0
-    for _, child in ipairs(togglesContainer:GetChildren()) do
-        if child:IsA("Frame") and child.Name ~= "UIListLayout" and child.Name ~= "UIPadding" then
-            local itemTab = child:GetAttribute("Tab") or "Combat"
-            local shouldBeVisible = false
-            if searchQuery ~= "" then
-                local titleLabel = child:FindFirstChild("Title")
-                shouldBeVisible = titleLabel and titleLabel.Text:lower():find(searchQuery) ~= nil
-            else
-                shouldBeVisible = (itemTab == currentActiveTab)
-            end
-            
-            if child.Visible ~= shouldBeVisible or shouldBeVisible then
-                child.Visible = shouldBeVisible
+    if debounceTimer then
+        task.cancel(debounceTimer)
+    end
+    debounceTimer = task.delay(0.08, function()
+        debounceTimer = nil
+        local searchQuery = (query or ""):lower()
+        local itemIndex = 0
+        for _, child in ipairs(togglesContainer:GetChildren()) do
+            if child:IsA("Frame") and child.Name ~= "UIListLayout" and child.Name ~= "UIPadding" then
+                local itemTab = child:GetAttribute("Tab") or "Combat"
+                local shouldBeVisible = false
+                if searchQuery ~= "" then
+                    local titleLabel = child:FindFirstChild("Title")
+                    shouldBeVisible = titleLabel and titleLabel.Text:lower():find(searchQuery) ~= nil
+                else
+                    shouldBeVisible = (itemTab == currentActiveTab)
+                end
+                
                 if shouldBeVisible then
+                    child.Visible = true
                     itemIndex = itemIndex + 1
-                    child.Size = UDim2.new(1, -10, 0, 0)
-                    child.BackgroundTransparency = 1
+                    -- Cancela tween anterior deste child
+                    if filterTweens[child] then
+                        filterTweens[child]:Cancel()
+                    end
                     local t = child:FindFirstChild("Title")
                     local d = child:FindFirstChild("Description")
-                    if t then t.TextTransparency = 1 end
-                    if d then d.TextTransparency = 1 end
-                    task.delay((itemIndex - 1) * 0.02, function()
-                        if not child or not child.Parent then return end
-                        TweenService:Create(child, TweenInfo.new(0.2, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {
-                            Size = UDim2.new(1, -10, 0, 60), BackgroundTransparency = 0.45
-                        }):Play()
-                        if t then TweenService:Create(t, TweenInfo.new(0.15), {TextTransparency = 0}):Play() end
-                        if d then TweenService:Create(d, TweenInfo.new(0.15), {TextTransparency = 0}):Play() end
-                    end)
+                    local sizeTween = TweenService:Create(child, TweenInfo.new(0.2, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {
+                        Size = UDim2.new(1, -10, 0, 60), BackgroundTransparency = 0.45
+                    })
+                    filterTweens[child] = sizeTween
+                    sizeTween:Play()
+                    if t then
+                        local tTween = TweenService:Create(t, TweenInfo.new(0.15), {TextTransparency = 0})
+                        tTween:Play()
+                    end
+                    if d then
+                        local dTween = TweenService:Create(d, TweenInfo.new(0.15), {TextTransparency = 0})
+                        dTween:Play()
+                    end
+                else
+                    child.Visible = false
+                    if filterTweens[child] then
+                        filterTweens[child]:Cancel()
+                        filterTweens[child] = nil
+                    end
                 end
             end
         end
-    end
-    task.delay(0.05, function() pcall(UpdateCanvasSize) end)
+        task.defer(UpdateCanvasSize)
+    end)
 end
 
--- Calcula e move a ActiveBar para acompanhar a aba ativa (usado tanto no clique quanto na rolagem)
+-- Calcula e move a ActiveBar para acompanhar a aba ativa (sem animação)
 local function UpdateActiveBarPosition(animar)
     local targetBtn = tabButtons[activeTab]
     if not targetBtn or not sharedActiveBar.Visible then return end
@@ -1112,15 +1126,17 @@ local function UpdateActiveBarPosition(animar)
     local targetYPos = targetCenterY - parentTopY
 
     if animar then
-        TweenService:Create(sharedActiveBar, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+        if activeBarTween then activeBarTween:Cancel() end
+        activeBarTween = TweenService:Create(sharedActiveBar, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
             Position = UDim2.new(0, 4, 0, targetYPos)
-        }):Play()
+        })
+        activeBarTween:Play()
     else
         sharedActiveBar.Position = UDim2.new(0, 4, 0, targetYPos)
     end
 end
 
--- Acompanha a ActiveBar em tempo real durante a rolagem do TabsContainer (sem RenderStepped)
+-- Acompanha a ActiveBar em tempo real durante a rolagem
 TabsContainer:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
     UpdateActiveBarPosition(false)
 end)
@@ -1159,35 +1175,7 @@ local function selectTab(tabName)
 
     if targetBtn then
         sharedActiveBar.Visible = true
-
-        -- Cálculo relativo correto da posição vertical dentro de LeftPanel.InnerBg
-        local targetCenterY = targetBtn.AbsolutePosition.Y + (targetBtn.AbsoluteSize.Y / 2)
-        local parentTopY = sharedActiveBar.Parent.AbsolutePosition.Y
-        local targetYPos = targetCenterY - parentTopY
-
-        -- Animação suave deslizando até a posição correta da aba
-        local slideInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-        local slideTween = TweenService:Create(sharedActiveBar, slideInfo, {
-            Position = UDim2.new(0, 4, 0, targetYPos)
-        })
-        slideTween:Play()
-
-        -- Efeito snappy na escala ao finalizar o movimento
-        slideTween.Completed:Connect(function()
-            if activeTab == tabName then
-                local scaleUp = TweenService:Create(sharedActiveBar, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                    Size = UDim2.new(0, 3, 0, 25)
-                })
-                scaleUp:Play()
-                scaleUp.Completed:Connect(function()
-                    if activeTab == tabName then
-                        TweenService:Create(sharedActiveBar, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-                            Size = UDim2.new(0, 3, 0, 22)
-                        }):Play()
-                    end
-                end)
-            end
-        end)
+        UpdateActiveBarPosition(true)
     end
 
     togglesContainer.CanvasPosition = Vector2.new(0, 0)
@@ -1268,6 +1256,7 @@ local function createToggle(parent, configKey, tabCategory)
     titleLabel.TextSize = 13
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     titleLabel.Text = optData and optData.Title or configKey
+    titleLabel.TextTruncate = Enum.TextTruncate.AtEnd
     titleLabel.ZIndex = 11
     
     local descLabel = Instance.new("TextLabel", toggleFrame)
@@ -1282,6 +1271,7 @@ local function createToggle(parent, configKey, tabCategory)
     descLabel.TextYAlignment = Enum.TextYAlignment.Top
     descLabel.TextWrapped = true
     descLabel.Text = optData and optData.Desc or ""
+    descLabel.TextTruncate = Enum.TextTruncate.AtEnd
     descLabel.ZIndex = 11
     
     local switchTrack = Instance.new("Frame", toggleFrame)
@@ -1336,9 +1326,11 @@ end)
 
 ExpandBtn.MouseButton1Click:Connect(function()
     PlayUI_Click()
+    if UIState ~= "OPEN" then return end
     isExpanded = not isExpanded
     local newSize = isExpanded and UDim2.new(0, 800, 0, 480) or UDim2.new(0, 640, 0, 360)
     TweenService:Create(mainWrapper, TweenInfo.new(0.3, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {Size = newSize}):Play()
+    updateMainScale()
 end)
 
 SetUIState = function(newState)
@@ -1375,8 +1367,6 @@ end
 
 MinimizeBtn.MouseButton1Click:Connect(function() 
     PlayUI_Click()
-    TweenService:Create(MinimizeBtn, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = Color3.fromRGB(15, 15, 15), BackgroundTransparency = 0.3}):Play()
-    TweenService:Create(MinimizeLine, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(160, 160, 160)}):Play()
     SetUIState("MINIMIZED")
 end)
 
@@ -1391,22 +1381,15 @@ local function AlternarConfirmacao(exibir)
         confirmOverlay.Visible = true
         
         confirmCard.Size = UDim2.new(0, 280, 0, 115)
-        local cardScale = Instance.new("UIScale", confirmCard)
-        cardScale.Scale = 0.88
-        TweenService:Create(cardScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+        confirmCardScale.Scale = 0.88
+        TweenService:Create(confirmCardScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
         AplicarFadeSincronizado(confirmCard, false, tempoAnim)
     else
         AplicarFadeSincronizado(confirmCard, true, tempoAnim)
-        local sc = confirmCard:FindFirstChildOfClass("UIScale")
-        if sc then
-            TweenService:Create(sc, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Scale = 0.88}):Play()
-        end
+        TweenService:Create(confirmCardScale, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Scale = 0.88}):Play()
         task.delay(tempoAnim + 0.05, function()
             if not isConfirmOpen then
                 confirmOverlay.Visible = false
-                local sc2 = confirmCard:FindFirstChildOfClass("UIScale")
-                if sc2 then sc2:Destroy() end
-                
                 if UIState == "OPEN" then
                     mainWrapper.Visible = true
                 end
@@ -1490,11 +1473,11 @@ local function ExecutarIntroAkat()
     mainWrapper.Visible = true
     FloatBtn.Visible = true 
     UIState = "OPEN"
-    local MainScale = Instance.new("UIScale", mainWrapper); MainScale.Scale = 0.85
+    local IntroScale = Instance.new("UIScale", mainWrapper); IntroScale.Scale = 0.85
     AplicarFadeSincronizado(mainWrapper, true, 0)
     AplicarFadeSincronizado(mainWrapper, false, 0.35)
     
-    local openScale = TweenService:Create(MainScale, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1})
+    local openScale = TweenService:Create(IntroScale, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1})
     openScale:Play()
     
     FloatBtn.Size = UDim2.new(0, 0, 0, 0)
@@ -1507,7 +1490,7 @@ local function ExecutarIntroAkat()
 
     openScale.Completed:Connect(function() 
         selectTab("Player") 
-        MainScale:Destroy()
+        IntroScale:Destroy()
         IntroFrame:Destroy()
         Blur:Destroy()
     end)
