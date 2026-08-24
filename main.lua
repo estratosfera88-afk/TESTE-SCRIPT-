@@ -210,7 +210,7 @@ mainFrame.ClipsDescendants = false
 local dragUIToggle = false
 local dragUIInput = nil
 local dragUIStart = nil
-startUIPos = nil
+local startUIPos = nil
 
 mainFrame.InputBegan:Connect(function(input)
     if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and not dragUIToggle then
@@ -277,6 +277,8 @@ RedGradientOverlay.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 RedGradientOverlay.BackgroundTransparency = 0
 RedGradientOverlay.BorderSizePixel = 0
 RedGradientOverlay.ZIndex = 4
+-- CORREÇÃO DE VAZAMENTO: Adicionado UICorner para o overlay não escapar do MainBackground
+Instance.new("UICorner", RedGradientOverlay).CornerRadius = UDim.new(0, 10)
 
 local SingleRedGrad = Instance.new("UIGradient", RedGradientOverlay)
 SingleRedGrad.Rotation = 90
@@ -290,7 +292,7 @@ RunService.RenderStepped:Connect(function()
     SingleRedGrad.Rotation = (t * 12) % 360
 end)
 
--- Painéis transparentes de estrutura (sem bordas ou cores separadas)
+-- Painéis transparentes de estrutura
 local LeftPanel = Instance.new("Frame", MainBackground)
 LeftPanel.Name = "LeftPanel"
 LeftPanel.Size = UDim2.new(0, 220, 1, 0)
@@ -314,7 +316,6 @@ UnifiedHeaderLine.BackgroundTransparency = 0.4
 UnifiedHeaderLine.BorderSizePixel = 0
 UnifiedHeaderLine.ZIndex = 6
 
--- Divisória vertical suave entre a barra lateral e a área principal
 local VerticalDividerLine = Instance.new("Frame", MainBackground)
 VerticalDividerLine.Name = "VerticalDividerLine"
 VerticalDividerLine.Size = UDim2.new(0, 1, 1, 0)
@@ -762,6 +763,7 @@ confStrokeGrad.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 30, 40)),
     ColorSequenceKeypoint.new(1.0, Color3.fromRGB(120, 0, 10))
 })
+
 RunService.RenderStepped:Connect(function()
     confStrokeGrad.Rotation = (os.clock() * 15) % 360
     uGrad.Rotation = (os.clock() * 10) % 360
@@ -1044,7 +1046,6 @@ local function filterToggles(currentActiveTab, query)
     task.delay(0.05, function() pcall(UpdateCanvasSize) end)
 end
 
--- Atualiza a posição da barra deslizante com base nas coordenadas da aba no contêiner
 local function UpdateActiveBarPosition(animar)
     local targetBtn = tabButtons[activeTab]
     if not targetBtn or not sharedActiveBar.Visible then return end
