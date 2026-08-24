@@ -126,7 +126,7 @@ FloatBtn.Size = UDim2.new(0, 44, 0, 44)
 FloatBtn.Position = UDim2.new(0.12, 0, 0.4, 0)
 FloatBtn.Image = "rbxthumb://type=Asset&id=139044062702391&w=150&h=150"
 FloatBtn.BackgroundColor3 = Color3.fromRGB(15, 0, 0)
-FloatBtn.Visible = true
+FloatBtn.Visible = false -- Oculto inicialmente para sincronizar com a intro
 FloatBtn.ZIndex = 100
 FloatBtn.ClipsDescendants = false
 if not FloatBtn:FindFirstChildOfClass("UICorner") then Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(0, 8) end
@@ -343,7 +343,7 @@ SearchContainer.Name = "SearchContainer"
 SearchContainer.Size = UDim2.new(1, -16, 0, 36)
 SearchContainer.Position = UDim2.new(0, 8, 0, 44)
 SearchContainer.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
-SearchContainer.BackgroundTransparency = 0.85 -- Alterado para mais transparente
+SearchContainer.BackgroundTransparency = 0.85
 SearchContainer.ZIndex = 10
 Instance.new("UICorner", SearchContainer).CornerRadius = UDim.new(0, 8)
 
@@ -428,7 +428,7 @@ local sharedActiveBar = Instance.new("Frame", LeftPanel)
 sharedActiveBar.Name = "SharedActiveBar"
 sharedActiveBar.AnchorPoint = Vector2.new(0, 0.5)
 sharedActiveBar.Size = UDim2.new(0, 3, 0, 22)
-sharedActiveBar.Position = UDim2.new(0, 11, 0, 0) -- Ajustado para ficar perfeitamente alinhado com o ícone
+sharedActiveBar.Position = UDim2.new(0, 11, 0, 0)
 sharedActiveBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 sharedActiveBar.BorderSizePixel = 0
 sharedActiveBar.Visible = false
@@ -444,17 +444,18 @@ sharedBarGrad.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(1.0, Color3.fromRGB(120, 0, 10))
 })
 
+-- Correção do bug do "círculo semi-transparente" e aumento da largura para o lado esquerdo
 local barGlow = Instance.new("ImageLabel", sharedActiveBar)
 barGlow.Name = "BarGlow"
 barGlow.AnchorPoint = Vector2.new(0, 0.5) 
-barGlow.Position = UDim2.new(0, -6, 0.5, 0) -- Offset da barra de Active ajustado para não encostar na borda esquerda e evitar o 'vazado' cortado
-barGlow.Size = UDim2.new(0, 34, 1, 16)
+barGlow.Position = UDim2.new(0, -18, 0.5, 0) -- Expandido para a esquerda
+barGlow.Size = UDim2.new(0, 48, 1, 20) -- Maior largura para cobrir perfeitamente
 barGlow.BackgroundTransparency = 1
 barGlow.Image = "rbxassetid://5554831957"
 barGlow.ImageColor3 = Color3.fromRGB(255, 20, 30)
 barGlow.ImageTransparency = 0.35
 barGlow.ScaleType = Enum.ScaleType.Slice
-barGlow.SliceCenter = Rect.new(36, 36, 114, 114)
+barGlow.SliceCenter = Rect.new(75, 75, 75, 75) -- Corrige a deformação em círculo
 barGlow.ZIndex = 14
 
 -- ==================== USER PROFILE BADGE ====================
@@ -844,7 +845,7 @@ local NOTIF_DURATION = 6
 local function UpdateNotifications()
     for i, notif in ipairs(ActiveNotifications) do
         if notif and notif.Parent then
-            local targetY = -24 - ((i - 1) * (96 + 12)) -- Calcula a posição empilhando para cima
+            local targetY = -24 - ((i - 1) * (96 + 12))
             TweenService:Create(notif, TweenInfo.new(0.3, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {
                 Position = UDim2.new(1, -20, 1, targetY)
             }):Play()
@@ -852,12 +853,13 @@ local function UpdateNotifications()
     end
 end
 
-local function CriarNotificacao(titulo, descricao, iconeId)
+-- Adicionado parâmetro 'customWidth' para permitir largura menor na notificação de link confirmado
+local function CriarNotificacao(titulo, descricao, iconeId, customWidth)
     local notifHolder = Instance.new("Frame", screenGui)
     notifHolder.Name = "NotifHolder"
     notifHolder.AnchorPoint = Vector2.new(1, 1)
-    notifHolder.Size = UDim2.new(0, 320, 0, 96)
-    notifHolder.Position = UDim2.new(1, 340, 1, -24) -- Inicia fora da tela
+    notifHolder.Size = UDim2.new(0, customWidth or 330, 0, 96) -- Padrão 330, Link confirmado 270
+    notifHolder.Position = UDim2.new(1, 340, 1, -24)
     notifHolder.BackgroundTransparency = 1
     notifHolder.ZIndex = 200
     notifHolder.ClipsDescendants = false
@@ -910,7 +912,6 @@ local function CriarNotificacao(titulo, descricao, iconeId)
     notifTitle.TextXAlignment = Enum.TextXAlignment.Left
     notifTitle.ZIndex = 203
 
-    -- Criação de um Container para colocar a descrição e o ícone extra dinamicamente 
     local descContainer = Instance.new("Frame", notifCard)
     descContainer.Size = UDim2.new(1, -40, 0, 40)
     descContainer.Position = UDim2.new(0, 26, 0, 36)
@@ -934,7 +935,6 @@ local function CriarNotificacao(titulo, descricao, iconeId)
     notifDesc.TextYAlignment = Enum.TextYAlignment.Top
     notifDesc.ZIndex = 203
 
-    -- Aplica o ícone recebido como argumento da notificação (substituindo o Emoji ✅)
     if iconeId then
         local extraIcon = Instance.new("ImageLabel", descContainer)
         extraIcon.Size = UDim2.new(0, 16, 0, 16)
@@ -1011,7 +1011,6 @@ local function CriarNotificacao(titulo, descricao, iconeId)
         ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 0, 0))
     })
 
-    -- Insere na pilha e atualiza (fazendo o novo subir empurrando os antigos para cima)
     table.insert(ActiveNotifications, 1, notifHolder)
     UpdateNotifications()
 
@@ -1020,7 +1019,6 @@ local function CriarNotificacao(titulo, descricao, iconeId)
         if dismissed then return end
         dismissed = true
         
-        -- Remove da tabela e realinha as outras notificações
         for i, v in ipairs(ActiveNotifications) do
             if v == notifHolder then
                 table.remove(ActiveNotifications, i)
@@ -1052,7 +1050,7 @@ local function CriarNotificacaoDiscord()
     local notifHolder = Instance.new("Frame", screenGui)
     notifHolder.Name = "NotifHolderDiscord"
     notifHolder.AnchorPoint = Vector2.new(1, 1)
-    notifHolder.Size = UDim2.new(0, 340, 0, 96)
+    notifHolder.Size = UDim2.new(0, 330, 0, 96) -- Uniformizado com as outras (330px)
     notifHolder.Position = UDim2.new(1, 360, 1, -24)
     notifHolder.BackgroundTransparency = 1
     notifHolder.ZIndex = 200
@@ -1101,7 +1099,7 @@ local function CriarNotificacaoDiscord()
     notifTitle.ZIndex = 203
 
     local notifDesc = Instance.new("TextLabel", notifCard)
-    notifDesc.Size = UDim2.new(1, -115, 0, 40)
+    notifDesc.Size = UDim2.new(1, -125, 0, 40) -- Ajustado tamanho do texto para acomodar o botão deslocado
     notifDesc.Position = UDim2.new(0, 26, 0, 36)
     notifDesc.BackgroundTransparency = 1
     notifDesc.Text = "LINK TO COPY https://discord.gg/rZuYzZ7zvt"
@@ -1113,10 +1111,11 @@ local function CriarNotificacaoDiscord()
     notifDesc.TextWrapped = true
     notifDesc.ZIndex = 203
 
+    -- Botão azul movido mais para a esquerda, longe do botão "X"
     local copyBtn = Instance.new("TextButton", notifCard)
     copyBtn.Size = UDim2.new(0, 75, 0, 32)
     copyBtn.AnchorPoint = Vector2.new(1, 0.5)
-    copyBtn.Position = UDim2.new(1, -14, 0.5, 0)
+    copyBtn.Position = UDim2.new(1, -62, 0.5, 0) 
     copyBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
     copyBtn.Text = "COPY"
     copyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1133,8 +1132,8 @@ local function CriarNotificacaoDiscord()
                 setclipboard("https://discord.gg/rZuYzZ7zvt")
             end
         end)
-        -- Aqui passamos o ID do ícone personalizado como 3º argumento para substituir o ✅
-        CriarNotificacao("AKATSUKI", "LINK COPIED SUCCESSFULLY ", "rbxthumb://type=Asset&id=118293546444074&w=150&h=150")
+        -- Notificação de link confirmado com largura menor (270px)
+        CriarNotificacao("AKATSUKI", "LINK COPIED SUCCESSFULLY ", "rbxthumb://type=Asset&id=118293546444074&w=150&h=150", 270)
     end)
 
     local notifCloseBtn = Instance.new("TextButton", notifCard)
@@ -1205,7 +1204,6 @@ local function CriarNotificacaoDiscord()
         ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 30, 100))
     })
 
-    -- Insere na pilha global
     table.insert(ActiveNotifications, 1, notifHolder)
     UpdateNotifications()
 
@@ -1289,7 +1287,6 @@ local function UpdateActiveBarPosition(animar)
 
     if animar then
         TweenService:Create(sharedActiveBar, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-            -- Posição fixa de X e ajusta o Y
             Position = UDim2.new(0, 11, 0, targetYPos) 
         }):Play()
     else
@@ -1460,7 +1457,6 @@ local function createToggle(parent, configKey, tabCategory)
     end)
 end
 
--- Remoção da animação de zoom da aba de pesquisa 
 searchTextBox.Focused:Connect(function()
     searchStroke.Transparency = 0.1
     searchStrokeGrad.Enabled = true
@@ -1630,7 +1626,7 @@ local function ExecutarIntroAkat()
     for _, item in ipairs(mainWrapper:GetDescendants()) do RegistrarTransparencias(item) end
 
     mainWrapper.Visible = true
-    FloatBtn.Visible = true 
+    FloatBtn.Visible = true -- Exibe o botão flutuante apenas após o término da intro
     UIState = "OPEN"
     local MainScale = Instance.new("UIScale", mainWrapper); MainScale.Scale = 0.85
     AplicarFadeSincronizado(mainWrapper, true, 0)
