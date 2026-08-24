@@ -1,6 +1,6 @@
--- [[ AKATSUKI UI ONLY [v3.6] - FIXED & IMPROVED (SOLID LIQUID RED EDITION) ]]
--- Updated with floating multi-layer shadows, refined user badge, interactive search bar with gradient on focus,
--- optimized taller toggles with scale animation, clean styling, and mobile multi-touch fixes.
+-- [[ AKATSUKI UI ONLY [v3.7] - REFINED RED EDITION ]]
+-- Updated with infinite scroll tabs, solid notification cards with proper shadows,
+-- moved search bar, balanced gradient sizes, slower badge outlines, and UI dragging fixes.
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -91,8 +91,10 @@ local function RegistrarTransparencias(objeto)
 end
 
 local function AplicarFadeSincronizado(raiz, fadeOut, duracao)
+    if not raiz or not raiz.Parent then return end
     local info = TweenInfo.new(duracao, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out)
     local function tratarObjeto(obj)
+        if not obj or not obj.Parent then return end
         RegistrarTransparencias(obj)
         local orig = originalTrans[obj]
         if not orig then return end
@@ -216,7 +218,6 @@ local startUIPos = nil
 
 mainFrame.InputBegan:Connect(function(input)
     if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and not dragUIToggle then
-        -- Permite apenas começar o drag em áreas limpas (como no painel lateral fora de botões)
         dragUIToggle = true
         dragUIInput = input
         dragUIStart = input.Position
@@ -351,11 +352,11 @@ subtitle.Font = Enum.Font.Gotham
 subtitle.TextXAlignment = Enum.TextXAlignment.Center
 subtitle.ZIndex = 11
 
--- ==================== BARRA DE PESQUISA (MOVIDA PARA BAIXO) ====================
+-- ==================== BARRA DE PESQUISA (MOVIDA PARA O TOPO) ====================
 local SearchContainer = Instance.new("Frame", LeftPanel.InnerBg)
 SearchContainer.Name = "SearchContainer"
 SearchContainer.Size = UDim2.new(1, -16, 0, 35)
-SearchContainer.Position = UDim2.new(0, 8, 1, -104) -- Posicionada acima da badge de usuário
+SearchContainer.Position = UDim2.new(0, 8, 0, 44) -- Logo abaixo do header (36 + margin)
 SearchContainer.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
 SearchContainer.BackgroundTransparency = 0.3
 SearchContainer.ZIndex = 10
@@ -406,12 +407,14 @@ searchTextBox.Font = Enum.Font.Gotham
 searchTextBox.TextSize = 11
 searchTextBox.TextXAlignment = Enum.TextXAlignment.Left
 searchTextBox.ZIndex = 12
+searchTextBox.Active = true -- Anti-drag bug fix
+searchTextBox.ClearTextOnFocus = false
 
 -- ==================== TABS CONTAINER ====================
 local TabsContainer = Instance.new("ScrollingFrame", LeftPanel.InnerBg)
 TabsContainer.Name = "TabsContainer"
-TabsContainer.Size = UDim2.new(1, -8, 1, -154) -- Redimensionado para comportar o layout
-TabsContainer.Position = UDim2.new(0, 4, 0, 44) -- Posicionado abaixo da linha de cabeçalho
+TabsContainer.Size = UDim2.new(1, -8, 1, -152) 
+TabsContainer.Position = UDim2.new(0, 4, 0, 87) -- Posicionado abaixo da SearchBar
 TabsContainer.BackgroundTransparency = 1
 TabsContainer.BorderSizePixel = 0
 TabsContainer.ZIndex = 10
@@ -454,7 +457,7 @@ uGrad.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 0, 0))
 })
 RunService.RenderStepped:Connect(function()
-    uGrad.Rotation = (os.clock() * 30) % 360
+    uGrad.Rotation = (os.clock() * 10) % 360 -- Rotação mais lenta (antes 30)
 end)
 
 local AvatarImage = Instance.new("ImageLabel", UserProfileFrame)
@@ -474,7 +477,7 @@ avGrad.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 0, 0))
 })
 RunService.RenderStepped:Connect(function()
-    avGrad.Rotation = (os.clock() * 30) % 360
+    avGrad.Rotation = (os.clock() * 10) % 360 -- Rotação mais lenta (antes 30)
 end)
 
 local StatusIndicator = Instance.new("Frame", AvatarImage)
@@ -664,7 +667,7 @@ badgeGrad.Color = ColorSequence.new({
 local BadgeText = Instance.new("TextLabel", BadgeFrame)
 BadgeText.Size = UDim2.new(1, 0, 1, 0)
 BadgeText.BackgroundTransparency = 1
-BadgeText.Text = "V3.6"
+BadgeText.Text = "V3.7"
 BadgeText.TextColor3 = Color3.fromRGB(255, 255, 255)
 BadgeText.Font = Enum.Font.GothamBold
 BadgeText.TextSize = 8.5
@@ -730,15 +733,18 @@ local confirmStroke = Instance.new("UIStroke", confirmCard)
 confirmStroke.Thickness = 1.5
 confirmStroke.Color = Color3.fromRGB(255, 255, 255)
 
--- Gradient Vermelho e Branco (Tela de Fechar)
+-- Gradient 50/50 equilibrado para a janela de fechar o script
 local confStrokeGrad = Instance.new("UIGradient", confirmStroke)
 confStrokeGrad.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 0, 0)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+    ColorSequenceKeypoint.new(0.15, Color3.fromRGB(255, 0, 0)),
+    ColorSequenceKeypoint.new(0.35, Color3.fromRGB(255, 255, 255)),
+    ColorSequenceKeypoint.new(0.65, Color3.fromRGB(255, 255, 255)),
+    ColorSequenceKeypoint.new(0.85, Color3.fromRGB(255, 0, 0)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))
 })
 RunService.RenderStepped:Connect(function()
-    confStrokeGrad.Rotation = (os.clock() * 30) % 360
+    confStrokeGrad.Rotation = (os.clock() * 20) % 360 -- Rotação suavizada e constante
 end)
 
 local confirmCardGrad = Instance.new("UIGradient", confirmCard)
@@ -778,7 +784,7 @@ btnYes.TextSize = 11
 btnYes.Text = UI_TEXT.ConfirmBtn
 btnYes.ZIndex = 1000
 btnYes.BorderSizePixel = 0
-Instance.new("UICorner", btnYes).CornerRadius = UDim.new(0, 14) -- Mais Arredondado
+Instance.new("UICorner", btnYes).CornerRadius = UDim.new(0, 14) 
 local btnYesGrad = Instance.new("UIGradient", btnYes)
 btnYesGrad.Rotation = 90
 btnYesGrad.Color = ColorSequence.new({
@@ -796,7 +802,7 @@ btnNo.TextSize = 11
 btnNo.Text = UI_TEXT.CancelBtn
 btnNo.ZIndex = 1000
 btnNo.BorderSizePixel = 0
-Instance.new("UICorner", btnNo).CornerRadius = UDim.new(0, 14) -- Mais Arredondado
+Instance.new("UICorner", btnNo).CornerRadius = UDim.new(0, 14) 
 local btnNoStroke = Instance.new("UIStroke", btnNo)
 btnNoStroke.Color = Color3.fromRGB(60, 60, 60)
 btnNoStroke.Thickness = 1
@@ -809,7 +815,7 @@ btnNo.MouseLeave:Connect(function() TweenService:Create(btnNo, TweenInfo.new(0.1
 
 AplicarFadeSincronizado(confirmCard, true, 0) 
 
--- ==================== SISTEMA DE NOTIFICAÇÃO LIMPO ====================
+-- ==================== SISTEMA DE NOTIFICAÇÃO LIMPO (SEM CONTORNO/TRANSPARENTE E COM SOMBRA) ====================
 local NOTIF_DURATION = 6 
 
 local function CriarNotificacao(titulo, descricao, icone)
@@ -825,25 +831,26 @@ local function CriarNotificacao(titulo, descricao, icone)
     local notifCard = Instance.new("Frame", notifHolder)
     notifCard.Name = "NotifCard"
     notifCard.Size = UDim2.new(1, 0, 1, 0)
-    notifCard.BackgroundColor3 = Color3.fromRGB(14, 14, 16)
-    notifCard.BackgroundTransparency = 0.08
+    notifCard.BackgroundColor3 = Color3.fromRGB(18, 18, 20) -- Cor sólida em vez de transparente
+    notifCard.BackgroundTransparency = 0 -- Totalmente Sólida
     notifCard.BorderSizePixel = 0
     notifCard.ZIndex = 201
     notifCard.ClipsDescendants = false
     Instance.new("UICorner", notifCard).CornerRadius = UDim.new(0, 16)
 
-    local notifStroke = Instance.new("UIStroke", notifCard)
-    notifStroke.Thickness = 1.2
-    notifStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    notifStroke.Color = Color3.fromRGB(255, 255, 255)
-    notifStroke.Transparency = 0.82
-    local notifStrokeGrad = Instance.new("UIGradient", notifStroke)
-    notifStrokeGrad.Rotation = 135
-    notifStrokeGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(180, 40, 40)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(60, 60, 60)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 30, 30))
-    })
+    -- Adiciona uma Sombra Polida na Notificação
+    local notifShadow = Instance.new("ImageLabel", notifCard)
+    notifShadow.Name = "Shadow"
+    notifShadow.AnchorPoint = Vector2.new(0.5, 0.5)
+    notifShadow.Position = UDim2.new(0.5, 0, 0.5, 4)
+    notifShadow.Size = UDim2.new(1, 24, 1, 24)
+    notifShadow.BackgroundTransparency = 1
+    notifShadow.Image = "rbxassetid://5554831957"
+    notifShadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+    notifShadow.ImageTransparency = 0.35
+    notifShadow.ScaleType = Enum.ScaleType.Slice
+    notifShadow.SliceCenter = Rect.new(36, 36, 114, 114)
+    notifShadow.ZIndex = 200
 
     local accentBar = Instance.new("Frame", notifCard)
     accentBar.Size = UDim2.new(0, 3, 0, 40)
@@ -1014,7 +1021,7 @@ local function filterToggles(currentActiveTab, query)
             end
         end
     end
-    task.delay(0.05, UpdateCanvasSize)
+    task.delay(0.05, function() pcall(UpdateCanvasSize) end)
 end
 
 local function selectTab(tabName)
@@ -1057,31 +1064,44 @@ local function createTabBtn(tabName)
     tabBtn.ZIndex = 11
     Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 8)
 
-    -- Barra lateral com gradiente Vermelho e Branco + animação Sobe/Desce
+    -- Container invisivel para criar o scroll infinito da cor vermelha e branca
     local activeBar = Instance.new("Frame", tabBtn)
     activeBar.Name = "ActiveBar"
     activeBar.Size = UDim2.new(0, 2, 0, 22)
     activeBar.Position = UDim2.new(0, 3, 0.5, -11)
     activeBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    activeBar.BackgroundTransparency = 1
     activeBar.BorderSizePixel = 0
     activeBar.Visible = false
     activeBar.ZIndex = 13 
+    activeBar.ClipsDescendants = true
     Instance.new("UICorner", activeBar).CornerRadius = UDim.new(1, 0)
 
-    local actGrad = Instance.new("UIGradient", activeBar)
+    local scroller = Instance.new("Frame", activeBar)
+    scroller.Size = UDim2.new(1, 0, 2, 0) -- Dobro do tamanho
+    scroller.Position = UDim2.new(0, 0, -1, 0)
+    scroller.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    scroller.BorderSizePixel = 0
+    scroller.ZIndex = 13
+
+    -- Gradient Equilibrado e simétrico (Vermelho e Branco ocupam o mesmo espaço com fade limpo)
+    local actGrad = Instance.new("UIGradient", scroller)
     actGrad.Rotation = 90
     actGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 0, 0)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+        ColorSequenceKeypoint.new(0.15, Color3.fromRGB(255, 0, 0)),
+        ColorSequenceKeypoint.new(0.35, Color3.fromRGB(255, 255, 255)),
+        ColorSequenceKeypoint.new(0.65, Color3.fromRGB(255, 255, 255)),
+        ColorSequenceKeypoint.new(0.85, Color3.fromRGB(255, 0, 0)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))
     })
     
     RunService.RenderStepped:Connect(function()
-        -- Animação Ping-Pong infinita usando math.sin
-        actGrad.Offset = Vector2.new(0, math.sin(os.clock() * 4) * 0.5)
+        -- Animação linear de rolagem contínua para baixo devagar (como se surgissem novos vermelhos sempre)
+        local t = (os.clock() * 0.4) % 1
+        scroller.Position = UDim2.new(0, 0, t - 1, 0)
     end)
 
-    -- Ícone com tamanho reduzido (14x14 em vez de 18x18)
     local iconContainer = Instance.new("Frame", tabBtn)
     iconContainer.Name = "Icon"
     iconContainer.Size = UDim2.new(0, 14, 0, 14) 
@@ -1095,7 +1115,7 @@ local function createTabBtn(tabName)
     imageLabel.ZIndex = 13
     imageLabel.ImageColor3 = Color3.fromRGB(150, 150, 150)
     
-    if tabName == "Player" then imageLabel.Image = "rbxthumb://type=Asset&id=107032293182891&w=150&h=150"
+    if tabName == "Player" then imageLabel.Image = "rbxthumb://type=Asset&id=71234705040146&w=150&h=150"
     elseif tabName == "Teleports" then imageLabel.Image = "rbxthumb://type=Asset&id=131082536388353&w=150&h=150"
     elseif tabName == "Settings" then imageLabel.Image = "rbxthumb://type=Asset&id=88409765080516&w=150&h=150"
     elseif tabName == "Visuals" then imageLabel.Image = "rbxthumb://type=Asset&id=97681798175944&w=150&h=150"
@@ -1133,7 +1153,6 @@ local function createToggle(parent, configKey, tabCategory)
     toggleScale.Scale = 1
 
     Instance.new("UICorner", toggleFrame).CornerRadius = UDim.new(0, 8)
-    -- Stroke removido aqui conforme pedido
     
     local optData = UI_TEXT.Options[configKey]
     local titleLabel = Instance.new("TextLabel", toggleFrame)
@@ -1198,7 +1217,7 @@ end
 
 -- ==================== SEARCH BAR INTERACTIVE FOCUS / BLUR LOGIC ====================
 searchTextBox.Focused:Connect(function()
-    TweenService:Create(SearchContainer, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, -16, 0, 37)}):Play()
+    TweenService:Create(SearchContainer, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, -12, 0, 37)}):Play()
     searchStroke.Transparency = 0.1
     searchStrokeGrad.Enabled = true
 end)
