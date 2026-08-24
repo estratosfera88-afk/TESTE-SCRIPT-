@@ -1,5 +1,5 @@
--- [[ AKATSUKI UI ONLY [v5.7] - REFINED RED EDITION ]]
--- Updated with smooth tab transitions, modern active bar gradient spinning, and detached confirm dialog.
+-- [[ AKATSUKI UI ONLY [v5.7.1] - REFINED RED EDITION ]]
+-- Updated with advanced sliding active bar, gradient glow, and snappy scale transition.
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -51,20 +51,6 @@ local tabButtons = {}
 local isExpanded = false
 local originalTrans = {}
 local isConfirmOpen = false
-
--- ==================== SISTEMA GLOBAL DA ACTIVEBAR ====================
-local globalActiveSpinners = {}
-local activeBarTweens = {}
-
-RunService.RenderStepped:Connect(function()
-    -- Animação contínua de rotação fluida
-    local rot = (os.clock() * 120) % 360
-    for _, spinner in ipairs(globalActiveSpinners) do
-        if spinner and spinner.Parent then
-            spinner.Rotation = rot
-        end
-    end
-end)
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "DeltaAkatUniversalUI"
@@ -449,6 +435,42 @@ end
 TabsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(UpdateTabsCanvas)
 TabsContainer:GetPropertyChangedSignal("AbsoluteSize"):Connect(UpdateTabsCanvas)
 
+-- ==================== SISTEMA GLOBAL DA ACTIVEBAR REUTILIZÁVEL ====================
+local sharedActiveBar = Instance.new("Frame", LeftPanel.InnerBg)
+sharedActiveBar.Name = "SharedActiveBar"
+sharedActiveBar.AnchorPoint = Vector2.new(0, 0.5)
+sharedActiveBar.Size = UDim2.new(0, 3, 0, 22)
+sharedActiveBar.Position = UDim2.new(0, 4, 0, 0) -- Posição inicial dinâmica
+sharedActiveBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+sharedActiveBar.BorderSizePixel = 0
+sharedActiveBar.Visible = false
+sharedActiveBar.ZIndex = 15
+sharedActiveBar.ClipsDescendants = false
+Instance.new("UICorner", sharedActiveBar).CornerRadius = UDim.new(1, 0)
+
+-- Gradiente Vertical Moderno (Vermelho escuro -> Vermelho vivo -> Vermelho escuro)
+local sharedBarGrad = Instance.new("UIGradient", sharedActiveBar)
+sharedBarGrad.Rotation = 90
+sharedBarGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0.0, Color3.fromRGB(120, 0, 10)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 30, 40)),
+    ColorSequenceKeypoint.new(1.0, Color3.fromRGB(120, 0, 10))
+})
+
+-- Glow/Bloom vermelho muito suave ao redor da barra
+local barGlow = Instance.new("ImageLabel", sharedActiveBar)
+barGlow.Name = "BarGlow"
+barGlow.AnchorPoint = Vector2.new(0.5, 0.5)
+barGlow.Position = UDim2.new(0.5, 0, 0.5, 0)
+barGlow.Size = UDim2.new(0, 16, 1, 14)
+barGlow.BackgroundTransparency = 1
+barGlow.Image = "rbxassetid://5554831957"
+barGlow.ImageColor3 = Color3.fromRGB(255, 20, 30)
+barGlow.ImageTransparency = 0.65
+barGlow.ScaleType = Enum.ScaleType.Slice
+barGlow.SliceCenter = Rect.new(36, 36, 114, 114)
+barGlow.ZIndex = 14
+
 -- ==================== USER PROFILE BADGE ====================
 local UserProfileFrame = Instance.new("Frame", LeftPanel.InnerBg)
 UserProfileFrame.Size = UDim2.new(1, -16, 0, 55)
@@ -717,7 +739,7 @@ end
 containerLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(UpdateCanvasSize)
 togglesContainer:GetPropertyChangedSignal("AbsoluteSize"):Connect(UpdateCanvasSize)
 
--- ==================== CONFIRM FRAME (DESANEXADO DA JANELA PRINCIPAL) ====================
+-- ==================== CONFIRM FRAME ====================
 local confirmOverlay = Instance.new("Frame", screenGui)
 confirmOverlay.Name = "ConfirmOverlay"
 confirmOverlay.Size = UDim2.new(1, 0, 1, 0)
@@ -957,11 +979,10 @@ local function CriarNotificacao(titulo, descricao, icone)
     progressBar.ZIndex = 203
     Instance.new("UICorner", progressBar).CornerRadius = UDim.new(1, 0)
     
-    -- ===== MUDANÇA: Gradiente da barra de progresso (Vermelho com Preto) =====
     local progressGrad = Instance.new("UIGradient", progressBar)
     progressGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(230, 20, 25)), -- Vermelho vivo (Mesmo da Badge)
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 0, 0))     -- Preto / Vermelho extremamente escuro
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(230, 20, 25)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 0, 0))
     })
 
     notifHolder.Position = UDim2.new(1, 320, 1, -24)
@@ -1032,29 +1053,16 @@ end
 
 local function selectTab(tabName)
     activeTab = tabName
-    local animSpeed = TweenInfo.new(0.5, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out)
+    local targetBtn = tabButtons[tabName]
     
     for name, btn in pairs(tabButtons) do
         local label = btn:FindFirstChild("Label")
         local iconContainer = btn:FindFirstChild("Icon")
-        local activeBar = btn:FindFirstChild("ActiveBar")
-        
-        if activeBarTweens[btn] then
-            activeBarTweens[btn]:Cancel()
-            activeBarTweens[btn] = nil
-        end
+        local animSpeed = TweenInfo.new(0.3, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out)
 
         if name == tabName then
             TweenService:Create(btn, animSpeed, {BackgroundColor3 = Color3.fromRGB(45, 10, 15), BackgroundTransparency = 0.5}):Play()
             if label then TweenService:Create(label, animSpeed, {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play() end
-            
-            if activeBar then
-                activeBar.Visible = true
-                local barTween = TweenService:Create(activeBar, animSpeed, {Size = UDim2.new(0, 3, 0, 22)})
-                activeBarTweens[btn] = barTween
-                barTween:Play()
-            end
-            
             if iconContainer and iconContainer:FindFirstChild("AccentImage") then
                 TweenService:Create(iconContainer.AccentImage, animSpeed, {ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
             end
@@ -1062,24 +1070,42 @@ local function selectTab(tabName)
         else
             TweenService:Create(btn, animSpeed, {BackgroundColor3 = Color3.fromRGB(15, 15, 15), BackgroundTransparency = 1}):Play()
             if label then TweenService:Create(label, animSpeed, {TextColor3 = Color3.fromRGB(150, 150, 150)}):Play() end
-            
-            if activeBar then
-                local barTween = TweenService:Create(activeBar, animSpeed, {Size = UDim2.new(0, 3, 0, 0)})
-                activeBarTweens[btn] = barTween
-                barTween:Play()
-                barTween.Completed:Connect(function()
-                    if activeBar and activeTab ~= name then
-                        activeBar.Visible = false
-                    end
-                end)
-            end
-            
             if iconContainer and iconContainer:FindFirstChild("AccentImage") then
                 TweenService:Create(iconContainer.AccentImage, animSpeed, {ImageColor3 = Color3.fromRGB(150, 150, 150)}):Play()
             end
             originalTrans[btn] = { BackgroundTransparency = 1, TextTransparency = 0 }
         end
     end
+
+    if targetBtn then
+        sharedActiveBar.Visible = true
+        local targetYPos = targetBtn.Position.Y.Offset + (targetBtn.AbsoluteSize.Y / 2) - (sharedActiveBar.AbsoluteSize.Y / 2) + 2
+        
+        -- Animação suave com Quint Out (deslizando da posição anterior até a nova)
+        local slideInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+        local slideTween = TweenService:Create(sharedActiveBar, slideInfo, {
+            Position = UDim2.new(0, 4, 0, targetYPos)
+        })
+        slideTween:Play()
+
+        -- Pequena animação de escala ("snappy" premium) ao atingir o destino
+        slideTween.Completed:Connect(function()
+            if activeTab == tabName then
+                local scaleUp = TweenService:Create(sharedActiveBar, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                    Size = UDim2.new(0, 3, 0, 25)
+                })
+                scaleUp:Play()
+                scaleUp.Completed:Connect(function()
+                    if activeTab == tabName then
+                        TweenService:Create(sharedActiveBar, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                            Size = UDim2.new(0, 3, 0, 22)
+                        }):Play()
+                    end
+                end)
+            end
+        end)
+    end
+
     togglesContainer.CanvasPosition = Vector2.new(0, 0)
     searchTextBox.Text = ""
     filterToggles(tabName, "")
@@ -1094,31 +1120,6 @@ local function createTabBtn(tabName)
     tabBtn.Text = ""
     tabBtn.ZIndex = 11
     Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 8)
-
-    -- ===== MUDANÇA: Gradiente Dinâmico e Brilhante na Barra das Abas =====
-    local activeBar = Instance.new("Frame", tabBtn)
-    activeBar.Name = "ActiveBar"
-    activeBar.AnchorPoint = Vector2.new(0, 0.5)
-    activeBar.Size = UDim2.new(0, 3, 0, 0)
-    activeBar.Position = UDim2.new(0, 3, 0.5, 0)
-    activeBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255) 
-    activeBar.BorderSizePixel = 0
-    activeBar.Visible = false
-    activeBar.ZIndex = 13 
-    activeBar.ClipsDescendants = true
-    Instance.new("UICorner", activeBar).CornerRadius = UDim.new(1, 0)
-
-    local spinnerGrad = Instance.new("UIGradient", activeBar)
-    spinnerGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 40, 40)),      -- Vermelho Vivo (Brilho neon)
-        ColorSequenceKeypoint.new(0.25, Color3.fromRGB(100, 0, 0)),     -- Transição intermediária
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(15, 0, 0)),       -- Preto/Vermelho muito escuro
-        ColorSequenceKeypoint.new(0.75, Color3.fromRGB(100, 0, 0)),     -- Transição intermediária
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 40, 40))       -- Vermelho Vivo
-    })
-
-    -- Insere na tabela global para rotacionar o UIGradient
-    table.insert(globalActiveSpinners, spinnerGrad)
 
     local iconContainer = Instance.new("Frame", tabBtn)
     iconContainer.Name = "Icon"
