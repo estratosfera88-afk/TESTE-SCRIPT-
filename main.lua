@@ -1079,7 +1079,10 @@ local function selectTab(tabName)
 
     if targetBtn then
         sharedActiveBar.Visible = true
-        local targetYPos = targetBtn.Position.Y.Offset + (targetBtn.AbsoluteSize.Y / 2) - (sharedActiveBar.AbsoluteSize.Y / 2) + 2
+        
+        -- FIX: Usamos o AbsolutePosition para contornar o UIListLayout
+        local relativeY = targetBtn.AbsolutePosition.Y - sharedActiveBar.Parent.AbsolutePosition.Y
+        local targetYPos = relativeY + (targetBtn.AbsoluteSize.Y / 2) - (sharedActiveBar.AbsoluteSize.Y / 2)
         
         -- Animação suave com Quint Out (deslizando da posição anterior até a nova)
         local slideInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
