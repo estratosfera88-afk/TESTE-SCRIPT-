@@ -308,7 +308,7 @@ local function CreateGradientPanel(parent, size, pos, name)
 end
 
 local LeftPanel = CreateGradientPanel(mainFrame, UDim2.new(0, 220, 1, 0), UDim2.new(0, 0, 0, 0), "LeftPanel")
-local RightPanel = CreateGradientPanel(mainFrame, UDim2.new(1, -235, 1, 0), UDim2.new(0, 235, 0, 0), "RightPanel")
+local RightPanel = CreateGradientPanel(mainFrame, UDim2.new(1, -220, 1, 0), UDim2.new(0, 220, 0, 0), "RightPanel")
 
 local LeftSeparatorLine = Instance.new("Frame", LeftPanel.InnerBg)
 LeftSeparatorLine.Size = UDim2.new(1, 0, 0, 1)
@@ -473,8 +473,8 @@ barGlow.ZIndex = 14
 local UserProfileFrame = Instance.new("Frame", LeftPanel.InnerBg)
 UserProfileFrame.Size = UDim2.new(1, -16, 0, 55)
 UserProfileFrame.Position = UDim2.new(0, 8, 1, -63)
-UserProfileFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0) -- Fundo Totalmente Preto
-UserProfileFrame.BackgroundTransparency = 0 -- Totalmente visível / Dark
+UserProfileFrame.BackgroundColor3 = Color3.fromRGB(20, 12, 12) -- Dark glass translúcido
+UserProfileFrame.BackgroundTransparency = 0.35 -- Transparência perceptível, contraste preservado
 UserProfileFrame.BorderSizePixel = 0
 UserProfileFrame.ZIndex = 10
 Instance.new("UICorner", UserProfileFrame).CornerRadius = UDim.new(0, 8)
@@ -857,8 +857,8 @@ local function CriarNotificacao(titulo, descricao, icone)
     local notifCard = Instance.new("Frame", notifHolder)
     notifCard.Name = "NotifCard"
     notifCard.Size = UDim2.new(1, 0, 1, 0)
-    notifCard.BackgroundColor3 = Color3.fromRGB(18, 18, 20)
-    notifCard.BackgroundTransparency = 0 
+    notifCard.BackgroundColor3 = Color3.fromRGB(16, 16, 18)
+    notifCard.BackgroundTransparency = 0.25 
     notifCard.BorderSizePixel = 0
     notifCard.ZIndex = 201
     notifCard.ClipsDescendants = false
@@ -892,24 +892,24 @@ local function CriarNotificacao(titulo, descricao, icone)
     })
 
     local notifTitle = Instance.new("TextLabel", notifCard)
-    notifTitle.Size = UDim2.new(1, -68, 0, 18)
-    notifTitle.Position = UDim2.new(0, 24, 0, 12)
+    notifTitle.Size = UDim2.new(1, -72, 0, 20)
+    notifTitle.Position = UDim2.new(0, 24, 0, 10)
     notifTitle.BackgroundTransparency = 1
     notifTitle.Text = titulo or "AKATSUKI"
     notifTitle.TextColor3 = Color3.fromRGB(240, 240, 240)
     notifTitle.Font = Enum.Font.GothamBold
-    notifTitle.TextSize = 13
+    notifTitle.TextSize = 15.5
     notifTitle.TextXAlignment = Enum.TextXAlignment.Left
     notifTitle.ZIndex = 203
 
     local notifDesc = Instance.new("TextLabel", notifCard)
-    notifDesc.Size = UDim2.new(1, -34, 0, 30)
-    notifDesc.Position = UDim2.new(0, 24, 0, 32)
+    notifDesc.Size = UDim2.new(1, -36, 0, 32)
+    notifDesc.Position = UDim2.new(0, 24, 0, 34)
     notifDesc.BackgroundTransparency = 1
     notifDesc.Text = descricao or ""
     notifDesc.TextColor3 = Color3.fromRGB(150, 150, 155)
     notifDesc.Font = Enum.Font.Gotham
-    notifDesc.TextSize = 11.5
+    notifDesc.TextSize = 12.5
     notifDesc.TextXAlignment = Enum.TextXAlignment.Left
     notifDesc.TextYAlignment = Enum.TextYAlignment.Top
     notifDesc.TextWrapped = true
@@ -1049,6 +1049,35 @@ local function filterToggles(currentActiveTab, query)
     task.delay(0.05, function() pcall(UpdateCanvasSize) end)
 end
 
+-- Calcula e move a ActiveBar para acompanhar a aba ativa (usado tanto no clique quanto na rolagem)
+local function UpdateActiveBarPosition(animar)
+    local targetBtn = tabButtons[activeTab]
+    if not targetBtn or not sharedActiveBar.Visible then return end
+
+    local targetCenterY = targetBtn.AbsolutePosition.Y + (targetBtn.AbsoluteSize.Y / 2)
+    local parentTopY = sharedActiveBar.Parent.AbsolutePosition.Y
+    local targetYPos = targetCenterY - parentTopY
+
+    if animar then
+        TweenService:Create(sharedActiveBar, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+            Position = UDim2.new(0, 4, 0, targetYPos)
+        }):Play()
+    else
+        sharedActiveBar.Position = UDim2.new(0, 4, 0, targetYPos)
+    end
+end
+
+-- Acompanha a ActiveBar em tempo real durante a rolagem do TabsContainer (sem RenderStepped)
+TabsContainer:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+    UpdateActiveBarPosition(false)
+end)
+TabsContainer:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+    UpdateActiveBarPosition(false)
+end)
+TabsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    UpdateActiveBarPosition(false)
+end)
+
 local function selectTab(tabName)
     activeTab = tabName
     local targetBtn = tabButtons[tabName]
@@ -1077,12 +1106,12 @@ local function selectTab(tabName)
 
     if targetBtn then
         sharedActiveBar.Visible = true
-        
-        -- FIX: Cálculo relativo correto da posição vertical dentro de LeftPanel.InnerBg
+
+        -- Cálculo relativo correto da posição vertical dentro de LeftPanel.InnerBg
         local targetCenterY = targetBtn.AbsolutePosition.Y + (targetBtn.AbsoluteSize.Y / 2)
         local parentTopY = sharedActiveBar.Parent.AbsolutePosition.Y
         local targetYPos = targetCenterY - parentTopY
-        
+
         -- Animação suave deslizando até a posição correta da aba
         local slideInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
         local slideTween = TweenService:Create(sharedActiveBar, slideInfo, {
