@@ -1,6 +1,6 @@
 -- [[ AKATSUKI UI ONLY [v3.6] - FIXED & IMPROVED (SOLID LIQUID RED EDITION) ]]
 -- Updated with floating multi-layer shadows, refined user badge, interactive search bar with gradient on focus,
--- optimized taller toggles with scale animation, and clean styling.
+-- optimized taller toggles with scale animation, clean styling, and mobile multi-touch fixes.
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -30,8 +30,8 @@ local UIState = "CLOSED"
 local UI_TEXT = {
     SearchPlaceholder = "Search...",
     ConfirmCloseTitle = "Do you want to close the script?",
-    ConfirmBtn = "Confirm",
-    CancelBtn = "Cancel",
+    ConfirmBtn = "Yes",
+    CancelBtn = "No",
     Intro = '<font color="#FFFFFF">Scripts by | </font><font color="#8B0000">AKATSUKI</font>',
     Tabs = { Player = "Player", Combat = "Combat", Visuals = "Visuals", Teleports = "Teleports", Settings = "Settings" },
     Options = {
@@ -143,34 +143,38 @@ task.spawn(function()
     end)
 end)
 
-local dragToggle = false
-local dragStart, startPos
-local isDragging = false
+-- MULTI-TOUCH FIX FOR FLOAT BUTTON
+local dragToggleF = false
+local dragInputF = nil
+local dragStartF = nil
+local startPosF = nil
+local isDraggingF = false
 
 FloatBtn.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragToggle = true
-        isDragging = false
-        dragStart = input.Position
-        startPos = FloatBtn.Position
+    if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and not dragToggleF then
+        dragToggleF = true
+        dragInputF = input
+        isDraggingF = false
+        dragStartF = input.Position
+        startPosF = FloatBtn.Position
     end
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-    if dragToggle and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        local delta = input.Position - dragStart
+    if dragToggleF and input == dragInputF then
+        local delta = input.Position - dragStartF
         if delta.Magnitude > 5 then
-            isDragging = true
+            isDraggingF = true
         end
-        FloatBtn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        FloatBtn.Position = UDim2.new(startPosF.X.Scale, startPosF.X.Offset + delta.X, startPosF.Y.Scale, startPosF.Y.Offset + delta.Y)
     end
 end)
 
 local SetUIState
 
 UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
-        if dragToggle and not isDragging then
+    if input == dragInputF then 
+        if dragToggleF and not isDraggingF then
             if UIState == "MINIMIZED" or UIState == "CLOSED" then
                 pcall(function() 
                     FloatOpenSound.TimePosition = 0
@@ -181,7 +185,8 @@ UserInputService.InputEnded:Connect(function(input)
                 SetUIState("MINIMIZED")
             end
         end
-        dragToggle = false 
+        dragToggleF = false 
+        dragInputF = nil
     end
 end)
 
@@ -203,25 +208,36 @@ mainFrame.BackgroundTransparency = 1
 mainFrame.ZIndex = 2
 mainFrame.ClipsDescendants = false
 
-local dragUIToggle, dragUIStart, startUIPos
+-- MULTI-TOUCH FIX FOR MAIN WINDOW
+local dragUIToggle = false
+local dragUIInput = nil
+local dragUIStart = nil
+local startUIPos = nil
+
 mainFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragUIToggle = true; dragUIStart = input.Position; startUIPos = mainWrapper.Position
+    if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and not dragUIToggle then
+        -- Permite apenas começar o drag em áreas limpas (como no painel lateral fora de botões)
+        dragUIToggle = true
+        dragUIInput = input
+        dragUIStart = input.Position
+        startUIPos = mainWrapper.Position
     end
 end)
 UserInputService.InputChanged:Connect(function(input)
-    if dragUIToggle and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+    if dragUIToggle and input == dragUIInput then
         local delta = input.Position - dragUIStart
         mainWrapper.Position = UDim2.new(startUIPos.X.Scale, startUIPos.X.Offset + delta.X, startUIPos.Y.Scale, startUIPos.Y.Offset + delta.Y)
     end
 end)
 UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragUIToggle = false end
+    if input == dragUIInput then
+        dragUIToggle = false
+        dragUIInput = nil
+    end
 end)
 
--- ==================== SOLID LIQUID RED BACKGROUND SYSTEM WITH REAL 3D SHADOW ====================
+-- ==================== BACKGROUND SYSTEM ====================
 local function CreateGradientPanel(parent, size, pos, name)
-    -- Sombra 3D realista usando textura dispersa (elimina caixa preta)
     local shadow = Instance.new("ImageLabel", parent)
     shadow.Name = name .. "_Shadow"
     shadow.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -335,11 +351,11 @@ subtitle.Font = Enum.Font.Gotham
 subtitle.TextXAlignment = Enum.TextXAlignment.Center
 subtitle.ZIndex = 11
 
--- ==================== BARRA DE PESQUISA ====================
+-- ==================== BARRA DE PESQUISA (MOVIDA PARA BAIXO) ====================
 local SearchContainer = Instance.new("Frame", LeftPanel.InnerBg)
 SearchContainer.Name = "SearchContainer"
 SearchContainer.Size = UDim2.new(1, -16, 0, 35)
-SearchContainer.Position = UDim2.new(0, 8, 0, 44)
+SearchContainer.Position = UDim2.new(0, 8, 1, -104) -- Posicionada acima da badge de usuário
 SearchContainer.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
 SearchContainer.BackgroundTransparency = 0.3
 SearchContainer.ZIndex = 10
@@ -391,11 +407,11 @@ searchTextBox.TextSize = 11
 searchTextBox.TextXAlignment = Enum.TextXAlignment.Left
 searchTextBox.ZIndex = 12
 
--- ==================== TABS & PROFILE ====================
+-- ==================== TABS CONTAINER ====================
 local TabsContainer = Instance.new("ScrollingFrame", LeftPanel.InnerBg)
 TabsContainer.Name = "TabsContainer"
-TabsContainer.Size = UDim2.new(1, -8, 1, -145)
-TabsContainer.Position = UDim2.new(0, 4, 0, 84)
+TabsContainer.Size = UDim2.new(1, -8, 1, -154) -- Redimensionado para comportar o layout
+TabsContainer.Position = UDim2.new(0, 4, 0, 44) -- Posicionado abaixo da linha de cabeçalho
 TabsContainer.BackgroundTransparency = 1
 TabsContainer.BorderSizePixel = 0
 TabsContainer.ZIndex = 10
@@ -440,13 +456,6 @@ uGrad.Color = ColorSequence.new({
 RunService.RenderStepped:Connect(function()
     uGrad.Rotation = (os.clock() * 30) % 360
 end)
-
-local userGrad = Instance.new("UIGradient", UserProfileFrame)
-userGrad.Rotation = 45
-userGrad.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 20, 20)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(5, 5, 5))
-})
 
 local AvatarImage = Instance.new("ImageLabel", UserProfileFrame)
 AvatarImage.Size = UDim2.new(0, 34, 0, 34)
@@ -511,7 +520,6 @@ PrivacyBtn.BackgroundTransparency = 0.2
 PrivacyBtn.BorderSizePixel = 0
 PrivacyBtn.ZIndex = 12
 Instance.new("UICorner", PrivacyBtn).CornerRadius = UDim.new(0, 5)
-
 local privStroke = Instance.new("UIStroke", PrivacyBtn)
 privStroke.Color = Color3.fromRGB(60, 20, 20)
 privStroke.Thickness = 1
@@ -590,7 +598,6 @@ ExpandBtn.BackgroundTransparency = 0.3
 ExpandBtn.Text = ""
 ExpandBtn.ZIndex = 11
 Instance.new("UICorner", ExpandBtn).CornerRadius = UDim.new(0, 5)
-
 local ExpandSquare = Instance.new("Frame", ExpandBtn)
 ExpandSquare.Name = "Square"
 ExpandSquare.Size = UDim2.new(0, 7, 0, 7)
@@ -663,12 +670,6 @@ BadgeText.Font = Enum.Font.GothamBold
 BadgeText.TextSize = 8.5
 BadgeText.ZIndex = 16
 
-local BadgeStroke = Instance.new("UIStroke", BadgeFrame)
-BadgeStroke.Color = Color3.fromRGB(230, 20, 25)
-BadgeStroke.Transparency = 0.9
-BadgeStroke.Thickness = 1
-BadgeStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-
 local togglesContainer = Instance.new("ScrollingFrame", RightPanel.InnerBg)
 togglesContainer.Name = "TogglesContainer"
 togglesContainer.Size = UDim2.new(1, -6, 1, -48)
@@ -691,7 +692,7 @@ local uiPadding = Instance.new("UIPadding", togglesContainer)
 uiPadding.PaddingTop = UDim.new(0, 8)
 uiPadding.PaddingBottom = UDim.new(0, 8)
 uiPadding.PaddingLeft = UDim.new(0, 4)
-uiPadding.PaddingRight = UDim.new(0, 6) -- Pequeno espaço entre o toggle e a barra de rolagem
+uiPadding.PaddingRight = UDim.new(0, 6) 
 
 local function UpdateCanvasSize()
     local contentHeight = containerLayout.AbsoluteContentSize.Y + 24
@@ -728,10 +729,13 @@ Instance.new("UICorner", confirmCard).CornerRadius = UDim.new(0, 14)
 local confirmStroke = Instance.new("UIStroke", confirmCard)
 confirmStroke.Thickness = 1.5
 confirmStroke.Color = Color3.fromRGB(255, 255, 255)
+
+-- Gradient Vermelho e Branco (Tela de Fechar)
 local confStrokeGrad = Instance.new("UIGradient", confirmStroke)
 confStrokeGrad.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 10, 15)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 0, 0))
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 0, 0)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
 })
 RunService.RenderStepped:Connect(function()
     confStrokeGrad.Rotation = (os.clock() * 30) % 360
@@ -774,7 +778,7 @@ btnYes.TextSize = 11
 btnYes.Text = UI_TEXT.ConfirmBtn
 btnYes.ZIndex = 1000
 btnYes.BorderSizePixel = 0
-Instance.new("UICorner", btnYes).CornerRadius = UDim.new(0, 8)
+Instance.new("UICorner", btnYes).CornerRadius = UDim.new(0, 14) -- Mais Arredondado
 local btnYesGrad = Instance.new("UIGradient", btnYes)
 btnYesGrad.Rotation = 90
 btnYesGrad.Color = ColorSequence.new({
@@ -792,7 +796,7 @@ btnNo.TextSize = 11
 btnNo.Text = UI_TEXT.CancelBtn
 btnNo.ZIndex = 1000
 btnNo.BorderSizePixel = 0
-Instance.new("UICorner", btnNo).CornerRadius = UDim.new(0, 8)
+Instance.new("UICorner", btnNo).CornerRadius = UDim.new(0, 14) -- Mais Arredondado
 local btnNoStroke = Instance.new("UIStroke", btnNo)
 btnNoStroke.Color = Color3.fromRGB(60, 60, 60)
 btnNoStroke.Thickness = 1
@@ -805,7 +809,7 @@ btnNo.MouseLeave:Connect(function() TweenService:Create(btnNo, TweenInfo.new(0.1
 
 AplicarFadeSincronizado(confirmCard, true, 0) 
 
--- ==================== SISTEMA DE NOTIFICAÇÃO LIMPO E RÁPIDO ====================
+-- ==================== SISTEMA DE NOTIFICAÇÃO LIMPO ====================
 local NOTIF_DURATION = 6 
 
 local function CriarNotificacao(titulo, descricao, icone)
@@ -965,7 +969,6 @@ local function CriarNotificacao(titulo, descricao, icone)
 
     notifCloseBtn.MouseButton1Click:Connect(function() DismissNotif() end)
 
-    -- Surgimento rápido e sincronizado
     local slideIn = TweenInfo.new(0.25, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out)
     TweenService:Create(notifHolder, slideIn, {Position = UDim2.new(1, -20, 1, -24)}):Play()
 
@@ -1022,11 +1025,9 @@ local function selectTab(tabName)
         local iconContainer = btn:FindFirstChild("Icon")
         local activeBar = btn:FindFirstChild("ActiveBar")
         if name == tabName then
-            -- Fundo totalmente selecionado com tom vermelho escuro sutil
             TweenService:Create(btn, animSpeed, {BackgroundColor3 = Color3.fromRGB(45, 10, 15), BackgroundTransparency = 0.5}):Play()
             if label then TweenService:Create(label, animSpeed, {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play() end
             if activeBar then activeBar.Visible = true end
-            -- Ícone ativo fica branco
             if iconContainer and iconContainer:FindFirstChild("AccentImage") then
                 TweenService:Create(iconContainer.AccentImage, animSpeed, {ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
             end
@@ -1035,7 +1036,6 @@ local function selectTab(tabName)
             TweenService:Create(btn, animSpeed, {BackgroundColor3 = Color3.fromRGB(15, 15, 15), BackgroundTransparency = 1}):Play()
             if label then TweenService:Create(label, animSpeed, {TextColor3 = Color3.fromRGB(150, 150, 150)}):Play() end
             if activeBar then activeBar.Visible = false end
-            -- Ícones inativos permanecem cinza
             if iconContainer and iconContainer:FindFirstChild("AccentImage") then
                 TweenService:Create(iconContainer.AccentImage, animSpeed, {ImageColor3 = Color3.fromRGB(150, 150, 150)}):Play()
             end
@@ -1057,7 +1057,7 @@ local function createTabBtn(tabName)
     tabBtn.ZIndex = 11
     Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 8)
 
-    -- Barra lateral com exatamente 2 px de espessura e gradiente giratório
+    -- Barra lateral com gradiente Vermelho e Branco + animação Sobe/Desce
     local activeBar = Instance.new("Frame", tabBtn)
     activeBar.Name = "ActiveBar"
     activeBar.Size = UDim2.new(0, 2, 0, 22)
@@ -1069,18 +1069,23 @@ local function createTabBtn(tabName)
     Instance.new("UICorner", activeBar).CornerRadius = UDim.new(1, 0)
 
     local actGrad = Instance.new("UIGradient", activeBar)
+    actGrad.Rotation = 90
     actGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 10, 15)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 0, 0))
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 0, 0)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
     })
+    
     RunService.RenderStepped:Connect(function()
-        actGrad.Rotation = (os.clock() * 30) % 360
+        -- Animação Ping-Pong infinita usando math.sin
+        actGrad.Offset = Vector2.new(0, math.sin(os.clock() * 4) * 0.5)
     end)
 
+    -- Ícone com tamanho reduzido (14x14 em vez de 18x18)
     local iconContainer = Instance.new("Frame", tabBtn)
     iconContainer.Name = "Icon"
-    iconContainer.Size = UDim2.new(0, 18, 0, 18) 
-    iconContainer.Position = UDim2.new(0, 12, 0.5, -9)
+    iconContainer.Size = UDim2.new(0, 14, 0, 14) 
+    iconContainer.Position = UDim2.new(0, 14, 0.5, -7)
     iconContainer.BackgroundTransparency = 1
     iconContainer.ZIndex = 12
     local imageLabel = Instance.new("ImageLabel", iconContainer)
@@ -1115,7 +1120,6 @@ end
 local function createToggle(parent, configKey, tabCategory)
     local toggleFrame = Instance.new("Frame")
     toggleFrame.Name = configKey
-    -- Largura expandida para o lado direito (com margem limpa da barra de rolagem)
     toggleFrame.Size = UDim2.new(1, -10, 0, 60)
     toggleFrame.BackgroundColor3 = Color3.fromRGB(15, 5, 5)
     toggleFrame.BackgroundTransparency = 0.45
@@ -1129,9 +1133,7 @@ local function createToggle(parent, configKey, tabCategory)
     toggleScale.Scale = 1
 
     Instance.new("UICorner", toggleFrame).CornerRadius = UDim.new(0, 8)
-    local stroke = Instance.new("UIStroke", toggleFrame)
-    stroke.Color = Color3.fromRGB(20, 20, 20)
-    stroke.Thickness = 1
+    -- Stroke removido aqui conforme pedido
     
     local optData = UI_TEXT.Options[configKey]
     local titleLabel = Instance.new("TextLabel", toggleFrame)
@@ -1369,7 +1371,6 @@ local function ExecutarIntroAkat()
     FloatBtn.Size = UDim2.new(0, 0, 0, 0)
     TweenService:Create(FloatBtn, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 44, 0, 44)}):Play()
     
-    -- Notificação disparada em sincronia com a transição do menu
     CriarNotificacao(
         "AKATSUKI SCRIPTS",
         "MM2 Script carregado com sucesso! Bem-vindo, " .. player.DisplayName .. "."
