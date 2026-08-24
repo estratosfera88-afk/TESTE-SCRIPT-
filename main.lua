@@ -126,7 +126,7 @@ FloatBtn.Size = UDim2.new(0, 44, 0, 44)
 FloatBtn.Position = UDim2.new(0.12, 0, 0.4, 0)
 FloatBtn.Image = "rbxthumb://type=Asset&id=139044062702391&w=150&h=150"
 FloatBtn.BackgroundColor3 = Color3.fromRGB(15, 0, 0)
-FloatBtn.Visible = false -- Oculto inicialmente para sincronizar com a intro
+FloatBtn.Visible = false
 FloatBtn.ZIndex = 100
 FloatBtn.ClipsDescendants = false
 if not FloatBtn:FindFirstChildOfClass("UICorner") then Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(0, 8) end
@@ -443,20 +443,7 @@ sharedBarGrad.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 30, 40)),
     ColorSequenceKeypoint.new(1.0, Color3.fromRGB(120, 0, 10))
 })
-
--- Correção do bug do "círculo semi-transparente" e aumento da largura para o lado esquerdo
-local barGlow = Instance.new("ImageLabel", sharedActiveBar)
-barGlow.Name = "BarGlow"
-barGlow.AnchorPoint = Vector2.new(0, 0.5) 
-barGlow.Position = UDim2.new(0, -18, 0.5, 0) -- Expandido para a esquerda
-barGlow.Size = UDim2.new(0, 48, 1, 20) -- Maior largura para cobrir perfeitamente
-barGlow.BackgroundTransparency = 1
-barGlow.Image = "rbxassetid://5554831957"
-barGlow.ImageColor3 = Color3.fromRGB(255, 20, 30)
-barGlow.ImageTransparency = 0.35
-barGlow.ScaleType = Enum.ScaleType.Slice
-barGlow.SliceCenter = Rect.new(75, 75, 75, 75) -- Corrige a deformação em círculo
-barGlow.ZIndex = 14
+-- Bug do círculo semi-transparente resolvido removendo completamente o barGlow defeituoso.
 
 -- ==================== USER PROFILE BADGE ====================
 local UserProfileFrame = Instance.new("Frame", LeftPanel)
@@ -840,7 +827,7 @@ AplicarFadeSincronizado(confirmCard, true, 0)
 
 -- ==================== SISTEMA DE NOTIFICAÇÃO (STACK / FILA) ====================
 local ActiveNotifications = {}
-local NOTIF_DURATION = 6 
+local NOTIF_DURATION = 10 -- Tempo de duração aumentado para 10 segundos em todas as notificações
 
 local function UpdateNotifications()
     for i, notif in ipairs(ActiveNotifications) do
@@ -853,12 +840,12 @@ local function UpdateNotifications()
     end
 end
 
--- Adicionado parâmetro 'customWidth' para permitir largura menor na notificação de link confirmado
-local function CriarNotificacao(titulo, descricao, iconeId, customWidth)
+-- Todas as notificações agora usam o mesmo tamanho padrão (330px), corrigindo o bug da badge pequena
+local function CriarNotificacao(titulo, descricao, iconeId)
     local notifHolder = Instance.new("Frame", screenGui)
     notifHolder.Name = "NotifHolder"
     notifHolder.AnchorPoint = Vector2.new(1, 1)
-    notifHolder.Size = UDim2.new(0, customWidth or 330, 0, 96) -- Padrão 330, Link confirmado 270
+    notifHolder.Size = UDim2.new(0, 330, 0, 96) -- Tamanho padronizado (330px)
     notifHolder.Position = UDim2.new(1, 340, 1, -24)
     notifHolder.BackgroundTransparency = 1
     notifHolder.ZIndex = 200
@@ -1050,7 +1037,7 @@ local function CriarNotificacaoDiscord()
     local notifHolder = Instance.new("Frame", screenGui)
     notifHolder.Name = "NotifHolderDiscord"
     notifHolder.AnchorPoint = Vector2.new(1, 1)
-    notifHolder.Size = UDim2.new(0, 330, 0, 96) -- Uniformizado com as outras (330px)
+    notifHolder.Size = UDim2.new(0, 330, 0, 96) 
     notifHolder.Position = UDim2.new(1, 360, 1, -24)
     notifHolder.BackgroundTransparency = 1
     notifHolder.ZIndex = 200
@@ -1098,8 +1085,9 @@ local function CriarNotificacaoDiscord()
     notifTitle.TextXAlignment = Enum.TextXAlignment.Left
     notifTitle.ZIndex = 203
 
+    -- Largura ajustada (-170) para evitar sobreposição bugada com o botão COPY
     local notifDesc = Instance.new("TextLabel", notifCard)
-    notifDesc.Size = UDim2.new(1, -125, 0, 40) -- Ajustado tamanho do texto para acomodar o botão deslocado
+    notifDesc.Size = UDim2.new(1, -170, 0, 40)
     notifDesc.Position = UDim2.new(0, 26, 0, 36)
     notifDesc.BackgroundTransparency = 1
     notifDesc.Text = "LINK TO COPY https://discord.gg/rZuYzZ7zvt"
@@ -1111,7 +1099,7 @@ local function CriarNotificacaoDiscord()
     notifDesc.TextWrapped = true
     notifDesc.ZIndex = 203
 
-    -- Botão azul movido mais para a esquerda, longe do botão "X"
+    -- Botão COPY ajustado perfeitamente na posição correta sem bugs
     local copyBtn = Instance.new("TextButton", notifCard)
     copyBtn.Size = UDim2.new(0, 75, 0, 32)
     copyBtn.AnchorPoint = Vector2.new(1, 0.5)
@@ -1132,8 +1120,8 @@ local function CriarNotificacaoDiscord()
                 setclipboard("https://discord.gg/rZuYzZ7zvt")
             end
         end)
-        -- Notificação de link confirmado com largura menor (270px)
-        CriarNotificacao("AKATSUKI", "LINK COPIED SUCCESSFULLY ", "rbxthumb://type=Asset&id=118293546444074&w=150&h=150", 270)
+        -- Notificação de link confirmado agora gerada com o mesmo tamanho padrão
+        CriarNotificacao("AKATSUKI", "LINK COPIED SUCCESSFULLY ", "rbxthumb://type=Asset&id=118293546444074&w=150&h=150")
     end)
 
     local notifCloseBtn = Instance.new("TextButton", notifCard)
@@ -1626,7 +1614,7 @@ local function ExecutarIntroAkat()
     for _, item in ipairs(mainWrapper:GetDescendants()) do RegistrarTransparencias(item) end
 
     mainWrapper.Visible = true
-    FloatBtn.Visible = true -- Exibe o botão flutuante apenas após o término da intro
+    FloatBtn.Visible = true
     UIState = "OPEN"
     local MainScale = Instance.new("UIScale", mainWrapper); MainScale.Scale = 0.85
     AplicarFadeSincronizado(mainWrapper, true, 0)
