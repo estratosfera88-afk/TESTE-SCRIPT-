@@ -1,5 +1,5 @@
 -- [[ AKATSUKI UI ONLY [v5.7] - REFINED RED EDITION ]]
--- Updated with smooth tab transitions, red-white gradient active bars, and detached confirm dialog.
+-- Updated with smooth tab transitions, modern active bar gradient spinning, and detached confirm dialog.
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -53,15 +53,15 @@ local originalTrans = {}
 local isConfirmOpen = false
 
 -- ==================== SISTEMA GLOBAL DA ACTIVEBAR ====================
-local globalActiveGrads = {}
+local globalActiveSpinners = {}
 local activeBarTweens = {}
 
 RunService.RenderStepped:Connect(function()
-    -- Gradiente vermelho com branco agora girando devagar
-    local rot = (os.clock() * 15) % 360
-    for _, grad in ipairs(globalActiveGrads) do
-        if grad and grad.Parent then
-            grad.Rotation = rot
+    -- Animação contínua de rotação fluida entre Vermelho e Branco
+    local rot = (os.clock() * 120) % 360
+    for _, spinner in ipairs(globalActiveSpinners) do
+        if spinner and spinner.Parent then
+            spinner.Rotation = rot
         end
     end
 end)
@@ -744,14 +744,13 @@ confirmStroke.Thickness = 1.5
 confirmStroke.Color = Color3.fromRGB(255, 255, 255)
 
 local confStrokeGrad = Instance.new("UIGradient", confirmStroke)
--- Mesmo tamanho para os dois gradientes padronizado (mesma sequencia 0, 0.5, 1)
 confStrokeGrad.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
     ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 255, 255)),
     ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))
 })
 RunService.RenderStepped:Connect(function()
-    confStrokeGrad.Rotation = (os.clock() * 15) % 360 -- Girando devagar
+    confStrokeGrad.Rotation = (os.clock() * 15) % 360
 end)
 
 local confirmCardGrad = Instance.new("UIGradient", confirmCard)
@@ -1032,7 +1031,6 @@ end
 
 local function selectTab(tabName)
     activeTab = tabName
-    -- Animação fluida e suave para transição das abas
     local animSpeed = TweenInfo.new(0.5, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out)
     
     for name, btn in pairs(tabButtons) do
@@ -1051,7 +1049,7 @@ local function selectTab(tabName)
             
             if activeBar then
                 activeBar.Visible = true
-                local barTween = TweenService:Create(activeBar, animSpeed, {Size = UDim2.new(0, 2, 0, 22)})
+                local barTween = TweenService:Create(activeBar, animSpeed, {Size = UDim2.new(0, 3, 0, 22)})
                 activeBarTweens[btn] = barTween
                 barTween:Play()
             end
@@ -1065,7 +1063,7 @@ local function selectTab(tabName)
             if label then TweenService:Create(label, animSpeed, {TextColor3 = Color3.fromRGB(150, 150, 150)}):Play() end
             
             if activeBar then
-                local barTween = TweenService:Create(activeBar, animSpeed, {Size = UDim2.new(0, 2, 0, 0)})
+                local barTween = TweenService:Create(activeBar, animSpeed, {Size = UDim2.new(0, 3, 0, 0)})
                 activeBarTweens[btn] = barTween
                 barTween:Play()
                 barTween.Completed:Connect(function()
@@ -1096,30 +1094,38 @@ local function createTabBtn(tabName)
     tabBtn.ZIndex = 11
     Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 8)
 
+    -- CONTAINER DA ACTIVEBAR COM CORTE DE BORDAS
     local activeBar = Instance.new("Frame", tabBtn)
     activeBar.Name = "ActiveBar"
     activeBar.AnchorPoint = Vector2.new(0, 0.5)
-    activeBar.Size = UDim2.new(0, 2, 0, 0)
+    activeBar.Size = UDim2.new(0, 3, 0, 0)
     activeBar.Position = UDim2.new(0, 3, 0.5, 0)
-    activeBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    activeBar.BackgroundTransparency = 0
+    activeBar.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
     activeBar.BorderSizePixel = 0
     activeBar.Visible = false
     activeBar.ZIndex = 13 
     activeBar.ClipsDescendants = true
     Instance.new("UICorner", activeBar).CornerRadius = UDim.new(1, 0)
 
-    -- GRADIENTE DE VERMELHO COM BRANCO NA BARRA LATERAL
-    -- Mesmo tamanho para os dois gradientes padronizado (mesma sequencia 0, 0.5, 1)
-    local actGrad = Instance.new("UIGradient", activeBar)
-    actGrad.Rotation = 90
-    actGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 255, 255)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))
+    -- GERADOR DO EFEITO GIRATÓRIO MODERNO (MISTURA VERMELHO + BRANCO)
+    local gradientSpinner = Instance.new("ImageLabel", activeBar)
+    gradientSpinner.Name = "GradientSpinner"
+    gradientSpinner.AnchorPoint = Vector2.new(0.5, 0.5)
+    gradientSpinner.Position = UDim2.new(0.5, 0, 0.5, 0)
+    gradientSpinner.Size = UDim2.new(0, 50, 0, 50)
+    gradientSpinner.BackgroundTransparency = 1
+    gradientSpinner.Image = "rbxassetid://4996891970"
+    gradientSpinner.ImageColor3 = Color3.fromRGB(255, 255, 255)
+    gradientSpinner.ZIndex = 14
+
+    local spinnerGrad = Instance.new("UIGradient", gradientSpinner)
+    spinnerGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(220, 20, 30)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(100, 0, 0))
     })
-    
-    table.insert(globalActiveGrads, actGrad)
+
+    table.insert(globalActiveSpinners, gradientSpinner)
 
     local iconContainer = Instance.new("Frame", tabBtn)
     iconContainer.Name = "Icon"
@@ -1302,7 +1308,6 @@ local function AlternarConfirmacao(exibir)
     local tempoAnim = 0.25
 
     if exibir then
-        -- Oculta a janela principal e o botão flutuante para a pergunta ficar sozinha na tela
         mainWrapper.Visible = false
         FloatBtn.Visible = false
         confirmOverlay.Visible = true
@@ -1313,7 +1318,6 @@ local function AlternarConfirmacao(exibir)
         TweenService:Create(cardScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
         AplicarFadeSincronizado(confirmCard, false, tempoAnim)
     else
-        -- Ao cancelar, esconde a confirmação e restaura a UI e o botão flutuante
         AplicarFadeSincronizado(confirmCard, true, tempoAnim)
         local sc = confirmCard:FindFirstChildOfClass("UIScale")
         if sc then
@@ -1325,7 +1329,6 @@ local function AlternarConfirmacao(exibir)
                 local sc2 = confirmCard:FindFirstChildOfClass("UIScale")
                 if sc2 then sc2:Destroy() end
                 
-                -- Tudo volta ao normal
                 if UIState == "OPEN" then
                     mainWrapper.Visible = true
                 end
