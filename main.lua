@@ -1,4 +1,4 @@
--- [[ AKATSUKI UI ONLY [v3.7] - REFINED RED EDITION ]]
+-- [[ AKATSUKI UI ONLY [v5.7] - REFINED RED EDITION ]]
 -- Updated with smooth tab transitions, red-white gradient active bars, and detached confirm dialog.
 
 local Players = game:GetService("Players")
@@ -51,19 +51,6 @@ local tabButtons = {}
 local isExpanded = false
 local originalTrans = {}
 local isConfirmOpen = false
-
--- ==================== SISTEMA GLOBAL DA ACTIVEBAR ====================
-local globalActiveGrads = {}
-local activeBarTweens = {}
-
-RunService.RenderStepped:Connect(function()
-    local t = (os.clock() * 0.4) % 1
-    for _, grad in ipairs(globalActiveGrads) do
-        if grad and grad.Parent then
-            grad.Offset = Vector2.new(0, -t)
-        end
-    end
-end)
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "DeltaAkatUniversalUI"
@@ -354,7 +341,7 @@ subtitle.Size = UDim2.new(1, 0, 0, 12)
 subtitle.AnchorPoint = Vector2.new(0.5, 0)
 subtitle.Position = UDim2.new(0.5, 0, 0, 20)
 subtitle.BackgroundTransparency = 1
-subtitle.Text = "MM2 SCRIPT | by zeni <3"
+subtitle.Text = "MM2 SCRIPT | made by akat"
 subtitle.TextColor3 = Color3.fromRGB(180, 180, 180)
 subtitle.TextTransparency = 0.2
 subtitle.TextSize = 9.5
@@ -438,6 +425,30 @@ local TabsLayout = Instance.new("UIListLayout", TabsContainer)
 TabsLayout.SortOrder = Enum.SortOrder.LayoutOrder
 TabsLayout.Padding = UDim.new(0, 2)
 TabsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+-- BARRA LATERAL DESLIZANTE ÚNICA (Resolve a animação bugada)
+local SlidingActiveBar = Instance.new("Frame", TabsContainer)
+SlidingActiveBar.Name = "SlidingActiveBar"
+SlidingActiveBar.Size = UDim2.new(0, 3, 0, 22)
+SlidingActiveBar.Position = UDim2.new(0, 6, 0, 7)
+SlidingActiveBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+SlidingActiveBar.BorderSizePixel = 0
+SlidingActiveBar.ZIndex = 15
+Instance.new("UICorner", SlidingActiveBar).CornerRadius = UDim.new(1, 0)
+
+local slidingGrad = Instance.new("UIGradient", SlidingActiveBar)
+slidingGrad.Rotation = 90
+slidingGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 255, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))
+})
+
+-- Animação de gradiente fluida e senoidal (sem "saltos/teleporte" bruscos)
+RunService.RenderStepped:Connect(function()
+    local t = (math.sin(os.clock() * 2.5) + 1) / 2
+    slidingGrad.Offset = Vector2.new(0, -t * 0.5)
+end)
 
 local function UpdateTabsCanvas()
     local contentH = TabsLayout.AbsoluteContentSize.Y + 8
@@ -677,7 +688,7 @@ badgeGrad.Color = ColorSequence.new({
 local BadgeText = Instance.new("TextLabel", BadgeFrame)
 BadgeText.Size = UDim2.new(1, 0, 1, 0)
 BadgeText.BackgroundTransparency = 1
-BadgeText.Text = "V3.7"
+BadgeText.Text = "V5.7"
 BadgeText.TextColor3 = Color3.fromRGB(255, 255, 255)
 BadgeText.Font = Enum.Font.GothamBold
 BadgeText.TextSize = 8.5
@@ -716,7 +727,7 @@ end
 containerLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(UpdateCanvasSize)
 togglesContainer:GetPropertyChangedSignal("AbsoluteSize"):Connect(UpdateCanvasSize)
 
--- ==================== CONFIRM FRAME (DESANEXADO DA JANELA PRINCIPAL) ====================
+-- ==================== CONFIRM FRAME ====================
 local confirmOverlay = Instance.new("Frame", screenGui)
 confirmOverlay.Name = "ConfirmOverlay"
 confirmOverlay.Size = UDim2.new(1, 0, 1, 0)
@@ -1033,30 +1044,24 @@ end
 
 local function selectTab(tabName)
     activeTab = tabName
-    -- Animação fluida e suave para transição das abas
-    local animSpeed = TweenInfo.new(0.5, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out)
+    local animSpeed = TweenInfo.new(0.4, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out)
+    
+    -- Transição fluida da barra lateral deslizando até o botão correspondente
+    local targetBtn = tabButtons[tabName]
+    if targetBtn and SlidingActiveBar then
+        task.defer(function()
+            local relativeY = (targetBtn.AbsolutePosition.Y - TabsContainer.AbsolutePosition.Y) + TabsContainer.CanvasPosition.Y + (targetBtn.AbsoluteSize.Y / 2) - 11
+            TweenService:Create(SlidingActiveBar, animSpeed, {Position = UDim2.new(0, 6, 0, relativeY)}):Play()
+        end)
+    end
     
     for name, btn in pairs(tabButtons) do
         local label = btn:FindFirstChild("Label")
         local iconContainer = btn:FindFirstChild("Icon")
-        local activeBar = btn:FindFirstChild("ActiveBar")
-        
-        if activeBarTweens[btn] then
-            activeBarTweens[btn]:Cancel()
-            activeBarTweens[btn] = nil
-        end
 
         if name == tabName then
             TweenService:Create(btn, animSpeed, {BackgroundColor3 = Color3.fromRGB(45, 10, 15), BackgroundTransparency = 0.5}):Play()
             if label then TweenService:Create(label, animSpeed, {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play() end
-            
-            if activeBar then
-                activeBar.Visible = true
-                local barTween = TweenService:Create(activeBar, animSpeed, {Size = UDim2.new(0, 2, 0, 22)})
-                activeBarTweens[btn] = barTween
-                barTween:Play()
-            end
-            
             if iconContainer and iconContainer:FindFirstChild("AccentImage") then
                 TweenService:Create(iconContainer.AccentImage, animSpeed, {ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
             end
@@ -1064,18 +1069,6 @@ local function selectTab(tabName)
         else
             TweenService:Create(btn, animSpeed, {BackgroundColor3 = Color3.fromRGB(15, 15, 15), BackgroundTransparency = 1}):Play()
             if label then TweenService:Create(label, animSpeed, {TextColor3 = Color3.fromRGB(150, 150, 150)}):Play() end
-            
-            if activeBar then
-                local barTween = TweenService:Create(activeBar, animSpeed, {Size = UDim2.new(0, 2, 0, 0)})
-                activeBarTweens[btn] = barTween
-                barTween:Play()
-                barTween.Completed:Connect(function()
-                    if activeBar and activeTab ~= name then
-                        activeBar.Visible = false
-                    end
-                end)
-            end
-            
             if iconContainer and iconContainer:FindFirstChild("AccentImage") then
                 TweenService:Create(iconContainer.AccentImage, animSpeed, {ImageColor3 = Color3.fromRGB(150, 150, 150)}):Play()
             end
@@ -1096,30 +1089,6 @@ local function createTabBtn(tabName)
     tabBtn.Text = ""
     tabBtn.ZIndex = 11
     Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 8)
-
-    local activeBar = Instance.new("Frame", tabBtn)
-    activeBar.Name = "ActiveBar"
-    activeBar.AnchorPoint = Vector2.new(0, 0.5)
-    activeBar.Size = UDim2.new(0, 2, 0, 0)
-    activeBar.Position = UDim2.new(0, 3, 0.5, 0)
-    activeBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    activeBar.BackgroundTransparency = 0
-    activeBar.BorderSizePixel = 0
-    activeBar.Visible = false
-    activeBar.ZIndex = 13 
-    activeBar.ClipsDescendants = true
-    Instance.new("UICorner", activeBar).CornerRadius = UDim.new(1, 0)
-
-    -- GRADIENTE DE VERMELHO COM BRANCO NA BARRA LATERAL
-    local actGrad = Instance.new("UIGradient", activeBar)
-    actGrad.Rotation = 90
-    actGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 255, 255)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))
-    })
-    
-    table.insert(globalActiveGrads, actGrad)
 
     local iconContainer = Instance.new("Frame", tabBtn)
     iconContainer.Name = "Icon"
@@ -1302,7 +1271,6 @@ local function AlternarConfirmacao(exibir)
     local tempoAnim = 0.25
 
     if exibir then
-        -- Oculta a janela principal e o botão flutuante para a pergunta ficar sozinha na tela
         mainWrapper.Visible = false
         FloatBtn.Visible = false
         confirmOverlay.Visible = true
@@ -1313,7 +1281,6 @@ local function AlternarConfirmacao(exibir)
         TweenService:Create(cardScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
         AplicarFadeSincronizado(confirmCard, false, tempoAnim)
     else
-        -- Ao cancelar, esconde a confirmação e restaura a UI e o botão flutuante
         AplicarFadeSincronizado(confirmCard, true, tempoAnim)
         local sc = confirmCard:FindFirstChildOfClass("UIScale")
         if sc then
@@ -1325,7 +1292,6 @@ local function AlternarConfirmacao(exibir)
                 local sc2 = confirmCard:FindFirstChildOfClass("UIScale")
                 if sc2 then sc2:Destroy() end
                 
-                -- Tudo volta ao normal
                 if UIState == "OPEN" then
                     mainWrapper.Visible = true
                 end
