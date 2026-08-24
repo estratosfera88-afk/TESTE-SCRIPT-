@@ -57,7 +57,7 @@ local globalActiveSpinners = {}
 local activeBarTweens = {}
 
 RunService.RenderStepped:Connect(function()
-    -- Animação contínua de rotação fluida entre Vermelho e Branco
+    -- Animação contínua de rotação fluida entre Vermelho Escuro e Branco
     local rot = (os.clock() * 120) % 360
     for _, spinner in ipairs(globalActiveSpinners) do
         if spinner and spinner.Parent then
@@ -1094,38 +1094,29 @@ local function createTabBtn(tabName)
     tabBtn.ZIndex = 11
     Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 8)
 
-    -- CONTAINER DA ACTIVEBAR COM CORTE DE BORDAS
+    -- CONTAINER DA ACTIVEBAR MELHORADO SEM IMAGEM
     local activeBar = Instance.new("Frame", tabBtn)
     activeBar.Name = "ActiveBar"
     activeBar.AnchorPoint = Vector2.new(0, 0.5)
     activeBar.Size = UDim2.new(0, 3, 0, 0)
     activeBar.Position = UDim2.new(0, 3, 0.5, 0)
-    activeBar.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+    activeBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255) -- Fundo branco para receber o Gradient
     activeBar.BorderSizePixel = 0
     activeBar.Visible = false
     activeBar.ZIndex = 13 
     activeBar.ClipsDescendants = true
     Instance.new("UICorner", activeBar).CornerRadius = UDim.new(1, 0)
 
-    -- GERADOR DO EFEITO GIRATÓRIO MODERNO (MISTURA VERMELHO + BRANCO)
-    local gradientSpinner = Instance.new("ImageLabel", activeBar)
-    gradientSpinner.Name = "GradientSpinner"
-    gradientSpinner.AnchorPoint = Vector2.new(0.5, 0.5)
-    gradientSpinner.Position = UDim2.new(0.5, 0, 0.5, 0)
-    gradientSpinner.Size = UDim2.new(0, 50, 0, 50)
-    gradientSpinner.BackgroundTransparency = 1
-    gradientSpinner.Image = "rbxassetid://4996891970"
-    gradientSpinner.ImageColor3 = Color3.fromRGB(255, 255, 255)
-    gradientSpinner.ZIndex = 14
-
-    local spinnerGrad = Instance.new("UIGradient", gradientSpinner)
+    -- GERADOR DO EFEITO GIRATÓRIO (DIRETO NO FRAME = SEM BUGS)
+    local spinnerGrad = Instance.new("UIGradient", activeBar)
     spinnerGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(220, 20, 30)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(100, 0, 0))
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),    -- Branco
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(139, 0, 0)),      -- Vermelho Escuro
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))     -- Branco
     })
 
-    table.insert(globalActiveSpinners, gradientSpinner)
+    -- Insere na tabela global para rotacionar o UIGradient
+    table.insert(globalActiveSpinners, spinnerGrad)
 
     local iconContainer = Instance.new("Frame", tabBtn)
     iconContainer.Name = "Icon"
