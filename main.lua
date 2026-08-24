@@ -53,6 +53,20 @@ local isExpanded = false
 local originalTrans = {}
 local isConfirmOpen = false
 
+-- ==================== SISTEMA GLOBAL DA ACTIVEBAR ====================
+local globalActiveGrads = {}
+local activeBarTweens = {}
+
+-- Único RenderStepped global para animar todos os gradientes das ActiveBars de forma contínua e sincronizada
+RunService.RenderStepped:Connect(function()
+    local t = (os.clock() * 0.4) % 1
+    for _, grad in ipairs(globalActiveGrads) do
+        if grad and grad.Parent then
+            grad.Offset = Vector2.new(0, -t)
+        end
+    end
+end)
+
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "DeltaAkatUniversalUI"
 screenGui.ResetOnSpawn = false
@@ -1025,14 +1039,30 @@ end
 local function selectTab(tabName)
     activeTab = tabName
     local animSpeed = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    
     for name, btn in pairs(tabButtons) do
         local label = btn:FindFirstChild("Label")
         local iconContainer = btn:FindFirstChild("Icon")
         local activeBar = btn:FindFirstChild("ActiveBar")
+        
+        -- CORRIGIDO: Cancela qualquer animação anterior em andamento na ActiveBar desta aba
+        if activeBarTweens[btn] then
+            activeBarTweens[btn]:Cancel()
+            activeBarTweens[btn] = nil
+        end
+
         if name == tabName then
             TweenService:Create(btn, animSpeed, {BackgroundColor3 = Color3.fromRGB(45, 10, 15), BackgroundTransparency = 0.5}):Play()
             if label then TweenService:Create(label, animSpeed, {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play() end
-            if activeBar then activeBar.Visible = true end
+            
+            if activeBar then
+                activeBar.Visible = true
+                -- Animação vertical suave de abertura (cresce a altura para 22)
+                local barTween = TweenService:Create(activeBar, animSpeed, {Size = UDim2.new(0, 2, 0, 22)})
+                activeBarTweens[btn] = barTween
+                barTween:Play()
+            end
+            
             if iconContainer and iconContainer:FindFirstChild("AccentImage") then
                 TweenService:Create(iconContainer.AccentImage, animSpeed, {ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
             end
@@ -1040,7 +1070,19 @@ local function selectTab(tabName)
         else
             TweenService:Create(btn, animSpeed, {BackgroundColor3 = Color3.fromRGB(15, 15, 15), BackgroundTransparency = 1}):Play()
             if label then TweenService:Create(label, animSpeed, {TextColor3 = Color3.fromRGB(150, 150, 150)}):Play() end
-            if activeBar then activeBar.Visible = false end
+            
+            if activeBar then
+                -- Animação vertical suave de fechamento (diminui a altura para 0)
+                local barTween = TweenService:Create(activeBar, animSpeed, {Size = UDim2.new(0, 2, 0, 0)})
+                activeBarTweens[btn] = barTween
+                barTween:Play()
+                barTween.Completed:Connect(function()
+                    if activeBar and activeTab ~= name then
+                        activeBar.Visible = false
+                    end
+                end)
+            end
+            
             if iconContainer and iconContainer:FindFirstChild("AccentImage") then
                 TweenService:Create(iconContainer.AccentImage, animSpeed, {ImageColor3 = Color3.fromRGB(150, 150, 150)}):Play()
             end
@@ -1064,8 +1106,9 @@ local function createTabBtn(tabName)
 
     local activeBar = Instance.new("Frame", tabBtn)
     activeBar.Name = "ActiveBar"
-    activeBar.Size = UDim2.new(0, 2, 0, 22)
-    activeBar.Position = UDim2.new(0, 3, 0.5, -11)
+    activeBar.AnchorPoint = Vector2.new(0, 0.5)
+    activeBar.Size = UDim2.new(0, 2, 0, 0) -- Inicia com altura 0 para a animação vertical suave
+    activeBar.Position = UDim2.new(0, 3, 0.5, 0)
     activeBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     activeBar.BackgroundTransparency = 0
     activeBar.BorderSizePixel = 0
@@ -1074,7 +1117,7 @@ local function createTabBtn(tabName)
     activeBar.ClipsDescendants = true
     Instance.new("UICorner", activeBar).CornerRadius = UDim.new(1, 0)
 
-    -- CORRIGIDO: Utilizando UIGradient.Offset para rolagem infinitamente fluida sem teleporte/pulos
+    -- CORRIGIDO: Gradiente registrado no sistema global (sem RenderStepped individual)
     local actGrad = Instance.new("UIGradient", activeBar)
     actGrad.Rotation = 90
     actGrad.Color = ColorSequence.new({
@@ -1085,10 +1128,7 @@ local function createTabBtn(tabName)
         ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))
     })
     
-    RunService.RenderStepped:Connect(function()
-        local t = (os.clock() * 0.4) % 1
-        actGrad.Offset = Vector2.new(0, -t)
-    end)
+    table.insert(globalActiveGrads, actGrad)
 
     local iconContainer = Instance.new("Frame", tabBtn)
     iconContainer.Name = "Icon"
