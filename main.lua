@@ -1,6 +1,5 @@
 -- [[ AKATSUKI UI ONLY [v3.7] - REFINED RED EDITION ]]
--- Updated with infinite scroll tabs, solid notification cards with proper shadows,
--- moved search bar, balanced gradient sizes, slower badge outlines, and UI dragging fixes.
+-- Updated with smooth tab transitions, red-white gradient active bars, and detached confirm dialog.
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -57,7 +56,6 @@ local isConfirmOpen = false
 local globalActiveGrads = {}
 local activeBarTweens = {}
 
--- Único RenderStepped global para animar todos os gradientes das ActiveBars de forma contínua e sincronizada
 RunService.RenderStepped:Connect(function()
     local t = (os.clock() * 0.4) % 1
     for _, grad in ipairs(globalActiveGrads) do
@@ -159,7 +157,6 @@ task.spawn(function()
     end)
 end)
 
--- MULTI-TOUCH FIX FOR FLOAT BUTTON
 local dragToggleF = false
 local dragInputF = nil
 local dragStartF = nil
@@ -224,7 +221,6 @@ mainFrame.BackgroundTransparency = 1
 mainFrame.ZIndex = 2
 mainFrame.ClipsDescendants = false
 
--- MULTI-TOUCH FIX FOR MAIN WINDOW
 local dragUIToggle = false
 local dragUIInput = nil
 local dragUIStart = nil
@@ -251,7 +247,7 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- ==================== BACKGROUND SYSTEM (CORRIGIDO AS SOMBRAS) ====================
+-- ==================== BACKGROUND SYSTEM ====================
 local function CreateGradientPanel(parent, size, pos, name)
     local shadow = Instance.new("ImageLabel", parent)
     shadow.Name = name .. "_Shadow"
@@ -366,7 +362,7 @@ subtitle.Font = Enum.Font.Gotham
 subtitle.TextXAlignment = Enum.TextXAlignment.Center
 subtitle.ZIndex = 11
 
--- ==================== BARRA DE PESQUISA (MOVIDA PARA O TOPO) ====================
+-- ==================== BARRA DE PESQUISA ====================
 local SearchContainer = Instance.new("Frame", LeftPanel.InnerBg)
 SearchContainer.Name = "SearchContainer"
 SearchContainer.Size = UDim2.new(1, -16, 0, 35)
@@ -720,17 +716,16 @@ end
 containerLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(UpdateCanvasSize)
 togglesContainer:GetPropertyChangedSignal("AbsoluteSize"):Connect(UpdateCanvasSize)
 
--- ==================== CONFIRM FRAME ====================
-local confirmOverlay = Instance.new("Frame", mainWrapper)
+-- ==================== CONFIRM FRAME (DESANEXADO DA JANELA PRINCIPAL) ====================
+local confirmOverlay = Instance.new("Frame", screenGui)
 confirmOverlay.Name = "ConfirmOverlay"
 confirmOverlay.Size = UDim2.new(1, 0, 1, 0)
 confirmOverlay.Position = UDim2.new(0, 0, 0, 0)
 confirmOverlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-confirmOverlay.BackgroundTransparency = 1 
+confirmOverlay.BackgroundTransparency = 0.55
 confirmOverlay.Visible = false
 confirmOverlay.ZIndex = 990
 confirmOverlay.ClipsDescendants = true
-Instance.new("UICorner", confirmOverlay).CornerRadius = UDim.new(0, 10)
 
 local confirmCard = Instance.new("Frame", confirmOverlay)
 confirmCard.Name = "ConfirmCard"
@@ -1038,14 +1033,14 @@ end
 
 local function selectTab(tabName)
     activeTab = tabName
-    local animSpeed = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    -- Animação fluida e suave para transição das abas
+    local animSpeed = TweenInfo.new(0.5, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out)
     
     for name, btn in pairs(tabButtons) do
         local label = btn:FindFirstChild("Label")
         local iconContainer = btn:FindFirstChild("Icon")
         local activeBar = btn:FindFirstChild("ActiveBar")
         
-        -- CORRIGIDO: Cancela qualquer animação anterior em andamento na ActiveBar desta aba
         if activeBarTweens[btn] then
             activeBarTweens[btn]:Cancel()
             activeBarTweens[btn] = nil
@@ -1057,7 +1052,6 @@ local function selectTab(tabName)
             
             if activeBar then
                 activeBar.Visible = true
-                -- Animação vertical suave de abertura (cresce a altura para 22)
                 local barTween = TweenService:Create(activeBar, animSpeed, {Size = UDim2.new(0, 2, 0, 22)})
                 activeBarTweens[btn] = barTween
                 barTween:Play()
@@ -1072,7 +1066,6 @@ local function selectTab(tabName)
             if label then TweenService:Create(label, animSpeed, {TextColor3 = Color3.fromRGB(150, 150, 150)}):Play() end
             
             if activeBar then
-                -- Animação vertical suave de fechamento (diminui a altura para 0)
                 local barTween = TweenService:Create(activeBar, animSpeed, {Size = UDim2.new(0, 2, 0, 0)})
                 activeBarTweens[btn] = barTween
                 barTween:Play()
@@ -1107,7 +1100,7 @@ local function createTabBtn(tabName)
     local activeBar = Instance.new("Frame", tabBtn)
     activeBar.Name = "ActiveBar"
     activeBar.AnchorPoint = Vector2.new(0, 0.5)
-    activeBar.Size = UDim2.new(0, 2, 0, 0) -- Inicia com altura 0 para a animação vertical suave
+    activeBar.Size = UDim2.new(0, 2, 0, 0)
     activeBar.Position = UDim2.new(0, 3, 0.5, 0)
     activeBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     activeBar.BackgroundTransparency = 0
@@ -1117,14 +1110,12 @@ local function createTabBtn(tabName)
     activeBar.ClipsDescendants = true
     Instance.new("UICorner", activeBar).CornerRadius = UDim.new(1, 0)
 
-    -- CORRIGIDO: Gradiente registrado no sistema global (sem RenderStepped individual)
+    -- GRADIENTE DE VERMELHO COM BRANCO NA BARRA LATERAL
     local actGrad = Instance.new("UIGradient", activeBar)
     actGrad.Rotation = 90
     actGrad.Color = ColorSequence.new({
         ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
-        ColorSequenceKeypoint.new(0.25, Color3.fromRGB(255, 255, 255)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 0, 0)),
-        ColorSequenceKeypoint.new(0.75, Color3.fromRGB(255, 255, 255)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 255, 255)),
         ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))
     })
     
@@ -1305,18 +1296,24 @@ MinimizeBtn.MouseButton1Click:Connect(function()
     SetUIState("MINIMIZED")
 end)
 
+-- ==================== SISTEMA DE CONFIRMAÇÃO DE FECHAMENTO ====================
 local function AlternarConfirmacao(exibir)
     isConfirmOpen = exibir
-    local tempoAnim = 0.22
+    local tempoAnim = 0.25
 
     if exibir then
+        -- Oculta a janela principal e o botão flutuante para a pergunta ficar sozinha na tela
+        mainWrapper.Visible = false
+        FloatBtn.Visible = false
         confirmOverlay.Visible = true
+        
         confirmCard.Size = UDim2.new(0, 280, 0, 115)
         local cardScale = Instance.new("UIScale", confirmCard)
         cardScale.Scale = 0.88
         TweenService:Create(cardScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
         AplicarFadeSincronizado(confirmCard, false, tempoAnim)
     else
+        -- Ao cancelar, esconde a confirmação e restaura a UI e o botão flutuante
         AplicarFadeSincronizado(confirmCard, true, tempoAnim)
         local sc = confirmCard:FindFirstChildOfClass("UIScale")
         if sc then
@@ -1327,6 +1324,12 @@ local function AlternarConfirmacao(exibir)
                 confirmOverlay.Visible = false
                 local sc2 = confirmCard:FindFirstChildOfClass("UIScale")
                 if sc2 then sc2:Destroy() end
+                
+                -- Tudo volta ao normal
+                if UIState == "OPEN" then
+                    mainWrapper.Visible = true
+                end
+                FloatBtn.Visible = true
             end
         end)
     end
@@ -1341,8 +1344,7 @@ btnNo.MouseButton1Click:Connect(function() AlternarConfirmacao(false) end)
 
 btnYes.MouseButton1Click:Connect(function()
     local syncTime = 0.2
-    AplicarFadeSincronizado(mainWrapper, true, syncTime)
-    TweenService:Create(FloatBtn, TweenInfo.new(syncTime, Enum.EasingStyle.Cubic, Enum.EasingDirection.In), {Size = UDim2.new(0,0,0,0)}):Play()
+    AplicarFadeSincronizado(confirmCard, true, syncTime)
     task.wait(syncTime)
     screenGui:Destroy()
 end)
