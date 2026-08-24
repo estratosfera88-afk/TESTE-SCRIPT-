@@ -57,7 +57,7 @@ local globalActiveSpinners = {}
 local activeBarTweens = {}
 
 RunService.RenderStepped:Connect(function()
-    -- Animação contínua de rotação fluida entre Vermelho Escuro e Branco
+    -- Animação contínua de rotação fluida
     local rot = (os.clock() * 120) % 360
     for _, spinner in ipairs(globalActiveSpinners) do
         if spinner and spinner.Parent then
@@ -956,11 +956,12 @@ local function CriarNotificacao(titulo, descricao, icone)
     progressBar.BorderSizePixel = 0
     progressBar.ZIndex = 203
     Instance.new("UICorner", progressBar).CornerRadius = UDim.new(1, 0)
+    
+    -- ===== MUDANÇA: Gradiente da barra de progresso (Vermelho com Preto) =====
     local progressGrad = Instance.new("UIGradient", progressBar)
     progressGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(200, 30, 30)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(230, 60, 40)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 100, 60))
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(230, 20, 25)), -- Vermelho vivo (Mesmo da Badge)
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 0, 0))     -- Preto / Vermelho extremamente escuro
     })
 
     notifHolder.Position = UDim2.new(1, 320, 1, -24)
@@ -1094,25 +1095,26 @@ local function createTabBtn(tabName)
     tabBtn.ZIndex = 11
     Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 8)
 
-    -- CONTAINER DA ACTIVEBAR MELHORADO SEM IMAGEM
+    -- ===== MUDANÇA: Gradiente Dinâmico e Brilhante na Barra das Abas =====
     local activeBar = Instance.new("Frame", tabBtn)
     activeBar.Name = "ActiveBar"
     activeBar.AnchorPoint = Vector2.new(0, 0.5)
     activeBar.Size = UDim2.new(0, 3, 0, 0)
     activeBar.Position = UDim2.new(0, 3, 0.5, 0)
-    activeBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255) -- Fundo branco para receber o Gradient
+    activeBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255) 
     activeBar.BorderSizePixel = 0
     activeBar.Visible = false
     activeBar.ZIndex = 13 
     activeBar.ClipsDescendants = true
     Instance.new("UICorner", activeBar).CornerRadius = UDim.new(1, 0)
 
-    -- GERADOR DO EFEITO GIRATÓRIO (DIRETO NO FRAME = SEM BUGS)
     local spinnerGrad = Instance.new("UIGradient", activeBar)
     spinnerGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),    -- Branco
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(139, 0, 0)),      -- Vermelho Escuro
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))     -- Branco
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 40, 40)),      -- Vermelho Vivo (Brilho neon)
+        ColorSequenceKeypoint.new(0.25, Color3.fromRGB(100, 0, 0)),     -- Transição intermediária
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(15, 0, 0)),       -- Preto/Vermelho muito escuro
+        ColorSequenceKeypoint.new(0.75, Color3.fromRGB(100, 0, 0)),     -- Transição intermediária
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 40, 40))       -- Vermelho Vivo
     })
 
     -- Insere na tabela global para rotacionar o UIGradient
