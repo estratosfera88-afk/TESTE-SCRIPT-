@@ -235,7 +235,9 @@ UserInputService.InputEnded:Connect(function(input)
 end)
 
 -- ==================== BACKGROUND SYSTEM ====================
-local function CreateGradientPanel(parent, size, pos, name)
+-- Cria a moldura externa única da janela: sombra, borda arredondada e UIStroke com gradiente.
+-- Isso substitui strokes/sombras individuais por painel, eliminando qualquer "parede" central.
+local function CreateOuterFrame(parent, size, pos, name)
     local shadow = Instance.new("ImageLabel", parent)
     shadow.Name = name .. "_Shadow"
     shadow.AnchorPoint = Vector2.new(0, 0)
@@ -249,6 +251,37 @@ local function CreateGradientPanel(parent, size, pos, name)
     shadow.SliceCenter = Rect.new(36, 36, 114, 114)
     shadow.ZIndex = 3
 
+    local outer = Instance.new("Frame", parent)
+    outer.Name = name
+    outer.Size = size
+    outer.Position = pos
+    outer.BackgroundTransparency = 1
+    outer.BorderSizePixel = 0
+    outer.ZIndex = 4
+    outer.ClipsDescendants = false
+
+    Instance.new("UICorner", outer).CornerRadius = UDim.new(0, 10)
+
+    local outerStroke = Instance.new("UIStroke", outer)
+    outerStroke.Name = "OuterStroke"
+    outerStroke.Thickness = 2.5
+    outerStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    outerStroke.Color = Color3.fromRGB(255, 255, 255)
+
+    local outerGrad = Instance.new("UIGradient", outerStroke)
+    outerGrad.Rotation = 45
+    outerGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(180, 20, 30))
+    })
+
+    return outer
+end
+
+-- Cria um painel de conteúdo (sem stroke e sem sombra própria - a moldura externa cuida disso).
+-- roundLeft/roundRight controlam se aquele lado do painel deve ter cantos arredondados
+-- (apenas os lados que tocam a borda externa da janela devem arredondar).
+local function CreateGradientPanel(parent, size, pos, name, roundLeft, roundRight)
     local panel = Instance.new("Frame", parent)
     panel.Name = name
     panel.Size = size
@@ -258,21 +291,6 @@ local function CreateGradientPanel(parent, size, pos, name)
     panel.ZIndex = 5
     panel.ClipsDescendants = false
 
-    Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 10)
-
-    local outerStroke = Instance.new("UIStroke", panel)
-    outerStroke.Name = "OuterStroke"
-    outerStroke.Thickness = 2.5
-    outerStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    outerStroke.Color = Color3.fromRGB(255, 255, 255)
-    
-    local outerGrad = Instance.new("UIGradient", outerStroke)
-    outerGrad.Rotation = 45
-    outerGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(180, 20, 30))
-    })
-
     local InnerBg = Instance.new("Frame", panel)
     InnerBg.Name = "InnerBg"
     InnerBg.Size = UDim2.new(1, 0, 1, 0)
@@ -281,7 +299,27 @@ local function CreateGradientPanel(parent, size, pos, name)
     InnerBg.BorderSizePixel = 0
     InnerBg.ClipsDescendants = true
     InnerBg.ZIndex = 5
-    Instance.new("UICorner", InnerBg).CornerRadius = UDim.new(0, 10)
+
+    -- Corner só nos cantos que tocam a borda externa da janela; internos ficam retos.
+    if roundLeft or roundRight then
+        local corner = Instance.new("UICorner", InnerBg)
+        corner.CornerRadius = UDim.new(0, 10)
+        -- UICorner do Roblox arredonda os 4 cantos; para deixar só um lado reto,
+        -- cobrimos o lado interno com um frame reto do mesmo tamanho do raio.
+        if not (roundLeft and roundRight) then
+            local straightener = Instance.new("Frame", InnerBg)
+            straightener.Name = "CornerStraightener"
+            straightener.BackgroundColor3 = InnerBg.BackgroundColor3
+            straightener.BorderSizePixel = 0
+            straightener.ZIndex = 5
+            straightener.Size = UDim2.new(0, 10, 1, 0)
+            if roundLeft then
+                straightener.Position = UDim2.new(1, -10, 0, 0)
+            else
+                straightener.Position = UDim2.new(0, 0, 0, 0)
+            end
+        end
+    end
     
     local overlay = Instance.new("Frame", InnerBg)
     overlay.Name = "RedGradientOverlay"
@@ -290,7 +328,6 @@ local function CreateGradientPanel(parent, size, pos, name)
     overlay.BackgroundTransparency = 0
     overlay.BorderSizePixel = 0
     overlay.ZIndex = 5
-    Instance.new("UICorner", overlay).CornerRadius = UDim.new(0, 10)
 
     local redGrad = Instance.new("UIGradient", overlay)
     redGrad.Rotation = 90
@@ -307,8 +344,11 @@ local function CreateGradientPanel(parent, size, pos, name)
     return panel
 end
 
-local LeftPanel = CreateGradientPanel(mainFrame, UDim2.new(0, 220, 1, 0), UDim2.new(0, 0, 0, 0), "LeftPanel")
-local RightPanel = CreateGradientPanel(mainFrame, UDim2.new(1, -220, 1, 0), UDim2.new(0, 220, 0, 0), "RightPanel")
+-- Moldura externa única: cobre a janela inteira, dá a silhueta/borda/sombra únicas.
+local OuterWindowFrame = CreateOuterFrame(mainFrame, UDim2.new(1, 0, 1, 0), UDim2.new(0, 0, 0, 0), "OuterWindowFrame")
+
+local LeftPanel = CreateGradientPanel(mainFrame, UDim2.new(0, 220, 1, 0), UDim2.new(0, 0, 0, 0), "LeftPanel", true, false)
+local RightPanel = CreateGradientPanel(mainFrame, UDim2.new(1, -220, 1, 0), UDim2.new(0, 220, 0, 0), "RightPanel", false, true)
 
 local LeftSeparatorLine = Instance.new("Frame", LeftPanel.InnerBg)
 LeftSeparatorLine.Size = UDim2.new(1, 0, 0, 1)
@@ -317,6 +357,7 @@ LeftSeparatorLine.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 LeftSeparatorLine.BackgroundTransparency = 0
 LeftSeparatorLine.BorderSizePixel = 0
 LeftSeparatorLine.ZIndex = 10
+LeftSeparatorLine.Visible = false
 
 local HeaderLeft = Instance.new("Frame", LeftPanel.InnerBg)
 HeaderLeft.Size = UDim2.new(1, 0, 0, 36)
@@ -678,6 +719,18 @@ RightSeparatorLine.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
 RightSeparatorLine.BackgroundTransparency = 0.5
 RightSeparatorLine.BorderSizePixel = 0
 RightSeparatorLine.ZIndex = 10
+RightSeparatorLine.Visible = false
+
+-- Linha horizontal única, cor sólida baseada no RightPanel, cobrindo toda a largura da janela
+-- (substitui as duas linhas separadas por painel, eliminando a divisão visual central)
+local UnifiedHeaderLine = Instance.new("Frame", mainFrame)
+UnifiedHeaderLine.Name = "UnifiedHeaderLine"
+UnifiedHeaderLine.Size = UDim2.new(1, 0, 0, 1)
+UnifiedHeaderLine.Position = UDim2.new(0, 0, 0, 36)
+UnifiedHeaderLine.BackgroundColor3 = Color3.fromRGB(60, 20, 20)
+UnifiedHeaderLine.BackgroundTransparency = 0.35
+UnifiedHeaderLine.BorderSizePixel = 0
+UnifiedHeaderLine.ZIndex = 12
 
 local BadgeFrame = Instance.new("Frame", RightPanel.InnerBg)
 BadgeFrame.Name = "BadgeFrame"
@@ -765,9 +818,9 @@ confirmStroke.Color = Color3.fromRGB(255, 255, 255)
 
 local confStrokeGrad = Instance.new("UIGradient", confirmStroke)
 confStrokeGrad.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 255, 255)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))
+    ColorSequenceKeypoint.new(0.0, Color3.fromRGB(120, 0, 10)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 30, 40)),
+    ColorSequenceKeypoint.new(1.0, Color3.fromRGB(120, 0, 10))
 })
 RunService.RenderStepped:Connect(function()
     confStrokeGrad.Rotation = (os.clock() * 15) % 360
@@ -806,7 +859,7 @@ btnYes.Position = UDim2.new(0.5, -124, 0, 62)
 btnYes.BackgroundColor3 = Color3.fromRGB(139, 0, 0)
 btnYes.TextColor3 = Color3.fromRGB(255, 255, 255)
 btnYes.Font = Enum.Font.GothamMedium
-btnYes.TextSize = 11
+btnYes.TextSize = 14
 btnYes.Text = UI_TEXT.ConfirmBtn
 btnYes.ZIndex = 1000
 btnYes.BorderSizePixel = 0
@@ -824,7 +877,7 @@ btnNo.Position = UDim2.new(0.5, 6, 0, 62)
 btnNo.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 btnNo.TextColor3 = Color3.fromRGB(170, 170, 170)
 btnNo.Font = Enum.Font.GothamMedium
-btnNo.TextSize = 11
+btnNo.TextSize = 14
 btnNo.Text = UI_TEXT.CancelBtn
 btnNo.ZIndex = 1000
 btnNo.BorderSizePixel = 0
