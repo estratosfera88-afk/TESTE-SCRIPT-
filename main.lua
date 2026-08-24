@@ -278,7 +278,7 @@ local function CreateGradientPanel(parent, size, pos, name)
 
     local outerStroke = Instance.new("UIStroke", panel)
     outerStroke.Name = "OuterStroke"
-    outerStroke.Thickness = 1.5 -- Contorno mais fino conforme solicitado
+    outerStroke.Thickness = 1.3 -- Deixado um pouco mais fino conforme solicitado
     outerStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     outerStroke.Color = Color3.fromRGB(255, 255, 255)
     
@@ -684,12 +684,6 @@ badgeGrad.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 0, 0))
 })
 
--- Removido contorno preto da badge e adicionado contorno limpo sem preto
-local badgeStroke = Instance.new("UIStroke", BadgeFrame)
-badgeStroke.Thickness = 1
-badgeStroke.Transparency = 0.4
-badgeStroke.Color = Color3.fromRGB(255, 255, 255)
-
 local BadgeText = Instance.new("TextLabel", BadgeFrame)
 BadgeText.Size = UDim2.new(1, 0, 1, 0)
 BadgeText.BackgroundTransparency = 1
@@ -1083,7 +1077,7 @@ local function createTabBtn(tabName)
     tabBtn.ZIndex = 11
     Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 8)
 
-    -- Traço lateral esquerdo com gradiente Vermelho e Branco e animação de descer e subir
+    -- Barra lateral com gradiente vermelho e branco, animada subindo e descendo
     local activeBar = Instance.new("Frame", tabBtn)
     activeBar.Name = "ActiveBar"
     activeBar.Size = UDim2.new(0, 2, 0, 22)
@@ -1097,15 +1091,15 @@ local function createTabBtn(tabName)
     local actGrad = Instance.new("UIGradient", activeBar)
     actGrad.Rotation = 90
     actGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)), -- Branco
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 20, 30))   -- Vermelho
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(220, 20, 30))
     })
     
+    -- Animação de descer e subir usando math.sin
     RunService.RenderStepped:Connect(function()
         local t = os.clock()
-        -- Animação de descer e subir utilizando o Offset vertical do gradiente
-        local yOffset = math.sin(t * 5) * 0.45
-        actGrad.Offset = Vector2.new(0, yOffset)
+        local offset = math.sin(t * 6) * 5
+        activeBar.Position = UDim2.new(0, 3, 0.5, -11 + offset)
     end)
 
     local iconContainer = Instance.new("Frame", tabBtn)
@@ -1159,9 +1153,7 @@ local function createToggle(parent, configKey, tabCategory)
     toggleScale.Scale = 1
 
     Instance.new("UICorner", toggleFrame).CornerRadius = UDim.new(0, 8)
-    local stroke = Instance.new("UIStroke", toggleFrame)
-    stroke.Color = Color3.fromRGB(20, 20, 20)
-    stroke.Thickness = 1
+    -- Contorno preto removido conforme solicitado
     
     local optData = UI_TEXT.Options[configKey]
     local titleLabel = Instance.new("TextLabel", toggleFrame)
@@ -1224,6 +1216,7 @@ local function createToggle(parent, configKey, tabCategory)
     end)
 end
 
+-- ==================== SEARCH BAR INTERACTIVE FOCUS / BLUR LOGIC ====================
 searchTextBox.Focused:Connect(function()
     TweenService:Create(SearchContainer, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, -16, 0, 37)}):Play()
     searchStroke.Transparency = 0.1
@@ -1334,14 +1327,14 @@ local function AplicarEfeitoFisicoBotao(btn, hoverColor)
         TweenService:Create(btn, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = Color3.fromRGB(30, 30, 30), BackgroundTransparency = 0.1}):Play()
         if btn.Name == "ExpandBtn" then TweenService:Create(ExpandStroke, TweenInfo.new(0.15), {Color = hoverColor}):Play()
         elseif btn.Name == "MinimizeBtn" then TweenService:Create(MinimizeLine, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play()
-        elseif btn.Name == "CloseBtn" then TweenService:Create(CloseLine1, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}); TweenService:Create(CloseLine2, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play() end
+        elseif btn.Name == "CloseBtn" then TweenService:Create(CloseLine1, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play(); TweenService:Create(CloseLine2, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play() end
     end)
     btn.MouseLeave:Connect(function()
         if UIState ~= "OPEN" then return end 
         TweenService:Create(btn, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = Color3.fromRGB(15, 15, 15), BackgroundTransparency = 0.3}):Play()
         if btn.Name == "ExpandBtn" then TweenService:Create(ExpandStroke, TweenInfo.new(0.15), {Color = Color3.fromRGB(160, 160, 160)}):Play()
         elseif btn.Name == "MinimizeBtn" then TweenService:Create(MinimizeLine, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(160, 160, 160)}):Play()
-        elseif btn.Name == "CloseBtn" then TweenService:Create(CloseLine1, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(160, 160, 160)}); TweenService:Create(CloseLine2, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(160, 160, 160)}):Play() end
+        elseif btn.Name == "CloseBtn" then TweenService:Create(CloseLine1, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(160, 160, 160)}):Play(); TweenService:Create(CloseLine2, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(160, 160, 160)}):Play() end
     end)
 end
 
