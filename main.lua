@@ -440,7 +440,7 @@ local sharedActiveBar = Instance.new("Frame", LeftPanel.InnerBg)
 sharedActiveBar.Name = "SharedActiveBar"
 sharedActiveBar.AnchorPoint = Vector2.new(0, 0.5)
 sharedActiveBar.Size = UDim2.new(0, 3, 0, 22)
-sharedActiveBar.Position = UDim2.new(0, 4, 0, 0) -- Posição inicial dinâmica
+sharedActiveBar.Position = UDim2.new(0, 4, 0, 0)
 sharedActiveBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 sharedActiveBar.BorderSizePixel = 0
 sharedActiveBar.Visible = false
@@ -448,7 +448,6 @@ sharedActiveBar.ZIndex = 15
 sharedActiveBar.ClipsDescendants = false
 Instance.new("UICorner", sharedActiveBar).CornerRadius = UDim.new(1, 0)
 
--- Gradiente Vertical Moderno (Vermelho escuro -> Vermelho vivo -> Vermelho escuro)
 local sharedBarGrad = Instance.new("UIGradient", sharedActiveBar)
 sharedBarGrad.Rotation = 90
 sharedBarGrad.Color = ColorSequence.new({
@@ -457,7 +456,6 @@ sharedBarGrad.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(1.0, Color3.fromRGB(120, 0, 10))
 })
 
--- Glow/Bloom vermelho muito suave ao redor da barra
 local barGlow = Instance.new("ImageLabel", sharedActiveBar)
 barGlow.Name = "BarGlow"
 barGlow.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -475,8 +473,8 @@ barGlow.ZIndex = 14
 local UserProfileFrame = Instance.new("Frame", LeftPanel.InnerBg)
 UserProfileFrame.Size = UDim2.new(1, -16, 0, 55)
 UserProfileFrame.Position = UDim2.new(0, 8, 1, -63)
-UserProfileFrame.BackgroundColor3 = Color3.fromRGB(15, 5, 5)
-UserProfileFrame.BackgroundTransparency = 0.5
+UserProfileFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0) -- Fundo Totalmente Preto
+UserProfileFrame.BackgroundTransparency = 0 -- Totalmente visível / Dark
 UserProfileFrame.BorderSizePixel = 0
 UserProfileFrame.ZIndex = 10
 Instance.new("UICorner", UserProfileFrame).CornerRadius = UDim.new(0, 8)
@@ -1080,18 +1078,19 @@ local function selectTab(tabName)
     if targetBtn then
         sharedActiveBar.Visible = true
         
-        -- FIX: Usamos o AbsolutePosition para contornar o UIListLayout
-        local relativeY = targetBtn.AbsolutePosition.Y - sharedActiveBar.Parent.AbsolutePosition.Y
-        local targetYPos = relativeY + (targetBtn.AbsoluteSize.Y / 2) - (sharedActiveBar.AbsoluteSize.Y / 2)
+        -- FIX: Cálculo relativo correto da posição vertical dentro de LeftPanel.InnerBg
+        local targetCenterY = targetBtn.AbsolutePosition.Y + (targetBtn.AbsoluteSize.Y / 2)
+        local parentTopY = sharedActiveBar.Parent.AbsolutePosition.Y
+        local targetYPos = targetCenterY - parentTopY
         
-        -- Animação suave com Quint Out (deslizando da posição anterior até a nova)
+        -- Animação suave deslizando até a posição correta da aba
         local slideInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
         local slideTween = TweenService:Create(sharedActiveBar, slideInfo, {
             Position = UDim2.new(0, 4, 0, targetYPos)
         })
         slideTween:Play()
 
-        -- Pequena animação de escala ("snappy" premium) ao atingir o destino
+        -- Efeito snappy na escala ao finalizar o movimento
         slideTween.Completed:Connect(function()
             if activeTab == tabName then
                 local scaleUp = TweenService:Create(sharedActiveBar, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
