@@ -220,9 +220,6 @@ UserInputService.InputEnded:Connect(function(input)
 end)
 
 -- ==================== SOLID LIQUID RED BACKGROUND SYSTEM WITH REAL 3D SHADOW ====================
--- Sombra 3D refinada: multi-camada, difusa, mais concentrada embaixo, quase invisível em cima,
--- sem halo uniforme e sem caixa preta atrás do painel. Estática em relação ao painel (só
--- reage a mudanças reais de tamanho/posição via GetPropertyChangedSignal, sem RenderStepped).
 local SHADOW_TEXTURE = "rbxassetid://5554831957"
 local SHADOW_SLICE = Rect.new(36, 36, 114, 114)
 
@@ -241,9 +238,6 @@ local function BuildShadowLayer(parent, cornerRadius, layerName, zIndex)
 end
 
 local function CreateGradientPanel(parent, size, pos, name)
-    -- Container dedicado da sombra: fica atrás do painel e nunca cria uma "caixa preta"
-    -- porque cada camada usa transparências baixas e offsets pequenos, com o grosso do
-    -- efeito concentrado abaixo do painel.
     local shadowHolder = Instance.new("Frame", parent)
     shadowHolder.Name = name .. "_ShadowHolder"
     shadowHolder.BackgroundTransparency = 1
@@ -252,14 +246,12 @@ local function CreateGradientPanel(parent, size, pos, name)
     shadowHolder.Position = pos
     shadowHolder.ZIndex = 3
 
-    -- Camada 1: sombra ampla e bem difusa (profundidade geral, quase imperceptível nas laterais/topo)
     local shadowWide = BuildShadowLayer(shadowHolder, 10, name .. "_ShadowWide", 3)
     shadowWide.AnchorPoint = Vector2.new(0.5, 0.5)
     shadowWide.Position = UDim2.new(0.5, 0, 0.5, 6)
     shadowWide.Size = UDim2.new(1, 20, 1, 20)
     shadowWide.ImageTransparency = 0.72
 
-    -- Camada 2: sombra mais fechada e concentrada embaixo, dando a sensação de elevação real
     local shadowTight = BuildShadowLayer(shadowHolder, 10, name .. "_ShadowTight", 4)
     shadowTight.AnchorPoint = Vector2.new(0.5, 0.5)
     shadowTight.Position = UDim2.new(0.5, 1, 0.5, 7)
@@ -277,8 +269,6 @@ local function CreateGradientPanel(parent, size, pos, name)
 
     Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 10)
 
-    -- Sombra acompanha o painel apenas quando há mudança real de tamanho/posição
-    -- (ex: botão ExpandBtn), sem usar RenderStepped nem conexões por frame.
     panel:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
         shadowHolder.Size = UDim2.new(0, panel.AbsoluteSize.X, 0, panel.AbsoluteSize.Y)
     end)
@@ -288,7 +278,7 @@ local function CreateGradientPanel(parent, size, pos, name)
 
     local outerStroke = Instance.new("UIStroke", panel)
     outerStroke.Name = "OuterStroke"
-    outerStroke.Thickness = 2.5
+    outerStroke.Thickness = 1.5 -- Contorno mais fino conforme solicitado
     outerStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     outerStroke.Color = Color3.fromRGB(255, 255, 255)
     
@@ -694,6 +684,12 @@ badgeGrad.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 0, 0))
 })
 
+-- Removido contorno preto da badge e adicionado contorno limpo sem preto
+local badgeStroke = Instance.new("UIStroke", BadgeFrame)
+badgeStroke.Thickness = 1
+badgeStroke.Transparency = 0.4
+badgeStroke.Color = Color3.fromRGB(255, 255, 255)
+
 local BadgeText = Instance.new("TextLabel", BadgeFrame)
 BadgeText.Size = UDim2.new(1, 0, 1, 0)
 BadgeText.BackgroundTransparency = 1
@@ -725,7 +721,7 @@ local uiPadding = Instance.new("UIPadding", togglesContainer)
 uiPadding.PaddingTop = UDim.new(0, 8)
 uiPadding.PaddingBottom = UDim.new(0, 8)
 uiPadding.PaddingLeft = UDim.new(0, 4)
-uiPadding.PaddingRight = UDim.new(0, 6) -- Pequeno espaço entre o toggle e a barra de rolagem
+uiPadding.PaddingRight = UDim.new(0, 6)
 
 local function UpdateCanvasSize()
     local contentHeight = containerLayout.AbsoluteContentSize.Y + 24
@@ -999,7 +995,6 @@ local function CriarNotificacao(titulo, descricao, icone)
 
     notifCloseBtn.MouseButton1Click:Connect(function() DismissNotif() end)
 
-    -- Surgimento rápido e sincronizado
     local slideIn = TweenInfo.new(0.25, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out)
     TweenService:Create(notifHolder, slideIn, {Position = UDim2.new(1, -20, 1, -24)}):Play()
 
@@ -1056,11 +1051,9 @@ local function selectTab(tabName)
         local iconContainer = btn:FindFirstChild("Icon")
         local activeBar = btn:FindFirstChild("ActiveBar")
         if name == tabName then
-            -- Fundo totalmente selecionado com tom vermelho escuro sutil
             TweenService:Create(btn, animSpeed, {BackgroundColor3 = Color3.fromRGB(45, 10, 15), BackgroundTransparency = 0.5}):Play()
             if label then TweenService:Create(label, animSpeed, {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play() end
             if activeBar then activeBar.Visible = true end
-            -- Ícone ativo fica branco
             if iconContainer and iconContainer:FindFirstChild("AccentImage") then
                 TweenService:Create(iconContainer.AccentImage, animSpeed, {ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
             end
@@ -1069,7 +1062,6 @@ local function selectTab(tabName)
             TweenService:Create(btn, animSpeed, {BackgroundColor3 = Color3.fromRGB(15, 15, 15), BackgroundTransparency = 1}):Play()
             if label then TweenService:Create(label, animSpeed, {TextColor3 = Color3.fromRGB(150, 150, 150)}):Play() end
             if activeBar then activeBar.Visible = false end
-            -- Ícones inativos permanecem cinza
             if iconContainer and iconContainer:FindFirstChild("AccentImage") then
                 TweenService:Create(iconContainer.AccentImage, animSpeed, {ImageColor3 = Color3.fromRGB(150, 150, 150)}):Play()
             end
@@ -1091,7 +1083,7 @@ local function createTabBtn(tabName)
     tabBtn.ZIndex = 11
     Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 8)
 
-    -- Barra lateral com exatamente 2 px de espessura e gradiente giratório
+    -- Traço lateral esquerdo com gradiente Vermelho e Branco e animação de descer e subir
     local activeBar = Instance.new("Frame", tabBtn)
     activeBar.Name = "ActiveBar"
     activeBar.Size = UDim2.new(0, 2, 0, 22)
@@ -1103,12 +1095,17 @@ local function createTabBtn(tabName)
     Instance.new("UICorner", activeBar).CornerRadius = UDim.new(1, 0)
 
     local actGrad = Instance.new("UIGradient", activeBar)
+    actGrad.Rotation = 90
     actGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 10, 15)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 0, 0))
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)), -- Branco
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 20, 30))   -- Vermelho
     })
+    
     RunService.RenderStepped:Connect(function()
-        actGrad.Rotation = (os.clock() * 30) % 360
+        local t = os.clock()
+        -- Animação de descer e subir utilizando o Offset vertical do gradiente
+        local yOffset = math.sin(t * 5) * 0.45
+        actGrad.Offset = Vector2.new(0, yOffset)
     end)
 
     local iconContainer = Instance.new("Frame", tabBtn)
@@ -1149,7 +1146,6 @@ end
 local function createToggle(parent, configKey, tabCategory)
     local toggleFrame = Instance.new("Frame")
     toggleFrame.Name = configKey
-    -- Largura expandida para o lado direito (com margem limpa da barra de rolagem)
     toggleFrame.Size = UDim2.new(1, -10, 0, 60)
     toggleFrame.BackgroundColor3 = Color3.fromRGB(15, 5, 5)
     toggleFrame.BackgroundTransparency = 0.45
@@ -1228,7 +1224,6 @@ local function createToggle(parent, configKey, tabCategory)
     end)
 end
 
--- ==================== SEARCH BAR INTERACTIVE FOCUS / BLUR LOGIC ====================
 searchTextBox.Focused:Connect(function()
     TweenService:Create(SearchContainer, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, -16, 0, 37)}):Play()
     searchStroke.Transparency = 0.1
@@ -1339,14 +1334,14 @@ local function AplicarEfeitoFisicoBotao(btn, hoverColor)
         TweenService:Create(btn, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = Color3.fromRGB(30, 30, 30), BackgroundTransparency = 0.1}):Play()
         if btn.Name == "ExpandBtn" then TweenService:Create(ExpandStroke, TweenInfo.new(0.15), {Color = hoverColor}):Play()
         elseif btn.Name == "MinimizeBtn" then TweenService:Create(MinimizeLine, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play()
-        elseif btn.Name == "CloseBtn" then TweenService:Create(CloseLine1, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play(); TweenService:Create(CloseLine2, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play() end
+        elseif btn.Name == "CloseBtn" then TweenService:Create(CloseLine1, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}); TweenService:Create(CloseLine2, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play() end
     end)
     btn.MouseLeave:Connect(function()
         if UIState ~= "OPEN" then return end 
         TweenService:Create(btn, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = Color3.fromRGB(15, 15, 15), BackgroundTransparency = 0.3}):Play()
         if btn.Name == "ExpandBtn" then TweenService:Create(ExpandStroke, TweenInfo.new(0.15), {Color = Color3.fromRGB(160, 160, 160)}):Play()
         elseif btn.Name == "MinimizeBtn" then TweenService:Create(MinimizeLine, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(160, 160, 160)}):Play()
-        elseif btn.Name == "CloseBtn" then TweenService:Create(CloseLine1, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(160, 160, 160)}):Play(); TweenService:Create(CloseLine2, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(160, 160, 160)}):Play() end
+        elseif btn.Name == "CloseBtn" then TweenService:Create(CloseLine1, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(160, 160, 160)}); TweenService:Create(CloseLine2, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(160, 160, 160)}):Play() end
     end)
 end
 
@@ -1403,7 +1398,6 @@ local function ExecutarIntroAkat()
     FloatBtn.Size = UDim2.new(0, 0, 0, 0)
     TweenService:Create(FloatBtn, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 44, 0, 44)}):Play()
     
-    -- Notificação disparada em sincronia com a transição do menu
     CriarNotificacao(
         "AKATSUKI SCRIPTS",
         "MM2 Script carregado com sucesso! Bem-vindo, " .. player.DisplayName .. "."
