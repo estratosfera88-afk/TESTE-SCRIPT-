@@ -220,43 +220,20 @@ UserInputService.InputEnded:Connect(function(input)
 end)
 
 -- ==================== SOLID LIQUID RED BACKGROUND SYSTEM WITH REAL 3D SHADOW ====================
-local SHADOW_TEXTURE = "rbxassetid://5554831957"
-local SHADOW_SLICE = Rect.new(36, 36, 114, 114)
-
-local function BuildShadowLayer(parent, cornerRadius, layerName, zIndex)
-    local layer = Instance.new("ImageLabel", parent)
-    layer.Name = layerName
-    layer.BackgroundTransparency = 1
-    layer.Image = SHADOW_TEXTURE
-    layer.ImageColor3 = Color3.fromRGB(0, 0, 0)
-    layer.ScaleType = Enum.ScaleType.Slice
-    layer.SliceCenter = SHADOW_SLICE
-    layer.AnchorPoint = Vector2.new(0.5, 0.5)
-    layer.ZIndex = zIndex
-    layer.BorderSizePixel = 0
-    return layer
-end
-
 local function CreateGradientPanel(parent, size, pos, name)
-    local shadowHolder = Instance.new("Frame", parent)
-    shadowHolder.Name = name .. "_ShadowHolder"
-    shadowHolder.BackgroundTransparency = 1
-    shadowHolder.BorderSizePixel = 0
-    shadowHolder.Size = size
-    shadowHolder.Position = pos
-    shadowHolder.ZIndex = 3
-
-    local shadowWide = BuildShadowLayer(shadowHolder, 10, name .. "_ShadowWide", 3)
-    shadowWide.AnchorPoint = Vector2.new(0.5, 0.5)
-    shadowWide.Position = UDim2.new(0.5, 0, 0.5, 6)
-    shadowWide.Size = UDim2.new(1, 20, 1, 20)
-    shadowWide.ImageTransparency = 0.72
-
-    local shadowTight = BuildShadowLayer(shadowHolder, 10, name .. "_ShadowTight", 4)
-    shadowTight.AnchorPoint = Vector2.new(0.5, 0.5)
-    shadowTight.Position = UDim2.new(0.5, 1, 0.5, 7)
-    shadowTight.Size = UDim2.new(1, 8, 1, 12)
-    shadowTight.ImageTransparency = 0.6
+    -- Sombra 3D realista usando textura dispersa (elimina caixa preta)
+    local shadow = Instance.new("ImageLabel", parent)
+    shadow.Name = name .. "_Shadow"
+    shadow.AnchorPoint = Vector2.new(0.5, 0.5)
+    shadow.Position = pos + UDim2.new(0.5, 0, 0.5, 4)
+    shadow.Size = size + UDim2.new(0, 24, 0, 24)
+    shadow.BackgroundTransparency = 1
+    shadow.Image = "rbxassetid://5554831957"
+    shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+    shadow.ImageTransparency = 0.45
+    shadow.ScaleType = Enum.ScaleType.Slice
+    shadow.SliceCenter = Rect.new(36, 36, 114, 114)
+    shadow.ZIndex = 3
 
     local panel = Instance.new("Frame", parent)
     panel.Name = name
@@ -269,16 +246,9 @@ local function CreateGradientPanel(parent, size, pos, name)
 
     Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 10)
 
-    panel:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-        shadowHolder.Size = UDim2.new(0, panel.AbsoluteSize.X, 0, panel.AbsoluteSize.Y)
-    end)
-    panel:GetPropertyChangedSignal("AbsolutePosition"):Connect(function()
-        shadowHolder.Position = UDim2.new(0, panel.AbsolutePosition.X - panel.Parent.AbsolutePosition.X, 0, panel.AbsolutePosition.Y - panel.Parent.AbsolutePosition.Y)
-    end)
-
     local outerStroke = Instance.new("UIStroke", panel)
     outerStroke.Name = "OuterStroke"
-    outerStroke.Thickness = 1.3 -- Deixado um pouco mais fino conforme solicitado
+    outerStroke.Thickness = 2.5
     outerStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     outerStroke.Color = Color3.fromRGB(255, 255, 255)
     
@@ -693,6 +663,12 @@ BadgeText.Font = Enum.Font.GothamBold
 BadgeText.TextSize = 8.5
 BadgeText.ZIndex = 16
 
+local BadgeStroke = Instance.new("UIStroke", BadgeFrame)
+BadgeStroke.Color = Color3.fromRGB(230, 20, 25)
+BadgeStroke.Transparency = 0.9
+BadgeStroke.Thickness = 1
+BadgeStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
 local togglesContainer = Instance.new("ScrollingFrame", RightPanel.InnerBg)
 togglesContainer.Name = "TogglesContainer"
 togglesContainer.Size = UDim2.new(1, -6, 1, -48)
@@ -715,7 +691,7 @@ local uiPadding = Instance.new("UIPadding", togglesContainer)
 uiPadding.PaddingTop = UDim.new(0, 8)
 uiPadding.PaddingBottom = UDim.new(0, 8)
 uiPadding.PaddingLeft = UDim.new(0, 4)
-uiPadding.PaddingRight = UDim.new(0, 6)
+uiPadding.PaddingRight = UDim.new(0, 6) -- Pequeno espaço entre o toggle e a barra de rolagem
 
 local function UpdateCanvasSize()
     local contentHeight = containerLayout.AbsoluteContentSize.Y + 24
@@ -989,6 +965,7 @@ local function CriarNotificacao(titulo, descricao, icone)
 
     notifCloseBtn.MouseButton1Click:Connect(function() DismissNotif() end)
 
+    -- Surgimento rápido e sincronizado
     local slideIn = TweenInfo.new(0.25, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out)
     TweenService:Create(notifHolder, slideIn, {Position = UDim2.new(1, -20, 1, -24)}):Play()
 
@@ -1045,9 +1022,11 @@ local function selectTab(tabName)
         local iconContainer = btn:FindFirstChild("Icon")
         local activeBar = btn:FindFirstChild("ActiveBar")
         if name == tabName then
+            -- Fundo totalmente selecionado com tom vermelho escuro sutil
             TweenService:Create(btn, animSpeed, {BackgroundColor3 = Color3.fromRGB(45, 10, 15), BackgroundTransparency = 0.5}):Play()
             if label then TweenService:Create(label, animSpeed, {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play() end
             if activeBar then activeBar.Visible = true end
+            -- Ícone ativo fica branco
             if iconContainer and iconContainer:FindFirstChild("AccentImage") then
                 TweenService:Create(iconContainer.AccentImage, animSpeed, {ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
             end
@@ -1056,6 +1035,7 @@ local function selectTab(tabName)
             TweenService:Create(btn, animSpeed, {BackgroundColor3 = Color3.fromRGB(15, 15, 15), BackgroundTransparency = 1}):Play()
             if label then TweenService:Create(label, animSpeed, {TextColor3 = Color3.fromRGB(150, 150, 150)}):Play() end
             if activeBar then activeBar.Visible = false end
+            -- Ícones inativos permanecem cinza
             if iconContainer and iconContainer:FindFirstChild("AccentImage") then
                 TweenService:Create(iconContainer.AccentImage, animSpeed, {ImageColor3 = Color3.fromRGB(150, 150, 150)}):Play()
             end
@@ -1077,7 +1057,7 @@ local function createTabBtn(tabName)
     tabBtn.ZIndex = 11
     Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 8)
 
-    -- Barra lateral com gradiente vermelho e branco, animada subindo e descendo
+    -- Barra lateral com exatamente 2 px de espessura e gradiente giratório
     local activeBar = Instance.new("Frame", tabBtn)
     activeBar.Name = "ActiveBar"
     activeBar.Size = UDim2.new(0, 2, 0, 22)
@@ -1089,23 +1069,18 @@ local function createTabBtn(tabName)
     Instance.new("UICorner", activeBar).CornerRadius = UDim.new(1, 0)
 
     local actGrad = Instance.new("UIGradient", activeBar)
-    actGrad.Rotation = 90
     actGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(220, 20, 30))
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 10, 15)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 0, 0))
     })
-    
-    -- Animação de descer e subir usando math.sin
     RunService.RenderStepped:Connect(function()
-        local t = os.clock()
-        local offset = math.sin(t * 6) * 5
-        activeBar.Position = UDim2.new(0, 3, 0.5, -11 + offset)
+        actGrad.Rotation = (os.clock() * 30) % 360
     end)
 
     local iconContainer = Instance.new("Frame", tabBtn)
     iconContainer.Name = "Icon"
-    iconContainer.Size = UDim2.new(0, 14, 0, 14) 
-    iconContainer.Position = UDim2.new(0, 14, 0.5, -7)
+    iconContainer.Size = UDim2.new(0, 18, 0, 18) 
+    iconContainer.Position = UDim2.new(0, 12, 0.5, -9)
     iconContainer.BackgroundTransparency = 1
     iconContainer.ZIndex = 12
     local imageLabel = Instance.new("ImageLabel", iconContainer)
@@ -1140,6 +1115,7 @@ end
 local function createToggle(parent, configKey, tabCategory)
     local toggleFrame = Instance.new("Frame")
     toggleFrame.Name = configKey
+    -- Largura expandida para o lado direito (com margem limpa da barra de rolagem)
     toggleFrame.Size = UDim2.new(1, -10, 0, 60)
     toggleFrame.BackgroundColor3 = Color3.fromRGB(15, 5, 5)
     toggleFrame.BackgroundTransparency = 0.45
@@ -1153,7 +1129,9 @@ local function createToggle(parent, configKey, tabCategory)
     toggleScale.Scale = 1
 
     Instance.new("UICorner", toggleFrame).CornerRadius = UDim.new(0, 8)
-    -- Contorno preto removido conforme solicitado
+    local stroke = Instance.new("UIStroke", toggleFrame)
+    stroke.Color = Color3.fromRGB(20, 20, 20)
+    stroke.Thickness = 1
     
     local optData = UI_TEXT.Options[configKey]
     local titleLabel = Instance.new("TextLabel", toggleFrame)
@@ -1344,8 +1322,8 @@ AplicarEfeitoFisicoBotao(CloseBtn, Color3.fromRGB(255, 60, 60))
 
 createTabBtn("Player")
 createTabBtn("Combat")
-createTabBtn("Teleports")
 createTabBtn("Visuals")
+createTabBtn("Teleports")
 createTabBtn("Settings")
 
 createToggle(togglesContainer, "Speed",       "Player")
@@ -1391,6 +1369,7 @@ local function ExecutarIntroAkat()
     FloatBtn.Size = UDim2.new(0, 0, 0, 0)
     TweenService:Create(FloatBtn, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 44, 0, 44)}):Play()
     
+    -- Notificação disparada em sincronia com a transição do menu
     CriarNotificacao(
         "AKATSUKI SCRIPTS",
         "MM2 Script carregado com sucesso! Bem-vindo, " .. player.DisplayName .. "."
