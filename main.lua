@@ -277,7 +277,6 @@ RedGradientOverlay.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 RedGradientOverlay.BackgroundTransparency = 0
 RedGradientOverlay.BorderSizePixel = 0
 RedGradientOverlay.ZIndex = 4
--- CORREÇÃO DE VAZAMENTO: Adicionado UICorner para o overlay não escapar do MainBackground
 Instance.new("UICorner", RedGradientOverlay).CornerRadius = UDim.new(0, 10)
 
 local SingleRedGrad = Instance.new("UIGradient", RedGradientOverlay)
@@ -292,7 +291,6 @@ RunService.RenderStepped:Connect(function()
     SingleRedGrad.Rotation = (t * 12) % 360
 end)
 
--- Painéis transparentes de estrutura
 local LeftPanel = Instance.new("Frame", MainBackground)
 LeftPanel.Name = "LeftPanel"
 LeftPanel.Size = UDim2.new(0, 220, 1, 0)
@@ -360,12 +358,12 @@ subtitle.ZIndex = 11
 -- ==================== BARRA DE PESQUISA ====================
 local SearchContainer = Instance.new("Frame", LeftPanel)
 SearchContainer.Name = "SearchContainer"
-SearchContainer.Size = UDim2.new(1, -16, 0, 35)
+SearchContainer.Size = UDim2.new(1, -16, 0, 36)
 SearchContainer.Position = UDim2.new(0, 8, 0, 44)
 SearchContainer.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
 SearchContainer.BackgroundTransparency = 0.3
 SearchContainer.ZIndex = 10
-Instance.new("UICorner", SearchContainer).CornerRadius = UDim.new(0, 9)
+Instance.new("UICorner", SearchContainer).CornerRadius = UDim.new(0, 8)
 
 local searchStroke = Instance.new("UIStroke", SearchContainer)
 searchStroke.Color = Color3.fromRGB(60, 20, 20)
@@ -381,7 +379,7 @@ searchStrokeGrad.Color = ColorSequence.new({
 
 local SearchIconFrame = Instance.new("Frame", SearchContainer)
 SearchIconFrame.Size = UDim2.new(0, 14, 0, 14)
-SearchIconFrame.Position = UDim2.new(0, 10, 0.5, -7)
+SearchIconFrame.Position = UDim2.new(0, 14, 0.5, -7)
 SearchIconFrame.BackgroundTransparency = 1
 SearchIconFrame.ZIndex = 12
 
@@ -401,15 +399,15 @@ scHandle.BackgroundColor3 = Color3.fromRGB(140, 140, 140)
 scHandle.BorderSizePixel = 0
 
 local searchTextBox = Instance.new("TextBox", SearchContainer)
-searchTextBox.Size = UDim2.new(1, -34, 1, 0)
-searchTextBox.Position = UDim2.new(0, 30, 0, 0)
+searchTextBox.Size = UDim2.new(1, -38, 1, 0)
+searchTextBox.Position = UDim2.new(0, 34, 0, 0)
 searchTextBox.BackgroundTransparency = 1
 searchTextBox.PlaceholderText = UI_TEXT.SearchPlaceholder
 searchTextBox.PlaceholderColor3 = Color3.fromRGB(120, 120, 120)
 searchTextBox.Text = ""
 searchTextBox.TextColor3 = Color3.fromRGB(230, 230, 230)
-searchTextBox.Font = Enum.Font.Gotham
-searchTextBox.TextSize = 11
+searchTextBox.Font = Enum.Font.GothamMedium
+searchTextBox.TextSize = 13
 searchTextBox.TextXAlignment = Enum.TextXAlignment.Left
 searchTextBox.ZIndex = 12
 searchTextBox.Active = true 
@@ -448,7 +446,7 @@ local sharedActiveBar = Instance.new("Frame", LeftPanel)
 sharedActiveBar.Name = "SharedActiveBar"
 sharedActiveBar.AnchorPoint = Vector2.new(0, 0.5)
 sharedActiveBar.Size = UDim2.new(0, 3, 0, 22)
-sharedActiveBar.Position = UDim2.new(0, 4, 0, 0)
+sharedActiveBar.Position = UDim2.new(0, 6, 0, 0)
 sharedActiveBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 sharedActiveBar.BorderSizePixel = 0
 sharedActiveBar.Visible = false
@@ -468,7 +466,7 @@ local barGlow = Instance.new("ImageLabel", sharedActiveBar)
 barGlow.Name = "BarGlow"
 barGlow.AnchorPoint = Vector2.new(0.5, 0.5)
 barGlow.Position = UDim2.new(0.5, 0, 0.5, 0)
-barGlow.Size = UDim2.new(0, 16, 1, 14)
+barGlow.Size = UDim2.new(0, 12, 1, 10)
 barGlow.BackgroundTransparency = 1
 barGlow.Image = "rbxassetid://5554831957"
 barGlow.ImageColor3 = Color3.fromRGB(255, 20, 30)
@@ -698,18 +696,23 @@ BadgeText.Font = Enum.Font.GothamBold
 BadgeText.TextSize = 8.5
 BadgeText.ZIndex = 16
 
+-- ==================== TOGGLES CONTAINER COM FUNDO DELIMITADO ====================
 local togglesContainer = Instance.new("ScrollingFrame", RightPanel)
 togglesContainer.Name = "TogglesContainer"
-togglesContainer.Size = UDim2.new(1, -6, 1, -48)
-togglesContainer.Position = UDim2.new(0, 0, 0, 42)
-togglesContainer.BackgroundTransparency = 1
+togglesContainer.Size = UDim2.new(1, -12, 1, -48)
+togglesContainer.Position = UDim2.new(0, 6, 0, 42)
+togglesContainer.BackgroundColor3 = Color3.fromRGB(30, 12, 14)
+togglesContainer.BackgroundTransparency = 0.7
 togglesContainer.BorderSizePixel = 0
+togglesContainer.ClipsDescendants = true
+togglesContainer.ZIndex = 10
 togglesContainer.ScrollBarThickness = 3
 togglesContainer.ScrollBarImageColor3 = Color3.fromRGB(220, 30, 40)
 togglesContainer.ScrollBarImageTransparency = 0
 togglesContainer.VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar
 togglesContainer.AutomaticCanvasSize = Enum.AutomaticSize.None
-togglesContainer.ZIndex = 10
+
+Instance.new("UICorner", togglesContainer).CornerRadius = UDim.new(0, 8)
 
 local containerLayout = Instance.new("UIListLayout", togglesContainer)
 containerLayout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -838,14 +841,14 @@ btnNo.MouseLeave:Connect(function() TweenService:Create(btnNo, TweenInfo.new(0.1
 
 AplicarFadeSincronizado(confirmCard, true, 0) 
 
--- ==================== SISTEMA DE NOTIFICAÇÃO ====================
+-- ==================== SISTEMA DE NOTIFICAÇÃO (AJUSTADO) ====================
 local NOTIF_DURATION = 6 
 
 local function CriarNotificacao(titulo, descricao, icone)
     local notifHolder = Instance.new("Frame", screenGui)
     notifHolder.Name = "NotifHolder"
     notifHolder.AnchorPoint = Vector2.new(1, 1)
-    notifHolder.Size = UDim2.new(0, 300, 0, 80)
+    notifHolder.Size = UDim2.new(0, 320, 0, 96)
     notifHolder.Position = UDim2.new(1, -20, 1, -24)
     notifHolder.BackgroundTransparency = 1
     notifHolder.ZIndex = 200
@@ -875,8 +878,8 @@ local function CriarNotificacao(titulo, descricao, icone)
     notifShadow.ZIndex = 200
 
     local accentBar = Instance.new("Frame", notifCard)
-    accentBar.Size = UDim2.new(0, 3, 0, 40)
-    accentBar.Position = UDim2.new(0, 12, 0.5, -20)
+    accentBar.Size = UDim2.new(0, 4, 0, 52)
+    accentBar.Position = UDim2.new(0, 14, 0.5, -26)
     accentBar.BackgroundColor3 = Color3.fromRGB(180, 20, 20)
     accentBar.BorderSizePixel = 0
     accentBar.ZIndex = 202
@@ -889,32 +892,32 @@ local function CriarNotificacao(titulo, descricao, icone)
     })
 
     local notifTitle = Instance.new("TextLabel", notifCard)
-    notifTitle.Size = UDim2.new(1, -72, 0, 20)
-    notifTitle.Position = UDim2.new(0, 24, 0, 10)
+    notifTitle.Size = UDim2.new(1, -76, 0, 22)
+    notifTitle.Position = UDim2.new(0, 26, 0, 10)
     notifTitle.BackgroundTransparency = 1
     notifTitle.Text = titulo or "AKATSUKI"
     notifTitle.TextColor3 = Color3.fromRGB(240, 240, 240)
     notifTitle.Font = Enum.Font.GothamBold
-    notifTitle.TextSize = 15.5
+    notifTitle.TextSize = 17.5
     notifTitle.TextXAlignment = Enum.TextXAlignment.Left
     notifTitle.ZIndex = 203
 
     local notifDesc = Instance.new("TextLabel", notifCard)
-    notifDesc.Size = UDim2.new(1, -36, 0, 32)
-    notifDesc.Position = UDim2.new(0, 24, 0, 34)
+    notifDesc.Size = UDim2.new(1, -40, 0, 40)
+    notifDesc.Position = UDim2.new(0, 26, 0, 36)
     notifDesc.BackgroundTransparency = 1
     notifDesc.Text = descricao or ""
     notifDesc.TextColor3 = Color3.fromRGB(150, 150, 155)
     notifDesc.Font = Enum.Font.Gotham
-    notifDesc.TextSize = 12.5
+    notifDesc.TextSize = 13.5
     notifDesc.TextXAlignment = Enum.TextXAlignment.Left
     notifDesc.TextYAlignment = Enum.TextYAlignment.Top
     notifDesc.TextWrapped = true
     notifDesc.ZIndex = 203
 
     local notifCloseBtn = Instance.new("TextButton", notifCard)
-    notifCloseBtn.Size = UDim2.new(0, 20, 0, 20)
-    notifCloseBtn.Position = UDim2.new(1, -28, 0, 8)
+    notifCloseBtn.Size = UDim2.new(0, 24, 0, 24)
+    notifCloseBtn.Position = UDim2.new(1, -32, 0, 10)
     notifCloseBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 38)
     notifCloseBtn.BackgroundTransparency = 0.2
     notifCloseBtn.Text = ""
@@ -930,7 +933,7 @@ local function CriarNotificacao(titulo, descricao, icone)
     local xL1 = Instance.new("Frame", notifCloseBtn)
     xL1.AnchorPoint = Vector2.new(0.5, 0.5)
     xL1.Position = UDim2.new(0.5, 0, 0.5, 0)
-    xL1.Size = UDim2.new(0, 8, 0, 1.2)
+    xL1.Size = UDim2.new(0, 10, 0, 1.5)
     xL1.Rotation = 45
     xL1.BackgroundColor3 = Color3.fromRGB(160, 160, 165)
     xL1.BorderSizePixel = 0
@@ -939,7 +942,7 @@ local function CriarNotificacao(titulo, descricao, icone)
     local xL2 = Instance.new("Frame", notifCloseBtn)
     xL2.AnchorPoint = Vector2.new(0.5, 0.5)
     xL2.Position = UDim2.new(0.5, 0, 0.5, 0)
-    xL2.Size = UDim2.new(0, 8, 0, 1.2)
+    xL2.Size = UDim2.new(0, 10, 0, 1.5)
     xL2.Rotation = -45
     xL2.BackgroundColor3 = Color3.fromRGB(160, 160, 165)
     xL2.BorderSizePixel = 0
@@ -958,8 +961,8 @@ local function CriarNotificacao(titulo, descricao, icone)
     end)
 
     local progressBg = Instance.new("Frame", notifCard)
-    progressBg.Size = UDim2.new(1, -24, 0, 3)
-    progressBg.Position = UDim2.new(0, 12, 1, -10)
+    progressBg.Size = UDim2.new(1, -28, 0, 3)
+    progressBg.Position = UDim2.new(0, 14, 1, -10)
     progressBg.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
     progressBg.BorderSizePixel = 0
     progressBg.ZIndex = 202
@@ -980,14 +983,14 @@ local function CriarNotificacao(titulo, descricao, icone)
         ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 0, 0))
     })
 
-    notifHolder.Position = UDim2.new(1, 320, 1, -24)
+    notifHolder.Position = UDim2.new(1, 340, 1, -24)
 
     local dismissed = false
     local function DismissNotif()
         if dismissed then return end
         dismissed = true
         local slideOut = TweenInfo.new(0.25, Enum.EasingStyle.Cubic, Enum.EasingDirection.In)
-        TweenService:Create(notifHolder, slideOut, {Position = UDim2.new(1, 340, 1, -24)}):Play()
+        TweenService:Create(notifHolder, slideOut, {Position = UDim2.new(1, 360, 1, -24)}):Play()
         TweenService:Create(notifCard, slideOut, {BackgroundTransparency = 1}):Play()
         task.delay(0.28, function()
             if notifHolder and notifHolder.Parent then
@@ -1056,10 +1059,10 @@ local function UpdateActiveBarPosition(animar)
 
     if animar then
         TweenService:Create(sharedActiveBar, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-            Position = UDim2.new(0, 4, 0, targetYPos)
+            Position = UDim2.new(0, 6, 0, targetYPos)
         }):Play()
     else
-        sharedActiveBar.Position = UDim2.new(0, 4, 0, targetYPos)
+        sharedActiveBar.Position = UDim2.new(0, 6, 0, targetYPos)
     end
 end
 
@@ -1227,13 +1230,13 @@ local function createToggle(parent, configKey, tabCategory)
 end
 
 searchTextBox.Focused:Connect(function()
-    TweenService:Create(SearchContainer, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, -12, 0, 37)}):Play()
+    TweenService:Create(SearchContainer, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, -12, 0, 36)}):Play()
     searchStroke.Transparency = 0.1
     searchStrokeGrad.Enabled = true
 end)
 
 searchTextBox.FocusLost:Connect(function()
-    TweenService:Create(SearchContainer, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, -16, 0, 35)}):Play()
+    TweenService:Create(SearchContainer, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, -16, 0, 36)}):Play()
     searchStroke.Transparency = 0.75
     searchStrokeGrad.Enabled = false
 end)
