@@ -561,8 +561,8 @@ topButtons.BackgroundTransparency = 1
 topButtons.ZIndex = 10
 
 local ControlsFrame = Instance.new("Frame", topButtons)
-ControlsFrame.Size = UDim2.new(0, 130, 1, 0)
-ControlsFrame.Position = UDim2.new(1, -130, 0, 0)
+ControlsFrame.Size = UDim2.new(0, 110, 1, 0)
+ControlsFrame.Position = UDim2.new(1, -110, 0, 0)
 ControlsFrame.BackgroundTransparency = 1
 ControlsFrame.ZIndex = 11
 
@@ -570,38 +570,69 @@ local UIListTop = Instance.new("UIListLayout", ControlsFrame)
 UIListTop.FillDirection = Enum.FillDirection.Horizontal
 UIListTop.HorizontalAlignment = Enum.HorizontalAlignment.Right
 UIListTop.VerticalAlignment = Enum.VerticalAlignment.Center
-UIListTop.Padding = UDim.new(0, 14)
+UIListTop.Padding = UDim.new(0, 6)
 UIListTop.SortOrder = Enum.SortOrder.LayoutOrder
 
--- Botões principais menores, espaçados e com ícones novos (mesma cor entre si)
-local TOP_BTN_COLOR = Color3.fromRGB(170, 170, 170)
-
-local MinimizeBtn = Instance.new("ImageButton", ControlsFrame)
+-- Botões principais sem fundo (apenas ícones transparentes) e em tamanho normal (22x22)
+local MinimizeBtn = Instance.new("TextButton", ControlsFrame)
 MinimizeBtn.Name = "MinimizeBtn"
 MinimizeBtn.LayoutOrder = 1
-MinimizeBtn.Size = UDim2.new(0, 16, 0, 16)
+MinimizeBtn.Size = UDim2.new(0, 22, 0, 22)
 MinimizeBtn.BackgroundTransparency = 1
-MinimizeBtn.Image = "rbxthumb://type=Asset&id=97090905107587&w=150&h=150"
-MinimizeBtn.ImageColor3 = TOP_BTN_COLOR
+MinimizeBtn.Text = ""
 MinimizeBtn.ZIndex = 11
+local MinimizeLine = Instance.new("Frame", MinimizeBtn)
+MinimizeLine.Name = "Line"
+MinimizeLine.AnchorPoint = Vector2.new(0.5, 0.5)
+MinimizeLine.Position = UDim2.new(0.5, 0, 0.5, 0)
+MinimizeLine.Size = UDim2.new(0, 12, 0, 1.5)
+MinimizeLine.BackgroundColor3 = Color3.fromRGB(160, 160, 160)
+MinimizeLine.BorderSizePixel = 0
+MinimizeLine.ZIndex = 12
 
-local ExpandBtn = Instance.new("ImageButton", ControlsFrame)
+local ExpandBtn = Instance.new("TextButton", ControlsFrame)
 ExpandBtn.Name = "ExpandBtn"
 ExpandBtn.LayoutOrder = 2
-ExpandBtn.Size = UDim2.new(0, 16, 0, 16)
+ExpandBtn.Size = UDim2.new(0, 22, 0, 22)
 ExpandBtn.BackgroundTransparency = 1
-ExpandBtn.Image = "rbxthumb://type=Asset&id=78749046909931&w=150&h=150"
-ExpandBtn.ImageColor3 = TOP_BTN_COLOR
+ExpandBtn.Text = ""
 ExpandBtn.ZIndex = 11
+local ExpandSquare = Instance.new("Frame", ExpandBtn)
+ExpandSquare.Name = "Square"
+ExpandSquare.Size = UDim2.new(0, 10, 0, 10)
+ExpandSquare.AnchorPoint = Vector2.new(0.5, 0.5)
+ExpandSquare.Position = UDim2.new(0.5, 0, 0.5, 0)
+ExpandSquare.BackgroundTransparency = 1
+ExpandSquare.ZIndex = 12
+local ExpandStroke = Instance.new("UIStroke", ExpandSquare)
+ExpandStroke.Color = Color3.fromRGB(160, 160, 160)
+ExpandStroke.Thickness = 1.2 
 
-local CloseBtn = Instance.new("ImageButton", ControlsFrame)
+local CloseBtn = Instance.new("TextButton", ControlsFrame)
 CloseBtn.Name = "CloseBtn"
 CloseBtn.LayoutOrder = 3
-CloseBtn.Size = UDim2.new(0, 16, 0, 16)
+CloseBtn.Size = UDim2.new(0, 22, 0, 22)
 CloseBtn.BackgroundTransparency = 1
-CloseBtn.Image = "rbxthumb://type=Asset&id=70710316269357&w=150&h=150"
-CloseBtn.ImageColor3 = TOP_BTN_COLOR
+CloseBtn.Text = ""
 CloseBtn.ZIndex = 11
+local CloseLine1 = Instance.new("Frame", CloseBtn)
+CloseLine1.Name = "Line1"
+CloseLine1.AnchorPoint = Vector2.new(0.5, 0.5)
+CloseLine1.Position = UDim2.new(0.5, 0, 0.5, 0)
+CloseLine1.Size = UDim2.new(0, 12, 0, 1.5)
+CloseLine1.Rotation = 45
+CloseLine1.BackgroundColor3 = Color3.fromRGB(160, 160, 160)
+CloseLine1.BorderSizePixel = 0
+CloseLine1.ZIndex = 12
+local CloseLine2 = Instance.new("Frame", CloseBtn)
+CloseLine2.Name = "Line2"
+CloseLine2.AnchorPoint = Vector2.new(0.5, 0.5)
+CloseLine2.Position = UDim2.new(0.5, 0, 0.5, 0)
+CloseLine2.Size = UDim2.new(0, 12, 0, 1.5)
+CloseLine2.Rotation = -45
+CloseLine2.BackgroundColor3 = Color3.fromRGB(160, 160, 160)
+CloseLine2.BorderSizePixel = 0
+CloseLine2.ZIndex = 12
 
 local BadgeFrame = Instance.new("Frame", RightPanel)
 BadgeFrame.Name = "BadgeFrame"
@@ -610,7 +641,7 @@ BadgeFrame.Position = UDim2.new(0, 12, 0, 9)
 BadgeFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 BadgeFrame.BorderSizePixel = 0
 BadgeFrame.ZIndex = 15
-Instance.new("UICorner", BadgeFrame).CornerRadius = UDim.new(0, 8)
+Instance.new("UICorner", BadgeFrame).CornerRadius = UDim.new(1, 0)
 
 local badgeStroke = Instance.new("UIStroke", BadgeFrame)
 badgeStroke.Thickness = 0.9
@@ -1683,11 +1714,25 @@ end)
 local function AplicarEfeitoFisicoBotao(btn, hoverColor)
     btn.MouseEnter:Connect(function()
         if UIState ~= "OPEN" then return end 
-        TweenService:Create(btn, TweenInfo.new(0.15), {ImageColor3 = hoverColor}):Play()
+        if btn.Name == "ExpandBtn" then 
+            TweenService:Create(ExpandStroke, TweenInfo.new(0.15), {Color = hoverColor}):Play()
+        elseif btn.Name == "MinimizeBtn" then 
+            TweenService:Create(MinimizeLine, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play()
+        elseif btn.Name == "CloseBtn" then 
+            TweenService:Create(CloseLine1, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play()
+            TweenService:Create(CloseLine2, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play() 
+        end
     end)
     btn.MouseLeave:Connect(function()
         if UIState ~= "OPEN" then return end 
-        TweenService:Create(btn, TweenInfo.new(0.15), {ImageColor3 = TOP_BTN_COLOR}):Play()
+        if btn.Name == "ExpandBtn" then 
+            TweenService:Create(ExpandStroke, TweenInfo.new(0.15), {Color = Color3.fromRGB(160, 160, 160)}):Play()
+        elseif btn.Name == "MinimizeBtn" then 
+            TweenService:Create(MinimizeLine, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(160, 160, 160)}):Play()
+        elseif btn.Name == "CloseBtn" then 
+            TweenService:Create(CloseLine1, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(160, 160, 160)}):Play()
+            TweenService:Create(CloseLine2, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(160, 160, 160)}):Play() 
+        end
     end)
 end
 
