@@ -1812,7 +1812,7 @@ local function ExecutarIntroAkat()
     
     CriarNotificacao(
         "AKATSUKI SCRIPTS",
-        "MM2 Script carregado com sucesso! Bem-vindo, " .. player.DisplayName .. "."
+        "MM2 Script carregado com sucesso. Bem-vindo, " .. player.DisplayName .. "."
     )
     
     task.wait(0.8)
