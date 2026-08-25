@@ -10,8 +10,6 @@ local ContentProvider = game:GetService("ContentProvider")
 local player = Players.LocalPlayer
 
 -- ==================== ESTADO DOS TOGGLES DA UI ====================
--- CORREÇÃO: "AutoShoot" renomeado para "Aimbot" para unificar com Configs.
--- A chave "Aimbot" é usada de forma consistente em Configs, createToggle e UI_TEXT.Options.
 local Configs = {
 	ESP         = false,
 	Aimbot      = false,
@@ -35,7 +33,6 @@ local UI_TEXT = {
 	Intro             = '<font color="#FFFFFF">Scripts by | </font><font color="#8B0000">AKATSUKI</font>',
 	Tabs              = { Player = "Player", Combat = "Combat", Visuals = "Visuals", Teleports = "Teleports", Settings = "Settings" },
 	Options           = {
-		-- CORREÇÃO: chave agora é "Aimbot" (igual ao Configs), não "AutoShoot"
 		Aimbot      = { Title = "Aimbot Murderer",  Desc = "Automatic aimbot that stays in the murderer's head non-stop." },
 		Reach       = { Title = "Knife Reach",       Desc = "Significantly increases your knife attack reach (18 studs)." },
 		ESP         = { Title = "Player ESP",        Desc = "Highlights players through walls (Sheriff Blue / Hero Yellow)." },
@@ -68,11 +65,10 @@ else
 	pcall(function() uiParent = game:GetService("CoreGui") end)
 end
 
--- CORREÇÃO: limpar execução anterior antes de criar nova instância
 if uiParent:FindFirstChild("DeltaAkatUniversalUI") then
 	pcall(function() uiParent.DeltaAkatUniversalUI:Destroy() end)
 end
--- CORREÇÃO: limpar BlurEffect de execuções anteriores
+
 for _, bf in ipairs(Lighting:GetChildren()) do
 	if bf:IsA("BlurEffect") and (bf.Name == "ConfirmBlur" or bf.Name == "IntroBlur") then
 		pcall(function() bf:Destroy() end)
@@ -176,10 +172,7 @@ task.spawn(function()
 	end)
 end)
 
--- ==================== DRAG DO FLOATING BUTTON (CORRIGIDO) ====================
--- CORREÇÃO: adicionado clamp para manter FloatBtn dentro da tela.
--- Usa InputBegan/InputChanged/InputEnded via UserInputService para funcionar
--- tanto em PC quanto em mobile, sem conflito com elementos filhos.
+-- ==================== DRAG DO FLOATING BUTTON ====================
 local dragToggleF  = false
 local dragInputF   = nil
 local dragStartF   = nil
@@ -198,10 +191,9 @@ FloatBtn.InputBegan:Connect(function(input)
 	end
 end)
 
-local SetUIState  -- declarado adiante, referenciado aqui no InputEnded
+local SetUIState 
 
--- ==================== DRAG DA JANELA PRINCIPAL (CORRIGIDO) ====================
--- CORREÇÃO: adicionado clamp para manter a janela dentro da tela.
+-- ==================== DRAG DA JANELA PRINCIPAL ====================
 local mainWrapper         = Instance.new("Frame", screenGui)
 mainWrapper.Name          = "MainWrapper"
 mainWrapper.AnchorPoint   = Vector2.new(0.5, 0.5)
@@ -235,10 +227,7 @@ mainFrame.InputBegan:Connect(function(input)
 	end
 end)
 
--- CORREÇÃO: InputChanged unificado — trata tanto FloatBtn quanto MainWrapper num único handler.
--- Evita conflitos entre conexões duplicadas de UserInputService.InputChanged.
 UserInputService.InputChanged:Connect(function(input)
-	-- Drag da janela principal
 	if dragUIToggle and input == dragUIInput then
 		local delta   = input.Position - dragUIStart
 		local vp      = workspace.CurrentCamera.ViewportSize
@@ -246,36 +235,28 @@ UserInputService.InputChanged:Connect(function(input)
 		local hh      = mainWrapper.Size.Y.Offset / 2
 		local newX    = startUIPos.X.Offset + delta.X
 		local newY    = startUIPos.Y.Offset + delta.Y
-		-- clamp em pixels absolutos (Scale já é 0.5 no centro)
 		local absX    = vp.X * startUIPos.X.Scale + newX
 		local absY    = vp.Y * startUIPos.Y.Scale + newY
 		absX          = math.clamp(absX, hw, vp.X - hw)
 		absY          = math.clamp(absY, hh, vp.Y - hh)
-		mainWrapper.Position = UDim2.new(
-			0, absX,
-			0, absY
-		)
+		mainWrapper.Position = UDim2.new(0, absX, 0, absY)
 	end
 
-	-- Drag do FloatBtn
 	if dragToggleF and input == dragInputF then
 		local delta   = input.Position - dragStartF
 		if delta.Magnitude > 5 then isDraggingF = true end
 
 		local vp      = workspace.CurrentCamera.ViewportSize
-		local half    = 22  -- metade do tamanho (44/2)
-		-- posição atual em pixels absolutos
+		local half    = 22
 		local baseAbsX = vp.X * startPosF.X.Scale + startPosF.X.Offset
 		local baseAbsY = vp.Y * startPosF.Y.Scale + startPosF.Y.Offset
 		local newAbsX  = math.clamp(baseAbsX + delta.X, half, vp.X - half)
 		local newAbsY  = math.clamp(baseAbsY + delta.Y, half, vp.Y - half)
-		-- converter de volta para scale=0, offset=absoluto
 		FloatBtn.Position = UDim2.new(0, newAbsX, 0, newAbsY)
 	end
 end)
 
 UserInputService.InputEnded:Connect(function(input)
-	-- FloatBtn
 	if input == dragInputF then
 		if dragToggleF and not isDraggingF then
 			if UIState == "MINIMIZED" or UIState == "CLOSED" then
@@ -292,7 +273,6 @@ UserInputService.InputEnded:Connect(function(input)
 		dragInputF  = nil
 	end
 
-	-- Janela principal
 	if input == dragUIInput then
 		dragUIToggle = false
 		dragUIInput  = nil
@@ -482,12 +462,22 @@ end
 TabsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(UpdateTabsCanvas)
 TabsContainer:GetPropertyChangedSignal("AbsoluteSize"):Connect(UpdateTabsCanvas)
 
--- ==================== ACTIVEBAR REUTILIZÁVEL ====================
-local sharedActiveBar      = Instance.new("Frame", LeftPanel)
+-- ==================== ACTIVEBAR REUTILIZÁVEL (CORRIGIDA) ====================
+-- Criamos um contêiner com ClipsDescendants para impedir que a ActiveBar
+-- vaze por cima da barra de pesquisa e do perfil.
+local ActiveBarContainer   = Instance.new("Frame", LeftPanel)
+ActiveBarContainer.Name    = "ActiveBarContainer"
+ActiveBarContainer.Size    = UDim2.new(1, -8, 1, -152) -- Mesmo tamanho e local do TabsContainer
+ActiveBarContainer.Position = UDim2.new(0, 4, 0, 87)
+ActiveBarContainer.BackgroundTransparency = 1
+ActiveBarContainer.ClipsDescendants = true
+ActiveBarContainer.ZIndex  = 8
+
+local sharedActiveBar      = Instance.new("Frame", ActiveBarContainer)
 sharedActiveBar.Name       = "SharedActiveBar"
 sharedActiveBar.AnchorPoint = Vector2.new(0, 0.5)
 sharedActiveBar.Size       = UDim2.new(0, 3, 0, 22)
-sharedActiveBar.Position   = UDim2.new(0, 11, 0, 0)
+sharedActiveBar.Position   = UDim2.new(0, 7, 0, 0) -- 11 absoluto - 4 do container
 sharedActiveBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 sharedActiveBar.BorderSizePixel = 0
 sharedActiveBar.Visible    = false
@@ -598,8 +588,6 @@ PrivacyIcon.ZIndex         = 23
 
 local isPrivate = false
 
--- CORREÇÃO: string.rep("", n) sempre retorna ""; corrigido para string.rep("*", n)
--- Agora o modo privacidade mascara os nomes corretamente.
 PrivacyBtn.MouseButton1Click:Connect(function()
 	PlayUI_Click()
 	local flashTween = TweenService:Create(PrivacyBtn, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, true), {BackgroundTransparency = 0})
@@ -739,7 +727,6 @@ containerLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(UpdateCa
 togglesContainer:GetPropertyChangedSignal("AbsoluteSize"):Connect(UpdateCanvasSize)
 
 -- ==================== CONFIRM FRAME & INTENSE BLUR ====================
--- CORREÇÃO: confirmBlur criado limpo, sem herdar de execuções anteriores (limpeza feita acima)
 local confirmBlur          = Instance.new("BlurEffect", Lighting)
 confirmBlur.Name           = "ConfirmBlur"
 confirmBlur.Size           = 0
@@ -845,8 +832,6 @@ btnNo.MouseLeave:Connect(function()  TweenService:Create(btnNo,  TweenInfo.new(0
 AplicarFadeSincronizado(confirmCard, true, 0)
 
 -- ==================== RENDERSTEP UNIFICADO ====================
--- CORREÇÃO: todos os gradientes animados centralizados num único RenderStepped
--- para evitar múltiplas conexões processando desnecessariamente.
 RunService.RenderStepped:Connect(function()
 	local t = os.clock()
 	SingleRedGrad.Rotation    = (t * 12)  % 360
@@ -861,7 +846,6 @@ end)
 local ActiveNotifications = {}
 local NOTIF_DURATION      = 10
 
--- CORREÇÃO: usa o Size.Y.Offset real de cada notifHolder; fallback 96 preservado.
 local function UpdateNotifications()
 	local currentY = -24
 	for _, notif in ipairs(ActiveNotifications) do
@@ -1017,7 +1001,6 @@ local function CriarNotificacao(titulo, descricao, iconeId)
 	table.insert(ActiveNotifications, 1, notifHolder)
 	UpdateNotifications()
 
-	-- Entrada deslizante
 	TweenService:Create(notifHolder, TweenInfo.new(0.3, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {
 		Position = UDim2.new(1, -20, 1, -24)
 	}):Play()
@@ -1300,7 +1283,6 @@ local function CriarNotificacaoDiscord()
 	copyBtn.BorderSizePixel        = 0
 	Instance.new("UICorner", copyBtn).CornerRadius = UDim.new(0, 6)
 
-	-- CORREÇÃO: notificação de "LINK COPIED" só aparece se setclipboard existir E não errar.
 	copyBtn.MouseButton1Click:Connect(function()
 		PlayUI_Click()
 		local success = false
@@ -1411,7 +1393,6 @@ local function CriarNotificacaoDiscord()
 end
 
 -- ==================== FILTRO / PESQUISA ====================
--- CORREÇÃO: debounce simples para evitar acúmulo de task.delay enquanto o usuário digita.
 local filterDebounceThread = nil
 
 local function filterToggles(currentActiveTab, query)
@@ -1455,9 +1436,7 @@ local function filterToggles(currentActiveTab, query)
 	task.delay(0.05, function() pcall(UpdateCanvasSize) end)
 end
 
--- ==================== ACTIVEBAR (CORRIGIDA) ====================
--- CORREÇÃO: proteção contra loop infinito no task.defer recursivo.
--- Limitado a MAX_DEFER tentativas; se AbsoluteSize ainda for zero, desiste.
+-- ==================== ACTIVEBAR POSITION UPDATE ====================
 local function UpdateActiveBarPosition(animar)
 	local targetBtn = tabButtons[activeTab]
 	if not targetBtn or not sharedActiveBar.Visible then return end
@@ -1471,7 +1450,7 @@ local function UpdateActiveBarPosition(animar)
 
 		local btnAbsSize = targetBtn.AbsoluteSize.Y
 		local btnAbsPos  = targetBtn.AbsolutePosition.Y
-		local panelAbsY  = LeftPanel.AbsolutePosition.Y
+		local panelAbsY  = ActiveBarContainer.AbsolutePosition.Y -- Agora pegando a posição relativa ao Container!
 
 		if (btnAbsSize == 0 or btnAbsPos == 0 or panelAbsY == 0) and deferCount < MAX_DEFER then
 			task.defer(aplicar)
@@ -1483,10 +1462,10 @@ local function UpdateActiveBarPosition(animar)
 
 		if animar then
 			TweenService:Create(sharedActiveBar, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-				Position = UDim2.new(0, 11, 0, targetYPos)
+				Position = UDim2.new(0, 7, 0, targetYPos)
 			}):Play()
 		else
-			sharedActiveBar.Position = UDim2.new(0, 11, 0, targetYPos)
+			sharedActiveBar.Position = UDim2.new(0, 7, 0, targetYPos)
 		end
 	end
 
@@ -1581,7 +1560,6 @@ local function createTabBtn(tabName)
 end
 
 -- ==================== CRIAR TOGGLE ====================
--- CORREÇÃO: configKey é a chave exata em Configs (ex: "Aimbot", não "AutoShoot")
 local function createToggle(parent, configKey, tabCategory)
 	local toggleFrame              = Instance.new("Frame")
 	toggleFrame.Name               = configKey
@@ -1658,7 +1636,6 @@ local function createToggle(parent, configKey, tabCategory)
 	end)
 end
 
--- CORREÇÃO: debounce na pesquisa para evitar animações acumuladas durante digitação rápida
 searchTextBox:GetPropertyChangedSignal("Text"):Connect(function()
 	if filterDebounceThread then
 		task.cancel(filterDebounceThread)
@@ -1670,7 +1647,6 @@ searchTextBox:GetPropertyChangedSignal("Text"):Connect(function()
 end)
 
 -- ==================== EXPAND ====================
--- CORREÇÃO: ExpandBtn protegido pelo UIState para não alterar tamanho durante animações.
 ExpandBtn.MouseButton1Click:Connect(function()
 	PlayUI_Click()
 	if UIState ~= "OPEN" then return end
@@ -1679,8 +1655,7 @@ ExpandBtn.MouseButton1Click:Connect(function()
 	TweenService:Create(mainWrapper, TweenInfo.new(0.3, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {Size = newSize}):Play()
 end)
 
--- ==================== MÁQUINA DE ESTADOS DA UI (CORRIGIDA) ====================
--- CORREÇÃO: guard correto para estados de transição usando flag booleana separada.
+-- ==================== MÁQUINA DE ESTADOS DA UI ====================
 local isTransitioning = false
 
 SetUIState = function(newState)
@@ -1736,8 +1711,6 @@ MinimizeBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ==================== CONFIRMAÇÃO DE FECHAMENTO ====================
--- CORREÇÃO: UIScale do confirmCard verificado antes de criar novo,
--- evitando empilhamento de UIScales a cada abertura do confirm.
 local function AlternarConfirmacao(exibir)
 	isConfirmOpen = exibir
 	local tempoAnim = 0.25
@@ -1749,7 +1722,6 @@ local function AlternarConfirmacao(exibir)
 
 		TweenService:Create(confirmBlur, TweenInfo.new(tempoAnim, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = 28}):Play()
 
-		-- Remove UIScale anterior antes de criar uma nova
 		local oldScale = confirmCard:FindFirstChildOfClass("UIScale")
 		if oldScale then oldScale:Destroy() end
 
@@ -1787,13 +1759,11 @@ end)
 
 btnNo.MouseButton1Click:Connect(function() AlternarConfirmacao(false) end)
 
--- CORREÇÃO: btnYes limpa confirmBlur e screenGui (que já destrói tudo, incluindo confirmBlur filho de Lighting)
 btnYes.MouseButton1Click:Connect(function()
 	local syncTime = 0.2
 	TweenService:Create(confirmBlur, TweenInfo.new(syncTime, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Size = 0}):Play()
 	AplicarFadeSincronizado(confirmCard, true, syncTime)
 	task.wait(syncTime)
-	-- Destrói confirmBlur antes do screenGui para não deixar BlurEffect em Lighting
 	pcall(function() confirmBlur:Destroy() end)
 	screenGui:Destroy()
 end)
@@ -1826,10 +1796,9 @@ createTabBtn("Teleports")
 createTabBtn("Settings")
 
 -- ==================== CRIAR TOGGLES ====================
--- CORREÇÃO: "AutoShoot" → "Aimbot" para corresponder exatamente à chave em Configs e UI_TEXT.Options
 createToggle(togglesContainer, "Speed",       "Player")
 createToggle(togglesContainer, "AntiFling",   "Player")
-createToggle(togglesContainer, "Aimbot",      "Combat")      -- era "AutoShoot"
+createToggle(togglesContainer, "Aimbot",      "Combat")
 createToggle(togglesContainer, "Reach",       "Combat")
 createToggle(togglesContainer, "ESP",         "Visuals")
 createToggle(togglesContainer, "TpToGun",     "Teleports")
@@ -1839,7 +1808,6 @@ createToggle(togglesContainer, "ChatRoles",   "Settings")
 
 -- ==================== ANIMAÇÃO DE INTRODUÇÃO ====================
 local function ExecutarIntroAkat()
-	-- Blur da intro com nome distinto para não conflitar com ConfirmBlur
 	local Blur             = Instance.new("BlurEffect")
 	Blur.Name              = "IntroBlur"
 	Blur.Size              = 0
@@ -1922,7 +1890,6 @@ local function ExecutarIntroAkat()
 
 	openScale.Completed:Connect(function()
 		MainScale:Destroy()
-		-- CORREÇÃO: Blur da intro destruído após animação para não deixar BlurEffect em Lighting
 		pcall(function() Blur:Destroy() end)
 		IntroFrame:Destroy()
 		task.defer(function()
