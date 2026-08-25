@@ -312,7 +312,6 @@ HeaderLeft.Position = UDim2.new(0, 0, 0, 0)
 HeaderLeft.BackgroundTransparency = 1
 HeaderLeft.ZIndex = 10
 
--- Imagem solicitada perfeitamente centralizada no lado esquerdo do título principal
 local HeaderImage = Instance.new("ImageLabel", HeaderLeft)
 HeaderImage.Size = UDim2.new(0, 24, 0, 24)
 HeaderImage.Position = UDim2.new(0, 10, 0.5, -12)
@@ -324,7 +323,7 @@ local title = Instance.new("TextLabel", HeaderLeft)
 title.Size = UDim2.new(1, -44, 0, 16)
 title.Position = UDim2.new(0, 40, 0, 4)
 title.BackgroundTransparency = 1
-title.Text = "AKATSUKI SCRIPTS"
+title.Text = "AKATSUKI SCRIPTS HUB"
 title.TextColor3 = Color3.fromRGB(245, 245, 245)
 title.TextSize = 13
 title.Font = Enum.Font.GothamBold
@@ -335,7 +334,7 @@ local subtitle = Instance.new("TextLabel", HeaderLeft)
 subtitle.Size = UDim2.new(1, -44, 0, 12)
 subtitle.Position = UDim2.new(0, 40, 0, 20)
 subtitle.BackgroundTransparency = 1
-subtitle.Text = "MM2 SCRIPT | by zeni <3"
+subtitle.Text = "MM2 SCRIPT | by zeni"
 subtitle.TextColor3 = Color3.fromRGB(180, 180, 180)
 subtitle.TextTransparency = 0.2
 subtitle.TextSize = 9.5
@@ -553,7 +552,7 @@ PrivacyBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ==================== RIGHT PANEL HEADER & BADGE ====================
+-- ==================== RIGHT PANEL HEADER & BADGE (COM NOVOS ÍCONES E TAMANHO DIMINUÍDO) ====================
 local topButtons = Instance.new("Frame", RightPanel)
 topButtons.Size = UDim2.new(1, -12, 0, 36)
 topButtons.Position = UDim2.new(0, 0, 0, 0)
@@ -561,8 +560,8 @@ topButtons.BackgroundTransparency = 1
 topButtons.ZIndex = 10
 
 local ControlsFrame = Instance.new("Frame", topButtons)
-ControlsFrame.Size = UDim2.new(0, 110, 1, 0)
-ControlsFrame.Position = UDim2.new(1, -110, 0, 0)
+ControlsFrame.Size = UDim2.new(0, 90, 1, 0)
+ControlsFrame.Position = UDim2.new(1, -90, 0, 0)
 ControlsFrame.BackgroundTransparency = 1
 ControlsFrame.ZIndex = 11
 
@@ -570,69 +569,38 @@ local UIListTop = Instance.new("UIListLayout", ControlsFrame)
 UIListTop.FillDirection = Enum.FillDirection.Horizontal
 UIListTop.HorizontalAlignment = Enum.HorizontalAlignment.Right
 UIListTop.VerticalAlignment = Enum.VerticalAlignment.Center
-UIListTop.Padding = UDim.new(0, 6)
+UIListTop.Padding = UDim.new(0, 6) -- Pequeno espaço entre os botões ao invés de juntos
 UIListTop.SortOrder = Enum.SortOrder.LayoutOrder
 
--- Botões principais sem fundo (apenas ícones transparentes) e em tamanho normal (22x22)
-local MinimizeBtn = Instance.new("TextButton", ControlsFrame)
+-- 1. Minimize (Novo ícone de traço)
+local MinimizeBtn = Instance.new("ImageButton", ControlsFrame)
 MinimizeBtn.Name = "MinimizeBtn"
 MinimizeBtn.LayoutOrder = 1
-MinimizeBtn.Size = UDim2.new(0, 22, 0, 22)
+MinimizeBtn.Size = UDim2.new(0, 16, 0, 16) -- Tamanho menor
 MinimizeBtn.BackgroundTransparency = 1
-MinimizeBtn.Text = ""
+MinimizeBtn.Image = "rbxthumb://type=Asset&id=97090905107587&w=150&h=150"
+MinimizeBtn.ImageColor3 = Color3.fromRGB(160, 160, 160)
 MinimizeBtn.ZIndex = 11
-local MinimizeLine = Instance.new("Frame", MinimizeBtn)
-MinimizeLine.Name = "Line"
-MinimizeLine.AnchorPoint = Vector2.new(0.5, 0.5)
-MinimizeLine.Position = UDim2.new(0.5, 0, 0.5, 0)
-MinimizeLine.Size = UDim2.new(0, 12, 0, 1.5)
-MinimizeLine.BackgroundColor3 = Color3.fromRGB(160, 160, 160)
-MinimizeLine.BorderSizePixel = 0
-MinimizeLine.ZIndex = 12
 
-local ExpandBtn = Instance.new("TextButton", ControlsFrame)
+-- 2. Expand/Square (Novo ícone de quadrado)
+local ExpandBtn = Instance.new("ImageButton", ControlsFrame)
 ExpandBtn.Name = "ExpandBtn"
 ExpandBtn.LayoutOrder = 2
-ExpandBtn.Size = UDim2.new(0, 22, 0, 22)
+ExpandBtn.Size = UDim2.new(0, 16, 0, 16) -- Tamanho menor
 ExpandBtn.BackgroundTransparency = 1
-ExpandBtn.Text = ""
+ExpandBtn.Image = "rbxthumb://type=Asset&id=78749046909931&w=150&h=150"
+ExpandBtn.ImageColor3 = Color3.fromRGB(160, 160, 160)
 ExpandBtn.ZIndex = 11
-local ExpandSquare = Instance.new("Frame", ExpandBtn)
-ExpandSquare.Name = "Square"
-ExpandSquare.Size = UDim2.new(0, 10, 0, 10)
-ExpandSquare.AnchorPoint = Vector2.new(0.5, 0.5)
-ExpandSquare.Position = UDim2.new(0.5, 0, 0.5, 0)
-ExpandSquare.BackgroundTransparency = 1
-ExpandSquare.ZIndex = 12
-local ExpandStroke = Instance.new("UIStroke", ExpandSquare)
-ExpandStroke.Color = Color3.fromRGB(160, 160, 160)
-ExpandStroke.Thickness = 1.2 
 
-local CloseBtn = Instance.new("TextButton", ControlsFrame)
+-- 3. Close (Novo ícone de X)
+local CloseBtn = Instance.new("ImageButton", ControlsFrame)
 CloseBtn.Name = "CloseBtn"
 CloseBtn.LayoutOrder = 3
-CloseBtn.Size = UDim2.new(0, 22, 0, 22)
+CloseBtn.Size = UDim2.new(0, 16, 0, 16) -- Tamanho menor
 CloseBtn.BackgroundTransparency = 1
-CloseBtn.Text = ""
+CloseBtn.Image = "rbxthumb://type=Asset&id=70710316269357&w=150&h=150"
+CloseBtn.ImageColor3 = Color3.fromRGB(160, 160, 160)
 CloseBtn.ZIndex = 11
-local CloseLine1 = Instance.new("Frame", CloseBtn)
-CloseLine1.Name = "Line1"
-CloseLine1.AnchorPoint = Vector2.new(0.5, 0.5)
-CloseLine1.Position = UDim2.new(0.5, 0, 0.5, 0)
-CloseLine1.Size = UDim2.new(0, 12, 0, 1.5)
-CloseLine1.Rotation = 45
-CloseLine1.BackgroundColor3 = Color3.fromRGB(160, 160, 160)
-CloseLine1.BorderSizePixel = 0
-CloseLine1.ZIndex = 12
-local CloseLine2 = Instance.new("Frame", CloseBtn)
-CloseLine2.Name = "Line2"
-CloseLine2.AnchorPoint = Vector2.new(0.5, 0.5)
-CloseLine2.Position = UDim2.new(0.5, 0, 0.5, 0)
-CloseLine2.Size = UDim2.new(0, 12, 0, 1.5)
-CloseLine2.Rotation = -45
-CloseLine2.BackgroundColor3 = Color3.fromRGB(160, 160, 160)
-CloseLine2.BorderSizePixel = 0
-CloseLine2.ZIndex = 12
 
 local BadgeFrame = Instance.new("Frame", RightPanel)
 BadgeFrame.Name = "BadgeFrame"
@@ -821,24 +789,25 @@ btnNo.MouseLeave:Connect(function() TweenService:Create(btnNo, TweenInfo.new(0.1
 
 AplicarFadeSincronizado(confirmCard, true, 0) 
 
--- ==================== SISTEMA DE NOTIFICAÇÃO (STACK / FILA) ====================
+-- ==================== SISTEMA DE NOTIFICAÇÃO (STACK / PILHA CORRIGIDO) ====================
 local ActiveNotifications = {}
 local NOTIF_DURATION = 10
 
 local function UpdateNotifications()
+    local accumulatedY = 24
     for i, notif in ipairs(ActiveNotifications) do
         if notif and notif.Parent then
-            -- Altura adaptativa correta (64px para link copiado, 96px para as demais) eliminando o espaçamento indesejado
             local h = notif.AbsoluteSize.Y > 0 and notif.AbsoluteSize.Y or (notif.Name == "NotifHolderLink" and 64 or 96)
-            local targetY = -24 - ((i - 1) * (h + 12))
+            local targetY = -accumulatedY
             TweenService:Create(notif, TweenInfo.new(0.3, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {
                 Position = UDim2.new(1, -20, 1, targetY)
             }):Play()
+            accumulatedY = accumulatedY + h + 12
         end
     end
 end
 
--- ==================== NOTIFICAÇÃO 1 (COM TÍTULO E SUBTÍTULO CENTRALIZADOS NA BARRA DE DESTAQUE) ====================
+-- ==================== NOTIFICAÇÃO 1 ====================
 local function CriarNotificacao(titulo, descricao, iconeId)
     local notifHolder = Instance.new("Frame", screenGui)
     notifHolder.Name = "NotifHolder"
@@ -886,7 +855,6 @@ local function CriarNotificacao(titulo, descricao, iconeId)
         ColorSequenceKeypoint.new(1, Color3.fromRGB(100, 10, 10))
     })
 
-    -- Título e subtítulo perfeitamente centralizados no meio da accentBar
     local notifTitle = Instance.new("TextLabel", notifCard)
     notifTitle.Size = UDim2.new(1, -76, 0, 18)
     notifTitle.Position = UDim2.new(0, 26, 0.5, -19)
@@ -905,7 +873,7 @@ local function CriarNotificacao(titulo, descricao, iconeId)
     notifDesc.Text = descricao or ""
     notifDesc.TextColor3 = Color3.fromRGB(150, 150, 155)
     notifDesc.Font = Enum.Font.Gotham
-    notifDesc.TextSize = 12 -- Tamanho de fonte igualado ao da segunda notificação
+    notifDesc.TextSize = 12 
     notifDesc.TextXAlignment = Enum.TextXAlignment.Left
     notifDesc.TextYAlignment = Enum.TextYAlignment.Top
     notifDesc.TextWrapped = true
@@ -1013,7 +981,7 @@ local function CriarNotificacao(titulo, descricao, iconeId)
     task.delay(NOTIF_DURATION + 0.1, function() DismissNotif() end)
 end
 
--- ==================== NOTIFICAÇÃO DE LINK COPIADO (REBAIXADA) ====================
+-- ==================== NOTIFICAÇÃO DE LINK COPIADO ====================
 local function CriarNotificacaoLinkCopiado(texto, iconeId)
     local notifHolder = Instance.new("Frame", screenGui)
     notifHolder.Name = "NotifHolderLink"
@@ -1196,7 +1164,7 @@ local function CriarNotificacaoLinkCopiado(texto, iconeId)
     task.delay(NOTIF_DURATION + 0.1, function() DismissNotif() end)
 end
 
--- ==================== NOTIFICAÇÃO 2 (DISCORD COM TÍTULO E SUBTÍTULO CENTRALIZADOS NA BARRA) ====================
+-- ==================== NOTIFICAÇÃO 2 (DISCORD) ====================
 local function CriarNotificacaoDiscord()
     local notifHolder = Instance.new("Frame", screenGui)
     notifHolder.Name = "NotifHolderDiscord"
@@ -1238,7 +1206,6 @@ local function CriarNotificacaoDiscord()
     accentBar.ZIndex = 202
     Instance.new("UICorner", accentBar).CornerRadius = UDim.new(1, 0)
 
-    -- Título e subtítulo perfeitamente centralizados na barra de destaque
     local notifTitle = Instance.new("TextLabel", notifCard)
     notifTitle.Size = UDim2.new(1, -76, 0, 18)
     notifTitle.Position = UDim2.new(0, 26, 0.5, -19)
@@ -1254,10 +1221,10 @@ local function CriarNotificacaoDiscord()
     notifDesc.Size = UDim2.new(1, -100, 0, 18)
     notifDesc.Position = UDim2.new(0, 26, 0.5, 1)
     notifDesc.BackgroundTransparency = 1
-    notifDesc.Text = "LINK TO COPY https://discord.gg/rZuYzZ7zvt"
+    notifDesc.Text = "https://discord.gg/rZuYzZ7zvt"
     notifDesc.TextColor3 = Color3.fromRGB(150, 150, 155)
     notifDesc.Font = Enum.Font.Gotham
-    notifDesc.TextSize = 12 -- Tamanho de fonte exatamente igual ao da primeira notificação
+    notifDesc.TextSize = 12 
     notifDesc.TextXAlignment = Enum.TextXAlignment.Left
     notifDesc.TextYAlignment = Enum.TextYAlignment.Top
     notifDesc.TextWrapped = true
@@ -1283,7 +1250,7 @@ local function CriarNotificacaoDiscord()
                 setclipboard("https://discord.gg/rZuYzZ7zvt")
             end
         end)
-        CriarNotificacaoLinkCopiado("LINK COPIED SUCCESSFULLY", "rbxthumb://type=Asset&id=118293546444074&w=150&h=150")
+        CriarNotificacaoLinkCopiado("LINK COPIED SUCCESSFULLY!", "rbxthumb://type=Asset&id=118293546444074&w=150&h=150")
     end)
 
     local notifCloseBtn = Instance.new("TextButton", notifCard)
@@ -1635,7 +1602,7 @@ SetUIState = function(newState)
         openTween:Play()
         openTween.Completed:Connect(function()
             UIState = "OPEN"
-            selectTab("Player") -- Garante que sempre abre na aba Player
+            selectTab("Player") 
             filterToggles(activeTab, searchTextBox.Text)
             UpdateActiveBarPosition(false)
         end)
@@ -1714,25 +1681,11 @@ end)
 local function AplicarEfeitoFisicoBotao(btn, hoverColor)
     btn.MouseEnter:Connect(function()
         if UIState ~= "OPEN" then return end 
-        if btn.Name == "ExpandBtn" then 
-            TweenService:Create(ExpandStroke, TweenInfo.new(0.15), {Color = hoverColor}):Play()
-        elseif btn.Name == "MinimizeBtn" then 
-            TweenService:Create(MinimizeLine, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play()
-        elseif btn.Name == "CloseBtn" then 
-            TweenService:Create(CloseLine1, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play()
-            TweenService:Create(CloseLine2, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play() 
-        end
+        TweenService:Create(btn, TweenInfo.new(0.15), {ImageColor3 = hoverColor}):Play()
     end)
     btn.MouseLeave:Connect(function()
         if UIState ~= "OPEN" then return end 
-        if btn.Name == "ExpandBtn" then 
-            TweenService:Create(ExpandStroke, TweenInfo.new(0.15), {Color = Color3.fromRGB(160, 160, 160)}):Play()
-        elseif btn.Name == "MinimizeBtn" then 
-            TweenService:Create(MinimizeLine, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(160, 160, 160)}):Play()
-        elseif btn.Name == "CloseBtn" then 
-            TweenService:Create(CloseLine1, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(160, 160, 160)}):Play()
-            TweenService:Create(CloseLine2, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(160, 160, 160)}):Play() 
-        end
+        TweenService:Create(btn, TweenInfo.new(0.15), {ImageColor3 = Color3.fromRGB(160, 160, 160)}):Play()
     end)
 end
 
@@ -1780,31 +1733,13 @@ local function ExecutarIntroAkat()
     FloatBtn.Visible = true
     UIState = "OPEN"
     local MainScale = Instance.new("UIScale", mainWrapper); MainScale.Scale = 0.85
-    AplicarFadeSincronizado(mainWrapper, true, 0)
-    AplicarFadeSincronizado(mainWrapper, false, 0.35)
-    
-    local openScale = TweenService:Create(MainScale, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1})
-    openScale:Play()
-    
-    FloatBtn.Size = UDim2.new(0, 0, 0, 0)
-    TweenService:Create(FloatBtn, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 44, 0, 44)}):Play()
-    
-    selectTab("Player") -- Garante aba Player aberta ao iniciar
-
-    CriarNotificacao(
-        "AKATSUKI SCRIPTS",
-        "MM2 Script carregado com sucesso! Bem-vindo, " .. player.DisplayName .. "."
-    )
-    
-    task.wait(0.8)
-    CriarNotificacaoDiscord()
-
-    openScale.Completed:Connect(function() 
-        selectTab("Player") 
-        MainScale:Destroy()
-        IntroFrame:Destroy()
-        Blur:Destroy()
-    end)
+    AplicarFadeSincronizado(mainWrapper, false, 0.4)
 end
 
-ExecutarIntroAkat()
+task.spawn(function()
+    ExecutarIntroAkat()
+    task.wait(0.2)
+    -- As duas notificações aparecem ao mesmo tempo simultaneamente
+    CriarNotificacao("AKATSUKI HUB", "Scripts by Akatsuki loaded successfully!", "rbxthumb://type=Asset&id=118293546444074&w=150&h=150")
+    CriarNotificacaoDiscord()
+end)
