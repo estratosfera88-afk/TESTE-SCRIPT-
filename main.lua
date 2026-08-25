@@ -312,29 +312,37 @@ HeaderLeft.Position = UDim2.new(0, 0, 0, 0)
 HeaderLeft.BackgroundTransparency = 1
 HeaderLeft.ZIndex = 10
 
+local LogoImage = Instance.new("ImageLabel", HeaderLeft)
+LogoImage.Size = UDim2.new(0, 26, 0, 26)
+LogoImage.AnchorPoint = Vector2.new(0, 0.5)
+LogoImage.Position = UDim2.new(0, 14, 0.5, 0)
+LogoImage.BackgroundTransparency = 1
+LogoImage.Image = "rbxassetid://134217291845443"
+LogoImage.ZIndex = 11
+
 local title = Instance.new("TextLabel", HeaderLeft)
-title.Size = UDim2.new(1, 0, 0, 16)
-title.AnchorPoint = Vector2.new(0.5, 0)
-title.Position = UDim2.new(0.5, 0, 0, 4)
+title.Size = UDim2.new(1, -50, 0, 16)
+title.AnchorPoint = Vector2.new(0, 0)
+title.Position = UDim2.new(0, 48, 0, 4)
 title.BackgroundTransparency = 1
 title.Text = "AKATSUKI SCRIPTS"
 title.TextColor3 = Color3.fromRGB(245, 245, 245)
 title.TextSize = 13
 title.Font = Enum.Font.GothamBold
-title.TextXAlignment = Enum.TextXAlignment.Center
+title.TextXAlignment = Enum.TextXAlignment.Left
 title.ZIndex = 11
 
 local subtitle = Instance.new("TextLabel", HeaderLeft)
-subtitle.Size = UDim2.new(1, 0, 0, 12)
-subtitle.AnchorPoint = Vector2.new(0.5, 0)
-subtitle.Position = UDim2.new(0.5, 0, 0, 20)
+subtitle.Size = UDim2.new(1, -50, 0, 12)
+subtitle.AnchorPoint = Vector2.new(0, 0)
+subtitle.Position = UDim2.new(0, 48, 0, 20)
 subtitle.BackgroundTransparency = 1
 subtitle.Text = "MM2 SCRIPT | by zeni <3"
 subtitle.TextColor3 = Color3.fromRGB(180, 180, 180)
 subtitle.TextTransparency = 0.2
 subtitle.TextSize = 9.5
 subtitle.Font = Enum.Font.Gotham
-subtitle.TextXAlignment = Enum.TextXAlignment.Center
+subtitle.TextXAlignment = Enum.TextXAlignment.Left
 subtitle.ZIndex = 11
 
 -- ==================== BARRA DE PESQUISA ====================
@@ -556,7 +564,7 @@ topButtons.ZIndex = 10
 
 local ControlsFrame = Instance.new("Frame", topButtons)
 ControlsFrame.Size = UDim2.new(0, 110, 1, 0)
-ControlsFrame.Position = UDim2.new(1, -110, 0, 0)
+ControlsFrame.Position = UDim2.new(1, -120, 0, 6) -- Centralizado melhor e em cima da toggle
 ControlsFrame.BackgroundTransparency = 1
 ControlsFrame.ZIndex = 11
 
@@ -567,13 +575,13 @@ UIListTop.VerticalAlignment = Enum.VerticalAlignment.Center
 UIListTop.Padding = UDim.new(0, 6)
 UIListTop.SortOrder = Enum.SortOrder.LayoutOrder
 
--- Botões aumentados de tamanho (30x30)
+-- Botões aumentados de tamanho (30x30), agora sem fundo
 local MinimizeBtn = Instance.new("TextButton", ControlsFrame)
 MinimizeBtn.Name = "MinimizeBtn"
 MinimizeBtn.LayoutOrder = 1
 MinimizeBtn.Size = UDim2.new(0, 30, 0, 30)
 MinimizeBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-MinimizeBtn.BackgroundTransparency = 0.3
+MinimizeBtn.BackgroundTransparency = 1
 MinimizeBtn.Text = ""
 MinimizeBtn.ZIndex = 11
 Instance.new("UICorner", MinimizeBtn).CornerRadius = UDim.new(0, 6)
@@ -591,7 +599,7 @@ ExpandBtn.Name = "ExpandBtn"
 ExpandBtn.LayoutOrder = 2
 ExpandBtn.Size = UDim2.new(0, 30, 0, 30)
 ExpandBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-ExpandBtn.BackgroundTransparency = 0.3
+ExpandBtn.BackgroundTransparency = 1
 ExpandBtn.Text = ""
 ExpandBtn.ZIndex = 11
 Instance.new("UICorner", ExpandBtn).CornerRadius = UDim.new(0, 6)
@@ -611,7 +619,7 @@ CloseBtn.Name = "CloseBtn"
 CloseBtn.LayoutOrder = 3
 CloseBtn.Size = UDim2.new(0, 30, 0, 30)
 CloseBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-CloseBtn.BackgroundTransparency = 0.3
+CloseBtn.BackgroundTransparency = 1
 CloseBtn.Text = ""
 CloseBtn.ZIndex = 11
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
@@ -747,7 +755,6 @@ confStrokeGrad.Color = ColorSequence.new({
 
 RunService.RenderStepped:Connect(function()
     confStrokeGrad.Rotation = (os.clock() * 15) % 360
-    -- Rotação do gradiente da User badge muito mais rápida (* 60)
     uGrad.Rotation = (os.clock() * 60) % 360
     avGrad.Rotation = (os.clock() * 60) % 360
     badgeGrad.Rotation = (os.clock() * 10) % 360
@@ -829,7 +836,6 @@ local NOTIF_DURATION = 10
 local function UpdateNotifications()
     for i, notif in ipairs(ActiveNotifications) do
         if notif and notif.Parent then
-            -- Altura adaptativa baseada no tamanho do holder (64px para link copiado, 96px para os demais)
             local h = notif.AbsoluteSize.Y > 0 and notif.AbsoluteSize.Y or 96
             local targetY = -24 - ((i - 1) * (h + 12))
             TweenService:Create(notif, TweenInfo.new(0.3, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {
@@ -886,26 +892,30 @@ local function CriarNotificacao(titulo, descricao, iconeId)
         ColorSequenceKeypoint.new(1, Color3.fromRGB(100, 10, 10))
     })
 
+    -- MODIFICAÇÃO: Título centralizado verticalmente perante à accentBar
     local notifTitle = Instance.new("TextLabel", notifCard)
-    notifTitle.Size = UDim2.new(1, -76, 0, 22)
-    notifTitle.Position = UDim2.new(0, 26, 0, 10)
+    notifTitle.Size = UDim2.new(1, -76, 0, 20)
+    notifTitle.AnchorPoint = Vector2.new(0, 1)
+    notifTitle.Position = UDim2.new(0, 26, 0.5, 0)
     notifTitle.BackgroundTransparency = 1
     notifTitle.Text = titulo or "AKATSUKI"
     notifTitle.TextColor3 = Color3.fromRGB(240, 240, 240)
     notifTitle.Font = Enum.Font.GothamBold
-    notifTitle.TextSize = 17.5
+    notifTitle.TextSize = 16
     notifTitle.TextXAlignment = Enum.TextXAlignment.Left
     notifTitle.ZIndex = 203
 
+    -- MODIFICAÇÃO: Descrição centralizada verticalmente
     local descContainer = Instance.new("Frame", notifCard)
-    descContainer.Size = UDim2.new(1, -40, 0, 40)
-    descContainer.Position = UDim2.new(0, 26, 0, 36)
+    descContainer.Size = UDim2.new(1, -40, 0, 20)
+    descContainer.AnchorPoint = Vector2.new(0, 0)
+    descContainer.Position = UDim2.new(0, 26, 0.5, 0)
     descContainer.BackgroundTransparency = 1
     
     local descLayout = Instance.new("UIListLayout", descContainer)
     descLayout.FillDirection = Enum.FillDirection.Horizontal
     descLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    descLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+    descLayout.VerticalAlignment = Enum.VerticalAlignment.Center
     descLayout.Padding = UDim.new(0, 6)
 
     local notifDesc = Instance.new("TextLabel", descContainer)
@@ -915,9 +925,9 @@ local function CriarNotificacao(titulo, descricao, iconeId)
     notifDesc.Text = descricao or ""
     notifDesc.TextColor3 = Color3.fromRGB(150, 150, 155)
     notifDesc.Font = Enum.Font.Gotham
-    notifDesc.TextSize = 13.5
+    notifDesc.TextSize = 13 -- Unificado com a notificação do Discord
     notifDesc.TextXAlignment = Enum.TextXAlignment.Left
-    notifDesc.TextYAlignment = Enum.TextYAlignment.Top
+    notifDesc.TextYAlignment = Enum.TextYAlignment.Center
     notifDesc.ZIndex = 203
 
     if iconeId then
@@ -1035,7 +1045,7 @@ local function CriarNotificacaoLinkCopiado(texto, iconeId)
     local notifHolder = Instance.new("Frame", screenGui)
     notifHolder.Name = "NotifHolderLink"
     notifHolder.AnchorPoint = Vector2.new(1, 1)
-    notifHolder.Size = UDim2.new(0, 330, 0, 64) -- Rebaixada (altura 64px)
+    notifHolder.Size = UDim2.new(0, 330, 0, 64) 
     notifHolder.Position = UDim2.new(1, 360, 1, -24)
     notifHolder.BackgroundTransparency = 1
     notifHolder.ZIndex = 200
@@ -1078,7 +1088,6 @@ local function CriarNotificacaoLinkCopiado(texto, iconeId)
         ColorSequenceKeypoint.new(1, Color3.fromRGB(100, 10, 10))
     })
 
-    -- Container centralizado para o texto e o emoji de Verify maior
     local contentContainer = Instance.new("Frame", notifCard)
     contentContainer.Size = UDim2.new(1, -64, 1, -12)
     contentContainer.Position = UDim2.new(0, 26, 0, 6)
@@ -1097,7 +1106,7 @@ local function CriarNotificacaoLinkCopiado(texto, iconeId)
     notifText.Size = UDim2.new(0, 0, 0, 24)
     notifText.BackgroundTransparency = 1
     notifText.Text = texto or "LINK COPIED SUCCESSFULLY"
-    notifText.TextColor3 = Color3.fromRGB(240, 240, 240) -- Mesma cor de título da notificação
+    notifText.TextColor3 = Color3.fromRGB(240, 240, 240) 
     notifText.Font = Enum.Font.GothamBold
     notifText.TextSize = 15
     notifText.TextXAlignment = Enum.TextXAlignment.Left
@@ -1106,7 +1115,7 @@ local function CriarNotificacaoLinkCopiado(texto, iconeId)
     if iconeId then
         local verifyIcon = Instance.new("ImageLabel", contentContainer)
         verifyIcon.LayoutOrder = 2
-        verifyIcon.Size = UDim2.new(0, 24, 0, 24) -- Emoji de verify maior e mais centralizado
+        verifyIcon.Size = UDim2.new(0, 24, 0, 24) 
         verifyIcon.BackgroundTransparency = 1
         verifyIcon.Image = iconeId
         verifyIcon.ZIndex = 204
@@ -1256,31 +1265,34 @@ local function CriarNotificacaoDiscord()
     accentBar.ZIndex = 202
     Instance.new("UICorner", accentBar).CornerRadius = UDim.new(1, 0)
 
+    -- MODIFICAÇÃO: Título centralizado verticalmente
     local notifTitle = Instance.new("TextLabel", notifCard)
-    notifTitle.Size = UDim2.new(1, -76, 0, 22)
-    notifTitle.Position = UDim2.new(0, 26, 0, 10)
+    notifTitle.Size = UDim2.new(1, -76, 0, 20)
+    notifTitle.AnchorPoint = Vector2.new(0, 1)
+    notifTitle.Position = UDim2.new(0, 26, 0.5, 0)
     notifTitle.BackgroundTransparency = 1
     notifTitle.Text = "DISCORD SERVER"
     notifTitle.TextColor3 = Color3.fromRGB(240, 240, 240)
     notifTitle.Font = Enum.Font.GothamBold
-    notifTitle.TextSize = 17.5
+    notifTitle.TextSize = 16
     notifTitle.TextXAlignment = Enum.TextXAlignment.Left
     notifTitle.ZIndex = 203
 
+    -- MODIFICAÇÃO: Descrição centralizada verticalmente
     local notifDesc = Instance.new("TextLabel", notifCard)
-    notifDesc.Size = UDim2.new(1, -100, 0, 40)
-    notifDesc.Position = UDim2.new(0, 26, 0, 36)
+    notifDesc.Size = UDim2.new(1, -100, 0, 20)
+    notifDesc.AnchorPoint = Vector2.new(0, 0)
+    notifDesc.Position = UDim2.new(0, 26, 0.5, 0)
     notifDesc.BackgroundTransparency = 1
     notifDesc.Text = "LINK TO COPY https://discord.gg/rZuYzZ7zvt"
     notifDesc.TextColor3 = Color3.fromRGB(150, 150, 155)
     notifDesc.Font = Enum.Font.Gotham
-    notifDesc.TextSize = 11.5
+    notifDesc.TextSize = 13 -- Unificado com a notificação padrão
     notifDesc.TextXAlignment = Enum.TextXAlignment.Left
-    notifDesc.TextYAlignment = Enum.TextYAlignment.Top
+    notifDesc.TextYAlignment = Enum.TextYAlignment.Center
     notifDesc.TextWrapped = true
     notifDesc.ZIndex = 203
 
-    -- Botão COPY posicionado perfeitamente em cima da barra de progresso no canto direito
     local copyBtn = Instance.new("TextButton", notifCard)
     copyBtn.Size = UDim2.new(0, 70, 0, 24)
     copyBtn.AnchorPoint = Vector2.new(1, 1)
@@ -1301,7 +1313,6 @@ local function CriarNotificacaoDiscord()
                 setclipboard("https://discord.gg/rZuYzZ7zvt")
             end
         end)
-        -- Terceira notificação de confirmação de link copiado (rebaixada)
         CriarNotificacaoLinkCopiado("LINK COPIED SUCCESSFULLY", "rbxthumb://type=Asset&id=118293546444074&w=150&h=150")
     end)
 
@@ -1626,7 +1637,6 @@ local function createToggle(parent, configKey, tabCategory)
     end)
 end
 
--- Removido o contorno indesejado ao clicar na barra de pesquisa
 searchTextBox:GetPropertyChangedSignal("Text"):Connect(function()
     filterToggles(activeTab, searchTextBox.Text)
 end)
@@ -1673,7 +1683,6 @@ end
 
 MinimizeBtn.MouseButton1Click:Connect(function() 
     PlayUI_Click()
-    TweenService:Create(MinimizeBtn, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = Color3.fromRGB(15, 15, 15), BackgroundTransparency = 0.3}):Play()
     TweenService:Create(MinimizeLine, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(160, 160, 160)}):Play()
     SetUIState("MINIMIZED")
 end)
@@ -1688,7 +1697,6 @@ local function AlternarConfirmacao(exibir)
         FloatBtn.Visible = false
         confirmOverlay.Visible = true
         
-        -- Ativa e intensifica o desfoque de fundo
         TweenService:Create(confirmBlur, TweenInfo.new(tempoAnim, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = 28}):Play()
 
         confirmCard.Size = UDim2.new(0, 280, 0, 115)
@@ -1697,7 +1705,6 @@ local function AlternarConfirmacao(exibir)
         TweenService:Create(cardScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
         AplicarFadeSincronizado(confirmCard, false, tempoAnim)
     else
-        -- Remove o desfoque de fundo
         TweenService:Create(confirmBlur, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Size = 0}):Play()
         AplicarFadeSincronizado(confirmCard, true, tempoAnim)
         local sc = confirmCard:FindFirstChildOfClass("UIScale")
@@ -1734,17 +1741,16 @@ btnYes.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
+-- Modificação do hover: Remove o fundo de cor dos botões da UI principal
 local function AplicarEfeitoFisicoBotao(btn, hoverColor)
     btn.MouseEnter:Connect(function()
         if UIState ~= "OPEN" then return end 
-        TweenService:Create(btn, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = Color3.fromRGB(30, 30, 30), BackgroundTransparency = 0.1}):Play()
         if btn.Name == "ExpandBtn" then TweenService:Create(ExpandStroke, TweenInfo.new(0.15), {Color = hoverColor}):Play()
         elseif btn.Name == "MinimizeBtn" then TweenService:Create(MinimizeLine, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play()
         elseif btn.Name == "CloseBtn" then TweenService:Create(CloseLine1, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play(); TweenService:Create(CloseLine2, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play() end
     end)
     btn.MouseLeave:Connect(function()
         if UIState ~= "OPEN" then return end 
-        TweenService:Create(btn, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {BackgroundColor3 = Color3.fromRGB(15, 15, 15), BackgroundTransparency = 0.3}):Play()
         if btn.Name == "ExpandBtn" then TweenService:Create(ExpandStroke, TweenInfo.new(0.15), {Color = Color3.fromRGB(160, 160, 160)}):Play()
         elseif btn.Name == "MinimizeBtn" then TweenService:Create(MinimizeLine, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(160, 160, 160)}):Play()
         elseif btn.Name == "CloseBtn" then TweenService:Create(CloseLine1, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(160, 160, 160)}):Play(); TweenService:Create(CloseLine2, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(160, 160, 160)}):Play() end
