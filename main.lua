@@ -564,7 +564,7 @@ topButtons.ZIndex = 10
 
 local ControlsFrame = Instance.new("Frame", topButtons)
 ControlsFrame.Size = UDim2.new(0, 110, 1, 0)
-ControlsFrame.Position = UDim2.new(1, -120, 0, 6) -- Centralizado melhor e em cima da toggle
+ControlsFrame.Position = UDim2.new(1, -120, 0, 6)
 ControlsFrame.BackgroundTransparency = 1
 ControlsFrame.ZIndex = 11
 
@@ -575,7 +575,6 @@ UIListTop.VerticalAlignment = Enum.VerticalAlignment.Center
 UIListTop.Padding = UDim.new(0, 6)
 UIListTop.SortOrder = Enum.SortOrder.LayoutOrder
 
--- Botões aumentados de tamanho (30x30), agora sem fundo
 local MinimizeBtn = Instance.new("TextButton", ControlsFrame)
 MinimizeBtn.Name = "MinimizeBtn"
 MinimizeBtn.LayoutOrder = 1
@@ -834,13 +833,17 @@ local ActiveNotifications = {}
 local NOTIF_DURATION = 10
 
 local function UpdateNotifications()
-    for i, notif in ipairs(ActiveNotifications) do
+    local currentY = -24
+    for _, notif in ipairs(ActiveNotifications) do
         if notif and notif.Parent then
-            local h = notif.AbsoluteSize.Y > 0 and notif.AbsoluteSize.Y or 96
-            local targetY = -24 - ((i - 1) * (h + 12))
+            local h = notif.Size.Y.Offset
+            if h == 0 then
+                h = (notif.Name == "NotifHolderLink") and 64 or 96
+            end
             TweenService:Create(notif, TweenInfo.new(0.3, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {
-                Position = UDim2.new(1, -20, 1, targetY)
+                Position = UDim2.new(1, -20, 1, currentY)
             }):Play()
+            currentY = currentY - h - 12
         end
     end
 end
@@ -892,7 +895,6 @@ local function CriarNotificacao(titulo, descricao, iconeId)
         ColorSequenceKeypoint.new(1, Color3.fromRGB(100, 10, 10))
     })
 
-    -- MODIFICAÇÃO: Título centralizado verticalmente perante à accentBar
     local notifTitle = Instance.new("TextLabel", notifCard)
     notifTitle.Size = UDim2.new(1, -76, 0, 20)
     notifTitle.AnchorPoint = Vector2.new(0, 1)
@@ -905,7 +907,6 @@ local function CriarNotificacao(titulo, descricao, iconeId)
     notifTitle.TextXAlignment = Enum.TextXAlignment.Left
     notifTitle.ZIndex = 203
 
-    -- MODIFICAÇÃO: Descrição centralizada verticalmente
     local descContainer = Instance.new("Frame", notifCard)
     descContainer.Size = UDim2.new(1, -40, 0, 20)
     descContainer.AnchorPoint = Vector2.new(0, 0)
@@ -925,7 +926,7 @@ local function CriarNotificacao(titulo, descricao, iconeId)
     notifDesc.Text = descricao or ""
     notifDesc.TextColor3 = Color3.fromRGB(150, 150, 155)
     notifDesc.Font = Enum.Font.Gotham
-    notifDesc.TextSize = 13 -- Unificado com a notificação do Discord
+    notifDesc.TextSize = 13 
     notifDesc.TextXAlignment = Enum.TextXAlignment.Left
     notifDesc.TextYAlignment = Enum.TextYAlignment.Center
     notifDesc.ZIndex = 203
@@ -1040,7 +1041,7 @@ local function CriarNotificacao(titulo, descricao, iconeId)
     task.delay(NOTIF_DURATION + 0.1, function() DismissNotif() end)
 end
 
--- ==================== NOTIFICAÇÃO DE LINK COPIADO (REBAIXADA) ====================
+-- ==================== NOTIFICAÇÃO DE LINK COPIADO ====================
 local function CriarNotificacaoLinkCopiado(texto, iconeId)
     local notifHolder = Instance.new("Frame", screenGui)
     notifHolder.Name = "NotifHolderLink"
@@ -1223,7 +1224,7 @@ local function CriarNotificacaoLinkCopiado(texto, iconeId)
     task.delay(NOTIF_DURATION + 0.1, function() DismissNotif() end)
 end
 
--- ==================== NOTIFICAÇÃO DISCORD COM BOTÃO "COPY" ====================
+-- ==================== NOTIFICAÇÃO DISCORD ====================
 local function CriarNotificacaoDiscord()
     local notifHolder = Instance.new("Frame", screenGui)
     notifHolder.Name = "NotifHolderDiscord"
@@ -1265,7 +1266,6 @@ local function CriarNotificacaoDiscord()
     accentBar.ZIndex = 202
     Instance.new("UICorner", accentBar).CornerRadius = UDim.new(1, 0)
 
-    -- MODIFICAÇÃO: Título centralizado verticalmente
     local notifTitle = Instance.new("TextLabel", notifCard)
     notifTitle.Size = UDim2.new(1, -76, 0, 20)
     notifTitle.AnchorPoint = Vector2.new(0, 1)
@@ -1278,16 +1278,15 @@ local function CriarNotificacaoDiscord()
     notifTitle.TextXAlignment = Enum.TextXAlignment.Left
     notifTitle.ZIndex = 203
 
-    -- MODIFICAÇÃO: Descrição centralizada verticalmente
     local notifDesc = Instance.new("TextLabel", notifCard)
     notifDesc.Size = UDim2.new(1, -100, 0, 20)
     notifDesc.AnchorPoint = Vector2.new(0, 0)
     notifDesc.Position = UDim2.new(0, 26, 0.5, 0)
     notifDesc.BackgroundTransparency = 1
-    notifDesc.Text = "LINK TO COPY https://discord.gg/rZuYzZ7zvt"
+    notifDesc.Text = "Click to copy. https://discord.gg/rZuYzZ7zvt"
     notifDesc.TextColor3 = Color3.fromRGB(150, 150, 155)
     notifDesc.Font = Enum.Font.Gotham
-    notifDesc.TextSize = 13 -- Unificado com a notificação padrão
+    notifDesc.TextSize = 13 
     notifDesc.TextXAlignment = Enum.TextXAlignment.Left
     notifDesc.TextYAlignment = Enum.TextYAlignment.Center
     notifDesc.TextWrapped = true
@@ -1298,7 +1297,7 @@ local function CriarNotificacaoDiscord()
     copyBtn.AnchorPoint = Vector2.new(1, 1)
     copyBtn.Position = UDim2.new(1, -14, 1, -14) 
     copyBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
-    copyBtn.Text = "COPY"
+    copyBtn.Text = "LINK"
     copyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     copyBtn.Font = Enum.Font.GothamBold
     copyBtn.TextSize = 12
@@ -1313,7 +1312,7 @@ local function CriarNotificacaoDiscord()
                 setclipboard("https://discord.gg/rZuYzZ7zvt")
             end
         end)
-        CriarNotificacaoLinkCopiado("LINK COPIED SUCCESSFULLY", "rbxthumb://type=Asset&id=118293546444074&w=150&h=150")
+        CriarNotificacaoLinkCopiado("LINK COPIED SUCCESSFULLY!", "rbxthumb://type=Asset&id=118293546444074&w=150&h=150")
     end)
 
     local notifCloseBtn = Instance.new("TextButton", notifCard)
@@ -1660,6 +1659,7 @@ SetUIState = function(newState)
         mainWrapper.Size = UDim2.new(0, 480, 0, 260)
         AplicarFadeSincronizado(mainWrapper, true, 0)
         AplicarFadeSincronizado(mainWrapper, false, tempoAnim)
+        selectTab("Player")
         
         local openTween = TweenService:Create(mainWrapper, windowAnim, {Size = isExpanded and UDim2.new(0, 800, 0, 480) or UDim2.new(0, 640, 0, 360)})
         openTween:Play()
@@ -1741,7 +1741,6 @@ btnYes.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
--- Modificação do hover: Remove o fundo de cor dos botões da UI principal
 local function AplicarEfeitoFisicoBotao(btn, hoverColor)
     btn.MouseEnter:Connect(function()
         if UIState ~= "OPEN" then return end 
@@ -1800,6 +1799,8 @@ local function ExecutarIntroAkat()
     mainWrapper.Visible = true
     FloatBtn.Visible = true
     UIState = "OPEN"
+    selectTab("Player")
+    
     local MainScale = Instance.new("UIScale", mainWrapper); MainScale.Scale = 0.85
     AplicarFadeSincronizado(mainWrapper, true, 0)
     AplicarFadeSincronizado(mainWrapper, false, 0.35)
