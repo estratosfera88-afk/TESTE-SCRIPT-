@@ -129,7 +129,6 @@ FloatBtn.BackgroundColor3 = Color3.fromRGB(15, 0, 0)
 FloatBtn.Visible = false
 FloatBtn.ZIndex = 100
 FloatBtn.ClipsDescendants = false
--- CORREÇÃO 4: Desativar AutoButtonColor para evitar branqueamento ao clicar
 FloatBtn.AutoButtonColor = false
 if not FloatBtn:FindFirstChildOfClass("UICorner") then Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(0, 8) end
 
@@ -281,17 +280,12 @@ RedGradientOverlay.BorderSizePixel = 0
 RedGradientOverlay.ZIndex = 4
 Instance.new("UICorner", RedGradientOverlay).CornerRadius = UDim.new(0, 10)
 
--- CORREÇÃO 2: Gradiente com cores duplicadas no início e fim para loop suave sem artefatos.
--- O Roblox interpola linearmente entre os keypoints. Ao girar de 0→360, a emenda entre
--- o último (time=1) e o primeiro (time=0) cria uma faixa estranha se as cores forem diferentes.
--- Solução: usar um gradiente cônico simulado com as cores espelhadas (ex: A→B→A),
--- garantindo que o ponto 0 e o ponto 1 tenham a mesma cor — a emenda fica invisível.
 local SingleRedGrad = Instance.new("UIGradient", RedGradientOverlay)
 SingleRedGrad.Rotation = 90
 SingleRedGrad.Color = ColorSequence.new({
 	ColorSequenceKeypoint.new(0,   Color3.fromRGB(40, 0, 5)),
 	ColorSequenceKeypoint.new(0.5, Color3.fromRGB(120, 15, 22)),
-	ColorSequenceKeypoint.new(1,   Color3.fromRGB(40, 0, 5))   -- mesmo que time=0: emenda invisível
+	ColorSequenceKeypoint.new(1,   Color3.fromRGB(40, 0, 5))
 })
 
 RunService.RenderStepped:Connect(function()
@@ -318,14 +312,14 @@ local HeaderLeft = Instance.new("Frame", LeftPanel)
 HeaderLeft.Size = UDim2.new(1, 0, 0, 36)
 HeaderLeft.Position = UDim2.new(0, 0, 0, 0)
 HeaderLeft.BackgroundTransparency = 1
-HeaderLeft.ZIndex = 10
+HeaderLeft.ZIndex = 20
 
 local HeaderImage = Instance.new("ImageLabel", HeaderLeft)
 HeaderImage.Size = UDim2.new(0, 24, 0, 24)
 HeaderImage.Position = UDim2.new(0, 10, 0.5, -12)
 HeaderImage.BackgroundTransparency = 1
 HeaderImage.Image = "rbxthumb://type=Asset&id=134217291845443&w=150&h=150"
-HeaderImage.ZIndex = 11
+HeaderImage.ZIndex = 21
 
 local title = Instance.new("TextLabel", HeaderLeft)
 title.Size = UDim2.new(1, -44, 0, 16)
@@ -336,7 +330,7 @@ title.TextColor3 = Color3.fromRGB(245, 245, 245)
 title.TextSize = 13
 title.Font = Enum.Font.GothamBold
 title.TextXAlignment = Enum.TextXAlignment.Left
-title.ZIndex = 11
+title.ZIndex = 21
 
 local subtitle = Instance.new("TextLabel", HeaderLeft)
 subtitle.Size = UDim2.new(1, -44, 0, 12)
@@ -348,7 +342,7 @@ subtitle.TextTransparency = 0.2
 subtitle.TextSize = 9.5
 subtitle.Font = Enum.Font.Gotham
 subtitle.TextXAlignment = Enum.TextXAlignment.Left
-subtitle.ZIndex = 11
+subtitle.ZIndex = 21
 
 -- ==================== BARRA DE PESQUISA ====================
 local SearchContainer = Instance.new("Frame", LeftPanel)
@@ -357,7 +351,7 @@ SearchContainer.Size = UDim2.new(1, -16, 0, 36)
 SearchContainer.Position = UDim2.new(0, 8, 0, 44)
 SearchContainer.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
 SearchContainer.BackgroundTransparency = 0.85
-SearchContainer.ZIndex = 10
+SearchContainer.ZIndex = 20
 Instance.new("UICorner", SearchContainer).CornerRadius = UDim.new(0, 8)
 
 local searchStroke = Instance.new("UIStroke", SearchContainer)
@@ -369,7 +363,7 @@ local SearchIconFrame = Instance.new("Frame", SearchContainer)
 SearchIconFrame.Size = UDim2.new(0, 14, 0, 14)
 SearchIconFrame.Position = UDim2.new(0, 14, 0.5, -7)
 SearchIconFrame.BackgroundTransparency = 1
-SearchIconFrame.ZIndex = 12
+SearchIconFrame.ZIndex = 21
 
 local scCircle = Instance.new("Frame", SearchIconFrame)
 scCircle.Size = UDim2.new(0, 8, 0, 8)
@@ -397,7 +391,7 @@ searchTextBox.TextColor3 = Color3.fromRGB(230, 230, 230)
 searchTextBox.Font = Enum.Font.GothamMedium
 searchTextBox.TextSize = 13
 searchTextBox.TextXAlignment = Enum.TextXAlignment.Left
-searchTextBox.ZIndex = 12
+searchTextBox.ZIndex = 22
 searchTextBox.Active = true
 searchTextBox.ClearTextOnFocus = false
 
@@ -438,7 +432,7 @@ sharedActiveBar.Position = UDim2.new(0, 11, 0, 0)
 sharedActiveBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 sharedActiveBar.BorderSizePixel = 0
 sharedActiveBar.Visible = false
-sharedActiveBar.ZIndex = 15
+sharedActiveBar.ZIndex = 8
 sharedActiveBar.ClipsDescendants = false
 Instance.new("UICorner", sharedActiveBar).CornerRadius = UDim.new(1, 0)
 
@@ -457,7 +451,7 @@ UserProfileFrame.Position = UDim2.new(0, 8, 1, -63)
 UserProfileFrame.BackgroundColor3 = Color3.fromRGB(20, 12, 12)
 UserProfileFrame.BackgroundTransparency = 0.35
 UserProfileFrame.BorderSizePixel = 0
-UserProfileFrame.ZIndex = 10
+UserProfileFrame.ZIndex = 20
 Instance.new("UICorner", UserProfileFrame).CornerRadius = UDim.new(0, 8)
 
 local userStroke = Instance.new("UIStroke", UserProfileFrame)
@@ -474,7 +468,7 @@ AvatarImage.Size = UDim2.new(0, 34, 0, 34)
 AvatarImage.Position = UDim2.new(0, 10, 0.5, -17)
 AvatarImage.BackgroundTransparency = 1
 AvatarImage.Image = "rbxthumb://type=AvatarHeadShot&id=" .. player.UserId .. "&w=150&h=150"
-AvatarImage.ZIndex = 11
+AvatarImage.ZIndex = 21
 Instance.new("UICorner", AvatarImage).CornerRadius = UDim.new(1, 0)
 
 local AvatarStroke = Instance.new("UIStroke", AvatarImage)
@@ -491,7 +485,7 @@ StatusIndicator.Size = UDim2.new(0, 9, 0, 9)
 StatusIndicator.Position = UDim2.new(1, -7, 1, -7)
 StatusIndicator.BackgroundColor3 = Color3.fromRGB(40, 220, 80)
 StatusIndicator.BorderSizePixel = 0
-StatusIndicator.ZIndex = 14
+StatusIndicator.ZIndex = 22
 Instance.new("UICorner", StatusIndicator).CornerRadius = UDim.new(1, 0)
 local statusStroke = Instance.new("UIStroke", StatusIndicator)
 statusStroke.Color = Color3.fromRGB(15, 5, 5)
@@ -507,7 +501,7 @@ DisplayNameLabel.Font = Enum.Font.GothamBold
 DisplayNameLabel.TextSize = 13.5
 DisplayNameLabel.TextXAlignment = Enum.TextXAlignment.Left
 DisplayNameLabel.TextTruncate = Enum.TextTruncate.AtEnd
-DisplayNameLabel.ZIndex = 11
+DisplayNameLabel.ZIndex = 21
 
 local UsernameLabel = Instance.new("TextLabel", UserProfileFrame)
 UsernameLabel.Size = UDim2.new(1, -82, 0, 14)
@@ -519,7 +513,7 @@ UsernameLabel.Font = Enum.Font.Gotham
 UsernameLabel.TextSize = 11.5
 UsernameLabel.TextXAlignment = Enum.TextXAlignment.Left
 UsernameLabel.TextTruncate = Enum.TextTruncate.AtEnd
-UsernameLabel.ZIndex = 11
+UsernameLabel.ZIndex = 21
 
 local PrivacyBtn = Instance.new("ImageButton", UserProfileFrame)
 PrivacyBtn.Size = UDim2.new(0, 20, 0, 20)
@@ -527,8 +521,7 @@ PrivacyBtn.Position = UDim2.new(1, -26, 0.5, -10)
 PrivacyBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 PrivacyBtn.BackgroundTransparency = 0.2
 PrivacyBtn.BorderSizePixel = 0
-PrivacyBtn.ZIndex = 12
--- CORREÇÃO 4: Desativar AutoButtonColor em todos os ImageButtons
+PrivacyBtn.ZIndex = 22
 PrivacyBtn.AutoButtonColor = false
 Instance.new("UICorner", PrivacyBtn).CornerRadius = UDim.new(0, 5)
 local privStroke = Instance.new("UIStroke", PrivacyBtn)
@@ -542,7 +535,7 @@ PrivacyIcon.Position = UDim2.new(0, 3, 0, 3)
 PrivacyIcon.BackgroundTransparency = 1
 PrivacyIcon.Image = "rbxthumb://type=Asset&id=103096515071530&w=150&h=150"
 PrivacyIcon.ImageColor3 = Color3.fromRGB(255, 255, 255)
-PrivacyIcon.ZIndex = 13
+PrivacyIcon.ZIndex = 23
 
 local isPrivate = false
 PrivacyBtn.MouseButton1Click:Connect(function()
@@ -567,55 +560,49 @@ local topButtons = Instance.new("Frame", RightPanel)
 topButtons.Size = UDim2.new(1, -12, 0, 36)
 topButtons.Position = UDim2.new(0, 0, 0, 0)
 topButtons.BackgroundTransparency = 1
-topButtons.ZIndex = 10
+topButtons.ZIndex = 20
 
 local ControlsFrame = Instance.new("Frame", topButtons)
 ControlsFrame.Size = UDim2.new(0, 130, 1, 0)
 ControlsFrame.Position = UDim2.new(1, -130, 0, 0)
 ControlsFrame.BackgroundTransparency = 1
-ControlsFrame.ZIndex = 11
+ControlsFrame.ZIndex = 25
 
 local UIListTop = Instance.new("UIListLayout", ControlsFrame)
 UIListTop.FillDirection = Enum.FillDirection.Horizontal
 UIListTop.HorizontalAlignment = Enum.HorizontalAlignment.Right
 UIListTop.VerticalAlignment = Enum.VerticalAlignment.Center
-UIListTop.Padding = UDim.new(0, 14)
+UIListTop.Padding = UDim.new(0, 2)
 UIListTop.SortOrder = Enum.SortOrder.LayoutOrder
 
-local TOP_BTN_COLOR = Color3.fromRGB(170, 170, 170)
+local TOP_BTN_COLOR = Color3.fromRGB(150, 150, 150)
 
-local MinimizeBtn = Instance.new("ImageButton", ControlsFrame)
-MinimizeBtn.Name = "MinimizeBtn"
-MinimizeBtn.LayoutOrder = 1
-MinimizeBtn.Size = UDim2.new(0, 16, 0, 16)
-MinimizeBtn.BackgroundTransparency = 1
-MinimizeBtn.Image = "rbxthumb://type=Asset&id=97090905107587&w=150&h=150"
-MinimizeBtn.ImageColor3 = TOP_BTN_COLOR
-MinimizeBtn.ZIndex = 11
--- CORREÇÃO 4: Desativar AutoButtonColor para evitar branqueamento ao clicar
-MinimizeBtn.AutoButtonColor = false
+-- Função de criação dos botões do topo com área de clique maior (28x28)
+local function CriarBotaoTopo(nome, idAsset, ordem)
+	local btn = Instance.new("ImageButton", ControlsFrame)
+	btn.Name = nome
+	btn.LayoutOrder = ordem
+	btn.Size = UDim2.new(0, 28, 0, 28)
+	btn.BackgroundTransparency = 1
+	btn.ZIndex = 25
+	btn.AutoButtonColor = false
 
-local ExpandBtn = Instance.new("ImageButton", ControlsFrame)
-ExpandBtn.Name = "ExpandBtn"
-ExpandBtn.LayoutOrder = 2
-ExpandBtn.Size = UDim2.new(0, 16, 0, 16)
-ExpandBtn.BackgroundTransparency = 1
-ExpandBtn.Image = "rbxthumb://type=Asset&id=78749046909931&w=150&h=150"
-ExpandBtn.ImageColor3 = TOP_BTN_COLOR
-ExpandBtn.ZIndex = 11
--- CORREÇÃO 4: Desativar AutoButtonColor
-ExpandBtn.AutoButtonColor = false
+	local icon = Instance.new("ImageLabel", btn)
+	icon.Name = "Icon"
+	icon.AnchorPoint = Vector2.new(0.5, 0.5)
+	icon.Position = UDim2.new(0.5, 0, 0.5, 0)
+	icon.Size = UDim2.new(0, 14, 0, 14)
+	icon.BackgroundTransparency = 1
+	icon.Image = idAsset
+	icon.ImageColor3 = TOP_BTN_COLOR
+	icon.ZIndex = 26
 
-local CloseBtn = Instance.new("ImageButton", ControlsFrame)
-CloseBtn.Name = "CloseBtn"
-CloseBtn.LayoutOrder = 3
-CloseBtn.Size = UDim2.new(0, 16, 0, 16)
-CloseBtn.BackgroundTransparency = 1
-CloseBtn.Image = "rbxthumb://type=Asset&id=70710316269357&w=150&h=150"
-CloseBtn.ImageColor3 = TOP_BTN_COLOR
-CloseBtn.ZIndex = 11
--- CORREÇÃO 4: Desativar AutoButtonColor
-CloseBtn.AutoButtonColor = false
+	return btn, icon
+end
+
+local MinimizeBtn, MinimizeIcon = CriarBotaoTopo("MinimizeBtn", "rbxthumb://type=Asset&id=97090905107587&w=150&h=150", 1)
+local ExpandBtn, ExpandIcon     = CriarBotaoTopo("ExpandBtn",   "rbxthumb://type=Asset&id=78749046909931&w=150&h=150", 2)
+local CloseBtn, CloseIcon       = CriarBotaoTopo("CloseBtn",    "rbxthumb://type=Asset&id=70710316269357&w=150&h=150", 3)
 
 local BadgeFrame = Instance.new("Frame", RightPanel)
 BadgeFrame.Name = "BadgeFrame"
@@ -808,22 +795,19 @@ AplicarFadeSincronizado(confirmCard, true, 0)
 local ActiveNotifications = {}
 local NOTIF_DURATION = 10
 
--- CORREÇÃO 3: Sistema de posicionamento corrigido.
--- O problema era que notif.AbsoluteSize.Y retorna 0 quando o frame acabou de
--- ser inserido (ainda não renderizado). O fallback usava lógica de nome que
--- podia falhar. Agora usamos os tamanhos fixos declarados (size.Y.Offset)
--- diretamente, que sempre estão disponíveis mesmo antes da renderização.
+-- CORREÇÃO DO EMPILHAMENTO DE NOTIFICAÇÕES:
+-- Calcula a posição vertical somando as alturas reais e individuais de cada notificação.
 local function UpdateNotifications()
+	local currentY = -24
 	for i, notif in ipairs(ActiveNotifications) do
 		if notif and notif.Parent then
-			-- Usa o tamanho declarado do UDim2 (Size.Y.Offset) em vez de AbsoluteSize.Y
-			-- para garantir cálculo correto antes da primeira renderização do frame
 			local h = notif.Size.Y.Offset
-			if h == 0 then h = 96 end -- fallback de segurança
-			local targetY = -24 - ((i - 1) * (h + 12))
+			if h == 0 then h = 96 end
+			local targetY = currentY
 			TweenService:Create(notif, TweenInfo.new(0.3, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {
 				Position = UDim2.new(1, -20, 1, targetY)
 			}):Play()
+			currentY = currentY - (h + 12)
 		end
 	end
 end
@@ -1001,7 +985,7 @@ local function CriarNotificacao(titulo, descricao, iconeId)
 	task.delay(NOTIF_DURATION + 0.1, function() DismissNotif() end)
 end
 
--- ==================== NOTIFICAÇÃO DE LINK COPIADO (REBAIXADA) ====================
+-- ==================== NOTIFICAÇÃO DE LINK COPIADO ====================
 local function CriarNotificacaoLinkCopiado(texto, iconeId)
 	local notifHolder = Instance.new("Frame", screenGui)
 	notifHolder.Name = "NotifHolderLink"
@@ -1412,18 +1396,18 @@ local function filterToggles(currentActiveTab, query)
 	task.delay(0.05, function() pcall(UpdateCanvasSize) end)
 end
 
--- CORREÇÃO 1: UpdateActiveBarPosition corrigida.
--- O problema era que AbsolutePosition só é calculado após o layout ser aplicado.
--- Quando chamado sem animação (animar=false) no momento em que a UI abre,
--- o frame pode ainda não ter posição absoluta correta.
--- Solução: aguardar um frame (RunService.RenderStepped) antes de calcular
--- quando animar=false para garantir que o layout já foi computado.
+-- CORREÇÃO DA ACTIVEBAR:
+-- Garante que o cálculo ocorra apenas com o layout pronto e posições absolutas válidas.
 local function UpdateActiveBarPosition(animar)
 	local targetBtn = tabButtons[activeTab]
 	if not targetBtn or not sharedActiveBar.Visible then return end
 
 	local function aplicar()
 		if not targetBtn or not targetBtn.Parent then return end
+		if targetBtn.AbsoluteSize.Y == 0 or targetBtn.AbsolutePosition.Y == 0 or LeftPanel.AbsolutePosition.Y == 0 then
+			task.defer(aplicar)
+			return
+		end
 		local targetCenterY = targetBtn.AbsolutePosition.Y + (targetBtn.AbsoluteSize.Y / 2)
 		local parentTopY = LeftPanel.AbsolutePosition.Y
 		local targetYPos = targetCenterY - parentTopY
@@ -1437,12 +1421,7 @@ local function UpdateActiveBarPosition(animar)
 		end
 	end
 
-	if animar then
-		aplicar()
-	else
-		-- Aguarda o próximo frame para garantir layout calculado
-		task.defer(aplicar)
-	end
+	task.defer(aplicar)
 end
 
 TabsContainer:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
@@ -1653,14 +1632,11 @@ SetUIState = function(newState)
 	end
 end
 
--- CORREÇÃO 5: Click flash nos botões do topo.
--- Função utilitária que aplica flash rápido de ImageColor3 sem interferir
--- nas conexões de hover já existentes. Usa reversão automática (Reverses=true).
-local function AplicarClickFlash(btn)
+-- Flash de clique para os botões do topo direcionado ao ícone interno
+local function AplicarClickFlash(btn, icon)
 	btn.MouseButton1Click:Connect(function()
-		-- Flash rápido: vai para branco e volta automaticamente
 		local flashInfo = TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, 0, true, 0)
-		TweenService:Create(btn, flashInfo, {ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+		TweenService:Create(icon, flashInfo, {ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
 	end)
 end
 
@@ -1724,26 +1700,25 @@ btnYes.MouseButton1Click:Connect(function()
 	screenGui:Destroy()
 end)
 
--- Hover nos botões do topo (mantido igual ao original)
-local function AplicarEfeitoFisicoBotao(btn, hoverColor)
+-- Hover nos ícones dos botões do topo
+local function AplicarEfeitoFisicoBotao(btn, icon, hoverColor)
 	btn.MouseEnter:Connect(function()
 		if UIState ~= "OPEN" then return end
-		TweenService:Create(btn, TweenInfo.new(0.15), {ImageColor3 = hoverColor}):Play()
+		TweenService:Create(icon, TweenInfo.new(0.15), {ImageColor3 = hoverColor}):Play()
 	end)
 	btn.MouseLeave:Connect(function()
 		if UIState ~= "OPEN" then return end
-		TweenService:Create(btn, TweenInfo.new(0.15), {ImageColor3 = TOP_BTN_COLOR}):Play()
+		TweenService:Create(icon, TweenInfo.new(0.15), {ImageColor3 = TOP_BTN_COLOR}):Play()
 	end)
 end
 
-AplicarEfeitoFisicoBotao(MinimizeBtn, Color3.fromRGB(255, 255, 255))
-AplicarEfeitoFisicoBotao(ExpandBtn, Color3.fromRGB(255, 255, 255))
-AplicarEfeitoFisicoBotao(CloseBtn, Color3.fromRGB(255, 60, 60))
+AplicarEfeitoFisicoBotao(MinimizeBtn, MinimizeIcon, Color3.fromRGB(255, 255, 255))
+AplicarEfeitoFisicoBotao(ExpandBtn, ExpandIcon, Color3.fromRGB(255, 255, 255))
+AplicarEfeitoFisicoBotao(CloseBtn, CloseIcon, Color3.fromRGB(255, 60, 60))
 
--- CORREÇÃO 5: Aplicar click flash nos três botões do topo
-AplicarClickFlash(MinimizeBtn)
-AplicarClickFlash(ExpandBtn)
-AplicarClickFlash(CloseBtn)
+AplicarClickFlash(MinimizeBtn, MinimizeIcon)
+AplicarClickFlash(ExpandBtn, ExpandIcon)
+AplicarClickFlash(CloseBtn, CloseIcon)
 
 createTabBtn("Player")
 createTabBtn("Combat")
@@ -1794,8 +1769,6 @@ local function ExecutarIntroAkat()
 	FloatBtn.Size = UDim2.new(0, 0, 0, 0)
 	TweenService:Create(FloatBtn, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 44, 0, 44)}):Play()
 
-	selectTab("Player")
-
 	CriarNotificacao(
 		"AKATSUKI SCRIPTS",
 		"MM2 Script carregado com sucesso. Bem-vindo, " .. player.DisplayName .. "."
@@ -1805,10 +1778,12 @@ local function ExecutarIntroAkat()
 	CriarNotificacaoDiscord()
 
 	openScale.Completed:Connect(function()
-		selectTab("Player")
 		MainScale:Destroy()
 		IntroFrame:Destroy()
 		Blur:Destroy()
+		task.defer(function()
+			selectTab("Player")
+		end)
 	end)
 end
 
