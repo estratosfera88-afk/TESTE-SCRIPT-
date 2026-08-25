@@ -286,11 +286,6 @@ SingleRedGrad.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(1, Color3.fromRGB(120, 15, 22))
 })
 
-RunService.RenderStepped:Connect(function()
-    local t = os.clock()
-    SingleRedGrad.Rotation = (t * 12) % 360
-end)
-
 local LeftPanel = Instance.new("Frame", MainBackground)
 LeftPanel.Name = "LeftPanel"
 LeftPanel.Size = UDim2.new(0, 220, 1, 0)
@@ -561,8 +556,8 @@ topButtons.BackgroundTransparency = 1
 topButtons.ZIndex = 10
 
 local ControlsFrame = Instance.new("Frame", topButtons)
-ControlsFrame.Size = UDim2.new(0, 110, 1, 0)
-ControlsFrame.Position = UDim2.new(1, -110, 0, 0)
+ControlsFrame.Size = UDim2.new(0, 130, 1, 0)
+ControlsFrame.Position = UDim2.new(1, -130, 0, 0)
 ControlsFrame.BackgroundTransparency = 1
 ControlsFrame.ZIndex = 11
 
@@ -570,69 +565,38 @@ local UIListTop = Instance.new("UIListLayout", ControlsFrame)
 UIListTop.FillDirection = Enum.FillDirection.Horizontal
 UIListTop.HorizontalAlignment = Enum.HorizontalAlignment.Right
 UIListTop.VerticalAlignment = Enum.VerticalAlignment.Center
-UIListTop.Padding = UDim.new(0, 6)
+UIListTop.Padding = UDim.new(0, 14)
 UIListTop.SortOrder = Enum.SortOrder.LayoutOrder
 
--- Botões principais sem fundo (apenas ícones transparentes) e em tamanho normal (22x22)
-local MinimizeBtn = Instance.new("TextButton", ControlsFrame)
+-- Botões principais menores, espaçados e com ícones novos (mesma cor entre si)
+local TOP_BTN_COLOR = Color3.fromRGB(170, 170, 170)
+
+local MinimizeBtn = Instance.new("ImageButton", ControlsFrame)
 MinimizeBtn.Name = "MinimizeBtn"
 MinimizeBtn.LayoutOrder = 1
-MinimizeBtn.Size = UDim2.new(0, 22, 0, 22)
+MinimizeBtn.Size = UDim2.new(0, 16, 0, 16)
 MinimizeBtn.BackgroundTransparency = 1
-MinimizeBtn.Text = ""
+MinimizeBtn.Image = "rbxthumb://type=Asset&id=97090905107587&w=150&h=150"
+MinimizeBtn.ImageColor3 = TOP_BTN_COLOR
 MinimizeBtn.ZIndex = 11
-local MinimizeLine = Instance.new("Frame", MinimizeBtn)
-MinimizeLine.Name = "Line"
-MinimizeLine.AnchorPoint = Vector2.new(0.5, 0.5)
-MinimizeLine.Position = UDim2.new(0.5, 0, 0.5, 0)
-MinimizeLine.Size = UDim2.new(0, 12, 0, 1.5)
-MinimizeLine.BackgroundColor3 = Color3.fromRGB(160, 160, 160)
-MinimizeLine.BorderSizePixel = 0
-MinimizeLine.ZIndex = 12
 
-local ExpandBtn = Instance.new("TextButton", ControlsFrame)
+local ExpandBtn = Instance.new("ImageButton", ControlsFrame)
 ExpandBtn.Name = "ExpandBtn"
 ExpandBtn.LayoutOrder = 2
-ExpandBtn.Size = UDim2.new(0, 22, 0, 22)
+ExpandBtn.Size = UDim2.new(0, 16, 0, 16)
 ExpandBtn.BackgroundTransparency = 1
-ExpandBtn.Text = ""
+ExpandBtn.Image = "rbxthumb://type=Asset&id=78749046909931&w=150&h=150"
+ExpandBtn.ImageColor3 = TOP_BTN_COLOR
 ExpandBtn.ZIndex = 11
-local ExpandSquare = Instance.new("Frame", ExpandBtn)
-ExpandSquare.Name = "Square"
-ExpandSquare.Size = UDim2.new(0, 10, 0, 10)
-ExpandSquare.AnchorPoint = Vector2.new(0.5, 0.5)
-ExpandSquare.Position = UDim2.new(0.5, 0, 0.5, 0)
-ExpandSquare.BackgroundTransparency = 1
-ExpandSquare.ZIndex = 12
-local ExpandStroke = Instance.new("UIStroke", ExpandSquare)
-ExpandStroke.Color = Color3.fromRGB(160, 160, 160)
-ExpandStroke.Thickness = 1.2 
 
-local CloseBtn = Instance.new("TextButton", ControlsFrame)
+local CloseBtn = Instance.new("ImageButton", ControlsFrame)
 CloseBtn.Name = "CloseBtn"
 CloseBtn.LayoutOrder = 3
-CloseBtn.Size = UDim2.new(0, 22, 0, 22)
+CloseBtn.Size = UDim2.new(0, 16, 0, 16)
 CloseBtn.BackgroundTransparency = 1
-CloseBtn.Text = ""
+CloseBtn.Image = "rbxthumb://type=Asset&id=70710316269357&w=150&h=150"
+CloseBtn.ImageColor3 = TOP_BTN_COLOR
 CloseBtn.ZIndex = 11
-local CloseLine1 = Instance.new("Frame", CloseBtn)
-CloseLine1.Name = "Line1"
-CloseLine1.AnchorPoint = Vector2.new(0.5, 0.5)
-CloseLine1.Position = UDim2.new(0.5, 0, 0.5, 0)
-CloseLine1.Size = UDim2.new(0, 12, 0, 1.5)
-CloseLine1.Rotation = 45
-CloseLine1.BackgroundColor3 = Color3.fromRGB(160, 160, 160)
-CloseLine1.BorderSizePixel = 0
-CloseLine1.ZIndex = 12
-local CloseLine2 = Instance.new("Frame", CloseBtn)
-CloseLine2.Name = "Line2"
-CloseLine2.AnchorPoint = Vector2.new(0.5, 0.5)
-CloseLine2.Position = UDim2.new(0.5, 0, 0.5, 0)
-CloseLine2.Size = UDim2.new(0, 12, 0, 1.5)
-CloseLine2.Rotation = -45
-CloseLine2.BackgroundColor3 = Color3.fromRGB(160, 160, 160)
-CloseLine2.BorderSizePixel = 0
-CloseLine2.ZIndex = 12
 
 local BadgeFrame = Instance.new("Frame", RightPanel)
 BadgeFrame.Name = "BadgeFrame"
@@ -641,7 +605,7 @@ BadgeFrame.Position = UDim2.new(0, 12, 0, 9)
 BadgeFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 BadgeFrame.BorderSizePixel = 0
 BadgeFrame.ZIndex = 15
-Instance.new("UICorner", BadgeFrame).CornerRadius = UDim.new(1, 0)
+Instance.new("UICorner", BadgeFrame).CornerRadius = UDim.new(0, 8)
 
 local badgeStroke = Instance.new("UIStroke", BadgeFrame)
 badgeStroke.Thickness = 0.9
@@ -822,18 +786,41 @@ btnNo.MouseLeave:Connect(function() TweenService:Create(btnNo, TweenInfo.new(0.1
 AplicarFadeSincronizado(confirmCard, true, 0) 
 
 -- ==================== SISTEMA DE NOTIFICAÇÃO (STACK / FILA) ====================
-local ActiveNotifications = {}
-local NOTIF_DURATION = 10
-
 local function UpdateNotifications()
+    local currentOffset = 24
+    local GAP = 10
+
     for i, notif in ipairs(ActiveNotifications) do
         if notif and notif.Parent then
-            -- Altura adaptativa correta (64px para link copiado, 96px para as demais) eliminando o espaçamento indesejado
-            local h = notif.AbsoluteSize.Y > 0 and notif.AbsoluteSize.Y or (notif.Name == "NotifHolderLink" and 64 or 96)
-            local targetY = -24 - ((i - 1) * (h + 12))
-            TweenService:Create(notif, TweenInfo.new(0.3, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {
-                Position = UDim2.new(1, -20, 1, targetY)
-            }):Play()
+
+            local height = notif.AbsoluteSize.Y
+
+            if height <= 0 then
+                height = (notif.Name == "NotifHolderLink")
+                    and 64
+                    or 96
+            end
+
+            local targetY = -currentOffset
+
+            TweenService:Create(
+                notif,
+                TweenInfo.new(
+                    0.3,
+                    Enum.EasingStyle.Cubic,
+                    Enum.EasingDirection.Out
+                ),
+                {
+                    Position = UDim2.new(
+                        1,
+                        -20,
+                        1,
+                        targetY
+                    )
+                }
+            ):Play()
+
+            currentOffset += height + GAP
         end
     end
 end
@@ -1427,25 +1414,60 @@ local function filterToggles(currentActiveTab, query)
     task.delay(0.05, function() pcall(UpdateCanvasSize) end)
 end
 
-local function UpdateActiveBarPosition(animar)
+local function UpdateActiveBarPosition(animate)
     local targetBtn = tabButtons[activeTab]
-    if not targetBtn or not sharedActiveBar.Visible then return end
 
-    local targetCenterY = targetBtn.AbsolutePosition.Y + (targetBtn.AbsoluteSize.Y / 2)
-    local parentTopY = LeftPanel.AbsolutePosition.Y
-    local targetYPos = targetCenterY - parentTopY
+    if not targetBtn or not targetBtn.Visible then
+        sharedActiveBar.Visible = false
+        return
+    end
 
-    if animar then
-        TweenService:Create(sharedActiveBar, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-            Position = UDim2.new(0, 11, 0, targetYPos) 
-        }):Play()
+    local targetCenterY =
+        targetBtn.AbsolutePosition.Y +
+        (targetBtn.AbsoluteSize.Y * 0.5)
+
+    local panelTop =
+        LeftPanel.AbsolutePosition.Y
+
+    local targetY =
+        targetCenterY - panelTop
+
+    sharedActiveBar.Visible = true
+
+    if animate then
+        TweenService:Create(
+            sharedActiveBar,
+            TweenInfo.new(
+                0.25,
+                Enum.EasingStyle.Quint,
+                Enum.EasingDirection.Out
+            ),
+            {
+                Position = UDim2.new(0, 11, 0, targetY)
+            }
+        ):Play()
     else
-        sharedActiveBar.Position = UDim2.new(0, 11, 0, targetYPos)
+        sharedActiveBar.Position =
+            UDim2.new(0, 11, 0, targetY)
     end
 end
 
 TabsContainer:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
-    UpdateActiveBarPosition(false)
+    task.defer(function()
+        UpdateActiveBarPosition(false)
+    end)
+end)
+
+TabsContainer:GetPropertyChangedSignal("AbsolutePosition"):Connect(function()
+    task.defer(function()
+        UpdateActiveBarPosition(false)
+    end)
+end)
+
+TabsContainer:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+    task.defer(function()
+        UpdateActiveBarPosition(false)
+    end)
 end)
 
 local function selectTab(tabName)
@@ -1714,25 +1736,11 @@ end)
 local function AplicarEfeitoFisicoBotao(btn, hoverColor)
     btn.MouseEnter:Connect(function()
         if UIState ~= "OPEN" then return end 
-        if btn.Name == "ExpandBtn" then 
-            TweenService:Create(ExpandStroke, TweenInfo.new(0.15), {Color = hoverColor}):Play()
-        elseif btn.Name == "MinimizeBtn" then 
-            TweenService:Create(MinimizeLine, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play()
-        elseif btn.Name == "CloseBtn" then 
-            TweenService:Create(CloseLine1, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play()
-            TweenService:Create(CloseLine2, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play() 
-        end
+        TweenService:Create(btn, TweenInfo.new(0.15), {ImageColor3 = hoverColor}):Play()
     end)
     btn.MouseLeave:Connect(function()
         if UIState ~= "OPEN" then return end 
-        if btn.Name == "ExpandBtn" then 
-            TweenService:Create(ExpandStroke, TweenInfo.new(0.15), {Color = Color3.fromRGB(160, 160, 160)}):Play()
-        elseif btn.Name == "MinimizeBtn" then 
-            TweenService:Create(MinimizeLine, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(160, 160, 160)}):Play()
-        elseif btn.Name == "CloseBtn" then 
-            TweenService:Create(CloseLine1, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(160, 160, 160)}):Play()
-            TweenService:Create(CloseLine2, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(160, 160, 160)}):Play() 
-        end
+        TweenService:Create(btn, TweenInfo.new(0.15), {ImageColor3 = TOP_BTN_COLOR}):Play()
     end)
 end
 
