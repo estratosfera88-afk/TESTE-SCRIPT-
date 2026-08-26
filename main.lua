@@ -990,12 +990,30 @@ end)
 -- ==================== INICIALIZADOR DA UI EXTERNA ====================
 task.spawn(function()
     local uiRawUrl = "https://raw.githubusercontent.com/estratosfera88-afk/Ui-do-teste/refs/heads/main/ui.lua"
-    
-    local success, err = pcall(function()
-        loadstring(game:HttpGet(uiRawUrl))()
+
+    local rawContent = nil
+    local fetchSuccess, fetchErr = pcall(function()
+        rawContent = game:HttpGet(uiRawUrl, true)
     end)
-    
-    if not success then
-        warn("[AKAT LOGIC] Falha ao carregar a UI externa: ", err)
+
+    if not fetchSuccess then
+        warn("[AKAT LOGIC] HttpGet falhou: " .. tostring(fetchErr))
+        return
+    end
+
+    if not rawContent or rawContent == "" then
+        warn("[AKAT LOGIC] HttpGet retornou vazio. Verifique a URL.")
+        return
+    end
+
+    local fn, compileErr = loadstring(rawContent)
+    if not fn then
+        warn("[AKAT LOGIC] loadstring falhou ao compilar a UI: " .. tostring(compileErr))
+        return
+    end
+
+    local runSuccess, runErr = pcall(fn)
+    if not runSuccess then
+        warn("[AKAT LOGIC] Erro ao executar a UI: " .. tostring(runErr))
     end
 end)
