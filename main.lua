@@ -1000,7 +1000,7 @@ end)
 
 -- ==================== INICIALIZADOR DA UI EXTERNA ====================
 task.spawn(function()
-    local uiRawUrl = "https://raw.githubusercontent.com/estratosfera88-afk/ui.lua.DO-MM2-SCRIPT/refs/heads/main/ui.lua"
+    local uiRawUrl = "https://raw.githubusercontent.com/estratosfera88-afk/Ui-do-teste/refs/heads/main/main.lua"
     
     local success, err = pcall(function()
         loadstring(game:HttpGet(uiRawUrl))()
