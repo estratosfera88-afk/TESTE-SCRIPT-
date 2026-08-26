@@ -1002,11 +1002,21 @@ end)
 task.spawn(function()
     local uiRawUrl = "https://raw.githubusercontent.com/estratosfera88-afk/Ui-do-teste/refs/heads/main/main.lua"
     
-    local success, err = pcall(function()
-        loadstring(game:HttpGet(uiRawUrl))()
+    local success, response = pcall(function()
+        return game:HttpGet(uiRawUrl)
     end)
     
-    if not success then
-        warn("[AKAT LOGIC] Falha ao carregar a UI externa: ", err)
+    if success and response and #response > 0 then
+        local func, parseErr = loadstring(response)
+        if type(func) == "function" then
+            local execSuccess, execErr = pcall(func)
+            if not execSuccess then
+                warn("[AKAT LOGIC] Erro de execução na UI externa: ", execErr)
+            end
+        else
+            warn("[AKAT LOGIC] Erro de sintaxe/compilação na UI externa: ", parseErr)
+        end
+    else
+        warn("[AKAT LOGIC] Falha ao baixar o código da UI (Verifique a URL ou conexão).")
     end
 end)
