@@ -1,5 +1,5 @@
 -- [[
---     AKAT MM2 MAIN LOGIC - FULLY UPDATED & OPTIMIZED [v5.7 - COMPLETE LOGIC 2026]
+--     AKAT MM2 MAIN LOGIC - FULLY UPDATED & OPTIMIZED [v5.8 - PERFECT AIM & UTILITIES 2026]
 --     Compatível com Delta Mobile & PC | MM2 (2026)
 --     BACKEND ONLY — sem código de interface visual
 -- ]]
@@ -30,7 +30,7 @@ local lastPositionBeforeTpToGun = nil
 local trackingTpToGun = false
 local autoCollectTemporarilyDisabled = false
 local aimbotConnection = nil
-local xrayOriginalTrans = {}
+local autoDodgeConnection = nil
 
 -- ==================== CONFIGURAÇÕES LOCAIS DO BACKEND ====================
 local Configs = {
@@ -43,6 +43,7 @@ local Configs = {
     SafeSpot     = false,
     AutoCollect  = false,
     ChatRoles    = false,
+    -- NOVAS CONFIGURAÇÕES
     KnifeThrow   = false,
     XRay         = false,
     AutoDodge    = false,
@@ -94,7 +95,7 @@ task.spawn(function()
                 end)
             end
 
-            -- SILENT AIM PRECISÃO ABSOLUTA (APENAS NO DISPARO)
+            -- SILENT AIM PRECISÃO ABSOLUTA
             if Configs.Aimbot and CachedState.HasGun and self == mouse then
                 if key == "Hit" or key == "hit" then
                     local murderer = CachedState.Murderer
@@ -125,19 +126,19 @@ task.spawn(function()
 end)
 
 -- ==================== VARIÁVEIS DE ESTADO INTERNAS ====================
-local PlayerRoles           = {}
-local ESPHighlights         = {}
-local espEventConnections   = {}
-local espPlayerAddedConn    = nil
+local PlayerRoles          = {}
+local ESPHighlights        = {}
+local espEventConnections  = {}
+local espPlayerAddedConn   = nil
 local espPlayerRemovingConn = nil
-local ESP_UpdatePlayer      -- declaração antecipada
-local hbConnection          = nil
-local steppedConnection     = nil
-local safePlatform          = nil
+local ESP_UpdatePlayer     
+local hbConnection         = nil
+local steppedConnection    = nil
+local safePlatform         = nil
 local lastPositionBeforeSafeSpot = nil
-local announcedThisRound    = false
-local currentCollectTarget  = nil
-local autoCollectTween      = nil
+local announcedThisRound   = false
+local currentCollectTarget = nil
+local autoCollectTween     = nil
 
 local ROLE_COLORS = {
     Murderer = Color3.fromRGB(220, 0,   0),
@@ -145,112 +146,6 @@ local ROLE_COLORS = {
     Hero     = Color3.fromRGB(255, 220, 0),
     Innocent = Color3.fromRGB(0,   200, 80),
 }
-
--- ==================== LÓGICAS DOS NOVOS RECURSOS ====================
-
--- 1. X-Ray
-local function ToggleXRay(enabled)
-    Configs.XRay = enabled
-    if enabled then
-        for _, part in ipairs(workspace:GetDescendants()) do
-            if part:IsA("BasePart") and not part:IsDescendantOf(player.Character) and part.Transparency < 0.5 then
-                xrayOriginalTrans[part] = part.Transparency
-                part.Transparency = 0.65
-            end
-        end
-    else
-        for part, trans in pairs(xrayOriginalTrans) do
-            if part and part.Parent then
-                part.Transparency = trans
-            end
-        end
-        table.clear(xrayOriginalTrans)
-    end
-end
-
--- 2. Invisibility (Invisibilidade local/servidor visual)
-local function ToggleInvisibility(enabled)
-    Configs.Invisibility = enabled
-    local char = player.Character
-    if not char then return end
-
-    for _, part in ipairs(char:GetDescendants()) do
-        if part:IsA("BasePart") or part:IsA("Decal") then
-            if part.Name ~= "HumanoidRootPart" then
-                part.Transparency = enabled and 1 or 0
-            end
-        end
-    end
-end
-
--- 3. Knife Throw (Lançamento Automático da Faca)
-local function ExecuteKnifeThrow()
-    local char = player.Character
-    local knife = char and (char:FindFirstChild("Knife") or char:FindFirstChild("Faca")) 
-        or player.Backpack:FindFirstChild("Knife") or player.Backpack:FindFirstChild("Faca")
-    
-    if not knife then return end
-    if knife.Parent == player.Backpack then
-        knife.Parent = char
-    end
-
-    local targetPos = mouse.Hit.Position
-    -- Se houver alvos e aimbot ativo ou alvos próximos, direciona para a cabeça do jogador mais próximo
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= player and p.Character then
-            local head = p.Character:FindFirstChild("Head")
-            if head then
-                targetPos = head.Position
-                break
-            end
-        end
-    end
-
-    local throwRemote = knife:FindFirstChild("Throw") or game:GetService("ReplicatedStorage"):FindFirstChild("Throw")
-    if throwRemote and throwRemote:IsA("RemoteEvent") then
-        throwRemote:FireServer(targetPos)
-    else
-        pcall(function() knife:Activate() end)
-    end
-end
-
--- 4. Kill All (Elimina todos se for o Murderer)
-local function ExecuteKillAll()
-    if not Configs.KillAll then return end
-    local char = player.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if not root then return end
-
-    local knife = char:FindFirstChild("Knife") or char:FindFirstChild("Faca") 
-        or player.Backpack:FindFirstChild("Knife") or player.Backpack:FindFirstChild("Faca")
-    
-    if not knife then return end
-    if knife.Parent == player.Backpack then
-        knife.Parent = char
-    end
-
-    local handle = knife:FindFirstChild("Handle")
-    if not handle then return end
-
-    for _, p in ipairs(Players:GetPlayers()) do
-        if not Configs.KillAll then break end
-        if p ~= player and p.Character then
-            local enemyRoot = p.Character:FindFirstChild("HumanoidRootPart")
-            local enemyHum  = p.Character:FindFirstChildOfClass("Humanoid")
-
-            if enemyRoot and enemyHum and enemyHum.Health > 0 then
-                root.CFrame = enemyRoot.CFrame * CFrame.new(0, 0, 1.5)
-                task.wait(0.05)
-                pcall(function()
-                    firetouchinterest(enemyRoot, handle, 0)
-                    firetouchinterest(enemyRoot, handle, 1)
-                end)
-                task.wait(0.08)
-            end
-        end
-    end
-    Configs.KillAll = false
-end
 
 -- ==================== SISTEMAS AUXILIARES E DETECÇÕES ====================
 local function ESP_DetectRole(p)
@@ -424,7 +319,6 @@ local function ESP_Disable()
     ESP_ClearAll()
 end
 
--- ==================== LOCK DE CÂMERA INTEGRAL E FLUIDO ====================
 local function ToggleAimbot(enabled)
     if Configs.Aimbot == enabled then return end
     Configs.Aimbot = enabled
@@ -452,7 +346,6 @@ local function ToggleAimbot(enabled)
     end
 end
 
--- ==================== LÓGICA DE PROCURA DE ITENS ====================
 local function ObterArmaCaida(root)
     local gun = workspace:FindFirstChild("GunDrop", true)
     if gun then
@@ -511,7 +404,7 @@ local function IsBagFull()
 end
 
 local function EnviarMensagemChat(msg)
-    local TextChatService   = game:GetService("TextChatService")
+    local TextChatService  = game:GetService("TextChatService")
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
     pcall(function()
         if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
@@ -529,13 +422,12 @@ local function LimparEDesligarAbsolutamente()
     if hbConnection      then hbConnection:Disconnect();      hbConnection      = nil end
     if steppedConnection then steppedConnection:Disconnect(); steppedConnection = nil end
     if aimbotConnection  then aimbotConnection:Disconnect();  aimbotConnection  = nil end
+    if autoDodgeConnection then autoDodgeConnection:Disconnect(); autoDodgeConnection = nil end
 
     for k in pairs(Configs) do Configs[k] = false end
     autoCollectTemporarilyDisabled = false
 
     ESP_Disable()
-    ToggleXRay(false)
-    ToggleInvisibility(false)
 
     if safePlatform then
         pcall(function() safePlatform:Destroy() end)
@@ -545,17 +437,30 @@ local function LimparEDesligarAbsolutamente()
         autoCollectTween:Cancel()
         autoCollectTween = nil
     end
-
+    
+    -- Reverte Transparência (Invisibility) e X-Ray
     pcall(function()
         local char = player.Character
-        local hum  = char and char:FindFirstChildOfClass("Humanoid")
-        if hum then
-            hum.WalkSpeed = 16
+        if char then
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") or part:IsA("Decal") then
+                    part.Transparency = 0
+                end
+            end
             local root = char:FindFirstChild("HumanoidRootPart")
             if root then
                 root.Anchored = false
                 root.AssemblyLinearVelocity  = Vector3.zero
                 root.AssemblyAngularVelocity = Vector3.zero
+                root.Transparency = 1
+            end
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then hum.WalkSpeed = 16 end
+        end
+        
+        for _, d in ipairs(workspace:GetDescendants()) do
+            if d:IsA("BasePart") and d:GetAttribute("OriginalTransparency") then
+                d.Transparency = d:GetAttribute("OriginalTransparency")
             end
         end
     end)
@@ -566,38 +471,20 @@ end
 -- ==================== PONTE DE COMUNICAÇÃO GLOBAL (UI → BACKEND) ====================
 _G.AkatCallbacks = {
 
-    -- ESP
     ESP = function(enabled)
         if enabled then ESP_Enable() else ESP_Disable() end
     end,
 
-    -- Aimbot / Camera lock
-    Aimbot = function(enabled)
-        ToggleAimbot(enabled)
-    end,
-
-    -- Speed
-    Speed = function(enabled)
-        Configs.Speed = enabled
-    end,
-
-    -- Reach
-    Reach = function(enabled)
-        Configs.Reach = enabled
-    end,
-
-    -- Anti-Fling
-    AntiFling = function(enabled)
-        Configs.AntiFling = enabled
-    end,
-
-    -- Chat Roles
+    Aimbot = function(enabled) ToggleAimbot(enabled) end,
+    Speed = function(enabled) Configs.Speed = enabled end,
+    Reach = function(enabled) Configs.Reach = enabled end,
+    AntiFling = function(enabled) Configs.AntiFling = enabled end,
+    
     ChatRoles = function(enabled)
         Configs.ChatRoles = enabled
         if not enabled then announcedThisRound = false end
     end,
 
-    -- Safe Spot
     SafeSpot = function(enabled)
         Configs.SafeSpot = enabled
         local char = player.Character
@@ -627,15 +514,11 @@ _G.AkatCallbacks = {
         end
     end,
 
-    -- Auto Collect
     AutoCollect = function(enabled)
         Configs.AutoCollect = enabled
         if not enabled then
             currentCollectTarget = nil
-            if autoCollectTween then
-                autoCollectTween:Cancel()
-                autoCollectTween = nil
-            end
+            if autoCollectTween then autoCollectTween:Cancel(); autoCollectTween = nil end
             local char = player.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
             if root then
@@ -652,43 +535,161 @@ _G.AkatCallbacks = {
         end
     end,
 
-    -- TP to Gun
-    TpToGun = function(enabled)
-        Configs.TpToGun = enabled
-    end,
-    ["Tp to gun"] = function(enabled)
-        Configs.TpToGun = enabled
-    end,
+    TpToGun = function(enabled) Configs.TpToGun = enabled end,
+    ["Tp to gun"] = function(enabled) Configs.TpToGun = enabled end,
+    ["Tp To Gun"] = function(enabled) Configs.TpToGun = enabled end,
 
-    -- NOVOS RECURSOS IMPLEMENTADOS:
-    KnifeThrow = function(enabled)
-        Configs.KnifeThrow = enabled
-        if enabled then ExecuteKnifeThrow() end
-    end,
-
-    XRay = function(enabled)
-        ToggleXRay(enabled)
-    end,
-
-    AutoDodge = function(enabled)
-        Configs.AutoDodge = enabled
-    end,
-
-    KillAll = function(enabled)
-        Configs.KillAll = enabled
-        if enabled then task.spawn(ExecuteKillAll) end
-    end,
-
-    Invisibility = function(enabled)
-        ToggleInvisibility(enabled)
-    end,
-
-    -- Aliases de Aimbot
     ["Shoot murder"]   = function(enabled) ToggleAimbot(enabled) end,
     ["Shoot Murderer"] = function(enabled) ToggleAimbot(enabled) end,
     AutoShoot          = function(enabled) ToggleAimbot(enabled) end,
+    
+    -- ==================== NOVAS OPÇÕES ADICIONADAS ====================
+    
+    -- 1. Auto Knife Throw
+    KnifeThrow = function(enabled)
+        Configs.KnifeThrow = enabled
+        if enabled then
+            task.spawn(function()
+                while Configs.KnifeThrow do
+                    task.wait(0.5)
+                    local char = player.Character
+                    local knife = char and (char:FindFirstChild("Knife") or char:FindFirstChild("Faca"))
+                    
+                    if knife then
+                        local closestPlayer, closestDist = nil, math.huge
+                        local root = char:FindFirstChild("HumanoidRootPart")
+                        
+                        if root then
+                            for _, p in ipairs(Players:GetPlayers()) do
+                                if p ~= player and p.Character then
+                                    local eRoot = p.Character:FindFirstChild("HumanoidRootPart")
+                                    local eHum = p.Character:FindFirstChildOfClass("Humanoid")
+                                    if eRoot and eHum and eHum.Health > 0 then
+                                        local dist = (root.Position - eRoot.Position).Magnitude
+                                        if dist < closestDist then
+                                            closestDist = dist
+                                            closestPlayer = p
+                                        end
+                                    end
+                                end
+                            end
+                            
+                            if closestPlayer and closestPlayer.Character then
+                                local targetRoot = closestPlayer.Character:FindFirstChild("HumanoidRootPart")
+                                if targetRoot then
+                                    -- Mirar no inimigo
+                                    Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetRoot.Position)
+                                    root.CFrame = CFrame.lookAt(root.Position, Vector3.new(targetRoot.Position.X, root.Position.Y, targetRoot.Position.Z))
+                                    
+                                    -- Dispara a faca (simula clique / evento se presente)
+                                    pcall(function()
+                                        local throwEvent = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes") and game:GetService("ReplicatedStorage").Remotes:FindFirstChild("Extras") and game:GetService("ReplicatedStorage").Remotes.Extras:FindFirstChild("Throw")
+                                        if throwEvent then
+                                            throwEvent:FireServer(targetRoot.Position)
+                                        else
+                                            knife:Activate()
+                                        end
+                                    end)
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    end,
+    
+    -- 2. X-Ray
+    XRay = function(enabled)
+        Configs.XRay = enabled
+        for _, d in ipairs(workspace:GetDescendants()) do
+            if d:IsA("BasePart") and not d:IsDescendantOf(player.Character) and not d:IsDescendantOf(Camera) then
+                if enabled then
+                    if not d:GetAttribute("OriginalTransparency") then
+                        d:SetAttribute("OriginalTransparency", d.Transparency)
+                    end
+                    d.Transparency = 0.5
+                else
+                    if d:GetAttribute("OriginalTransparency") then
+                        d.Transparency = d:GetAttribute("OriginalTransparency")
+                    end
+                end
+            end
+        end
+    end,
+    
+    -- 3. Auto Dodge Knife
+    AutoDodge = function(enabled)
+        Configs.AutoDodge = enabled
+        if enabled and not autoDodgeConnection then
+            autoDodgeConnection = RunService.Heartbeat:Connect(function()
+                if not Configs.AutoDodge then return end
+                local char = player.Character
+                local root = char and char:FindFirstChild("HumanoidRootPart")
+                if root then
+                    for _, obj in ipairs(workspace:GetChildren()) do
+                        if obj:IsA("BasePart") and (obj.Name:lower() == "knife" or obj.Name:lower() == "faca") then
+                            local dist = (obj.Position - root.Position).Magnitude
+                            local vel = obj.AssemblyLinearVelocity.Magnitude
+                            if dist < 20 and vel > 10 then
+                                -- Teleporte instantâneo curto para o lado oposto
+                                root.CFrame = root.CFrame * CFrame.new(math.random(-8, 8), 0, math.random(-8, 8))
+                            end
+                        end
+                    end
+                end
+            end)
+        elseif not enabled and autoDodgeConnection then
+            autoDodgeConnection:Disconnect()
+            autoDodgeConnection = nil
+        end
+    end,
+    
+    -- 4. Kill All
+    KillAll = function(enabled)
+        Configs.KillAll = enabled
+        if enabled then
+            task.spawn(function()
+                while Configs.KillAll do
+                    task.wait(0.2)
+                    local char = player.Character
+                    local myKnife = char and (char:FindFirstChild("Knife") or char:FindFirstChild("Faca"))
+                    local handle = myKnife and myKnife:FindFirstChild("Handle")
+                    
+                    if handle then
+                        for _, p in ipairs(Players:GetPlayers()) do
+                            if p ~= player and p.Character then
+                                local enemyRoot = p.Character:FindFirstChild("HumanoidRootPart")
+                                local enemyHum = p.Character:FindFirstChildOfClass("Humanoid")
+                                if enemyRoot and enemyHum and enemyHum.Health > 0 then
+                                    pcall(function()
+                                        firetouchinterest(enemyRoot, handle, 0)
+                                        firetouchinterest(enemyRoot, handle, 1)
+                                    end)
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    end,
+    
+    -- 5. Invisibility (Client-Side / Padrão de Exploit)
+    Invisibility = function(enabled)
+        Configs.Invisibility = enabled
+        local char = player.Character
+        if char then
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                    part.Transparency = enabled and 1 or 0
+                elseif part:IsA("Decal") then
+                    part.Transparency = enabled and 1 or 0
+                end
+            end
+        end
+    end,
 
-    -- Shutdown total
     ShutdownAll = function()
         LimparEDesligarAbsolutamente()
     end,
@@ -771,7 +772,7 @@ task.spawn(function()
                     or char:FindFirstChild("Faca")
 
                 if isMurdererRole or hasKnife then
-                    trackingTpToGun           = false
+                    trackingTpToGun        = false
                     lastPositionBeforeTpToGun = nil
                     if autoCollectTemporarilyDisabled then
                         autoCollectTemporarilyDisabled = false
@@ -876,18 +877,6 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- AUTO DODGE (DESVIAR DA FACA)
-    if Configs.AutoDodge then
-        for _, obj in ipairs(workspace:GetChildren()) do
-            if obj.Name == "FlyingKnife" or (obj:IsA("BasePart") and obj.Name:lower():find("knife")) then
-                local dist = (obj.Position - root.Position).Magnitude
-                if dist < 16 then
-                    root.CFrame = root.CFrame * CFrame.new(0, 12, 0)
-                end
-            end
-        end
-    end
-
     -- ANTI FLING
     if Configs.AntiFling then
         for _, p in ipairs(Players:GetPlayers()) do
@@ -911,13 +900,13 @@ task.spawn(function()
     local tempoUltimoScanESP    = 0
 
     while true do
-        local gunFoundInPlayers   = false
+        local gunFoundInPlayers  = false
         local knifeFoundInPlayers = false
-        local localPlayerHasGun   = false
+        local localPlayerHasGun  = false
         local currentMurderer, currentSheriff = nil, nil
 
-        local agora        = tick()
-        local atualizarESP = Configs.ESP and (agora - tempoUltimoScanESP > 1.0)
+        local agora         = tick()
+        local atualizarESP  = Configs.ESP and (agora - tempoUltimoScanESP > 1.0)
         if atualizarESP then
             tempoUltimoScanESP = agora
         end
@@ -1000,23 +989,13 @@ end)
 
 -- ==================== INICIALIZADOR DA UI EXTERNA ====================
 task.spawn(function()
-    local uiRawUrl = "https://raw.githubusercontent.com/estratosfera88-afk/Ui-do-teste/refs/heads/main/main.lua"
+    local uiRawUrl = "https://raw.githubusercontent.com/estratosfera88-afk/Ui-do-teste/refs/heads/main/ui.lua"
     
-    local success, response = pcall(function()
-        return game:HttpGet(uiRawUrl)
+    local success, err = pcall(function()
+        loadstring(game:HttpGet(uiRawUrl))()
     end)
     
-    if success and response and #response > 0 then
-        local func, parseErr = loadstring(response)
-        if type(func) == "function" then
-            local execSuccess, execErr = pcall(func)
-            if not execSuccess then
-                warn("[AKAT LOGIC] Erro de execução na UI externa: ", execErr)
-            end
-        else
-            warn("[AKAT LOGIC] Erro de sintaxe/compilação na UI externa: ", parseErr)
-        end
-    else
-        warn("[AKAT LOGIC] Falha ao baixar o código da UI (Verifique a URL ou conexão).")
+    if not success then
+        warn("[AKAT LOGIC] Falha ao carregar a UI externa: ", err)
     end
 end)
