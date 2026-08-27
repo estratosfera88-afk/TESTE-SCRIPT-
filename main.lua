@@ -29,13 +29,15 @@ local gunDroppedThisRound = false
 local lastPositionBeforeTpToGun = nil
 local trackingTpToGun = false
 local autoCollectTemporarilyDisabled = false
-local aimbotConnection = nil
+local autoShootConnection = nil
+local autoShootFiring = false
 local autoDodgeConnection = nil
+local knifeThrowConnection = nil
 
 -- ==================== CONFIGURAÇÕES LOCAIS DO BACKEND ====================
 local Configs = {
     ESP          = false,
-    Aimbot       = false,
+    AutoShoot    = false,
     Speed        = false,
     Reach        = false,
     AntiFling    = false,
@@ -94,7 +96,7 @@ task.spawn(function()
                 end)
             end
 
-            if Configs.Aimbot and CachedState.HasGun and self == mouse then
+            if Configs.AutoShoot and autoShootFiring and self == mouse then
                 if key == "Hit" or key == "hit" then
                     local murderer = CachedState.Murderer
                     if murderer and murderer.Character then
@@ -317,31 +319,119 @@ local function ESP_Disable()
     ESP_ClearAll()
 end
 
-local function ToggleAimbot(enabled)
-    if Configs.Aimbot == enabled then return end
-    Configs.Aimbot = enabled
-    if aimbotConnection then aimbotConnection:Disconnect(); aimbotConnection = nil end
+local autoShootBusy = false
+local lastAutoShot = 0
+local AUTO_SHOOT_COOLDOWN = 0.20
 
-    if enabled then
-        aimbotConnection = RunService.RenderStepped:Connect(function()
-            if not Configs.Aimbot then return end
-            if not CachedState.HasGun then return end
+local function AutoShoot_FindGun()
+    local char = player.Character
+    local backpack = player:FindFirstChildOfClass("Backpack")
+    if not char then return nil, nil end
 
-            local murderer = CachedState.Murderer
-            if murderer and murderer.Character then
-                local head = murderer.Character:FindFirstChild("Head")
-                local char = player.Character
-                local root = char and char:FindFirstChild("HumanoidRootPart")
-                local hum  = char and char:FindFirstChildOfClass("Humanoid")
+    local gun = char:FindFirstChild("Gun")
+        or char:FindFirstChild("Pistol")
+        or char:FindFirstChild("Revolver")
 
-                if head and root and hum and hum.Health > 0 then
-                    Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, head.Position)
-                    local targetLook = Vector3.new(head.Position.X, root.Position.Y, head.Position.Z)
-                    root.CFrame = CFrame.lookAt(root.Position, targetLook)
-                end
-            end
-        end)
+    if not gun and backpack then
+        gun = backpack:FindFirstChild("Gun")
+            or backpack:FindFirstChild("Pistol")
+            or backpack:FindFirstChild("Revolver")
     end
+
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    return gun, hum
+end
+
+local function AutoShoot_GetValidTarget()
+    local murderer = CachedState.Murderer
+    if not murderer or murderer == player or not murderer.Parent then
+        return nil
+    end
+
+    local char = murderer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local head = char and char:FindFirstChild("Head")
+
+    if not char or not hum or hum.Health <= 0 or not head then
+        return nil
+    end
+
+    if PlayerRoles[murderer] and PlayerRoles[murderer] ~= "Murderer" then
+        return nil
+    end
+
+    return murderer, head
+end
+
+local function ExecuteAutoShootOnce()
+    if not Configs.AutoShoot or autoShootBusy then return false end
+
+    local now = tick()
+    if now - lastAutoShot < AUTO_SHOOT_COOLDOWN then
+        return false
+    end
+
+    local murderer = AutoShoot_GetValidTarget()
+    if not murderer then return false end
+
+    local gun, hum = AutoShoot_FindGun()
+    if not gun or not gun:IsA("Tool") or not hum or hum.Health <= 0 then
+        return false
+    end
+
+    autoShootBusy = true
+    lastAutoShot = now
+
+    local ok = pcall(function()
+        if not Configs.AutoShoot then return end
+
+        if gun.Parent ~= player.Character then
+            hum:EquipTool(gun)
+            task.wait()
+        end
+
+        if not Configs.AutoShoot or gun.Parent ~= player.Character then
+            return
+        end
+
+        -- O Silent Aim é aplicado pelo hook de mouse somente durante o disparo.
+        -- Nenhum movimento manual da câmera é necessário.
+        autoShootFiring = true
+        gun:Activate()
+        autoShootFiring = false
+    end)
+
+    autoShootFiring = false
+
+    pcall(function()
+        if hum and hum.Parent and gun and gun.Parent == player.Character then
+            hum:UnequipTools()
+        end
+    end)
+
+    autoShootBusy = false
+    return ok
+end
+
+local function ToggleAutoShoot(enabled)
+    if Configs.AutoShoot == enabled then return end
+    Configs.AutoShoot = enabled
+
+    if autoShootConnection then
+        autoShootConnection:Disconnect()
+        autoShootConnection = nil
+    end
+
+    if not enabled then
+        autoShootBusy = false
+        autoShootFiring = false
+        return
+    end
+
+    autoShootConnection = RunService.RenderStepped:Connect(function()
+        if not Configs.AutoShoot then return end
+        ExecuteAutoShootOnce()
+    end)
 end
 
 local function ObterArmaCaida(root)
@@ -419,8 +509,9 @@ end
 local function LimparEDesligarAbsolutamente()
     if hbConnection      then hbConnection:Disconnect();      hbConnection      = nil end
     if steppedConnection then steppedConnection:Disconnect(); steppedConnection = nil end
-    if aimbotConnection  then aimbotConnection:Disconnect();  aimbotConnection  = nil end
+    if autoShootConnection  then autoShootConnection:Disconnect();  autoShootConnection  = nil end
     if autoDodgeConnection then autoDodgeConnection:Disconnect(); autoDodgeConnection = nil end
+    if knifeThrowConnection then knifeThrowConnection:Disconnect(); knifeThrowConnection = nil end
 
     for k in pairs(Configs) do Configs[k] = false end
     autoCollectTemporarilyDisabled = false
@@ -466,13 +557,100 @@ local function LimparEDesligarAbsolutamente()
 end
 
 -- ==================== PONTE DE COMUNICAÇÃO GLOBAL ====================
+local knifeThrowBusy = false
+local lastKnifeThrow = 0
+local KNIFE_THROW_COOLDOWN = 0.40
+
+local function ExecuteKnifeThrowOnce()
+    if not Configs.KnifeThrow or knifeThrowBusy then return false end
+
+    local now = tick()
+    if now - lastKnifeThrow < KNIFE_THROW_COOLDOWN then
+        return false
+    end
+
+    local char = player.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not char or not hum or hum.Health <= 0 or not root then
+        return false
+    end
+
+    local knife = char:FindFirstChild("Knife") or char:FindFirstChild("Faca")
+    local backpack = player:FindFirstChildOfClass("Backpack")
+
+    if not knife and backpack then
+        knife = backpack:FindFirstChild("Knife") or backpack:FindFirstChild("Faca")
+        if knife then
+            hum:EquipTool(knife)
+            task.wait()
+        end
+    end
+
+    if not Configs.KnifeThrow or not knife or knife.Parent ~= char then
+        return false
+    end
+
+    local closestPlayer, closestDist = nil, math.huge
+
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= player and p.Character then
+            local eRoot = p.Character:FindFirstChild("HumanoidRootPart")
+            local eHum = p.Character:FindFirstChildOfClass("Humanoid")
+
+            if eRoot and eHum and eHum.Health > 0 then
+                local dist = (root.Position - eRoot.Position).Magnitude
+                if dist < closestDist then
+                    closestDist = dist
+                    closestPlayer = p
+                end
+            end
+        end
+    end
+
+    if not closestPlayer or not closestPlayer.Character then
+        return false
+    end
+
+    local targetRoot = closestPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not targetRoot or not Configs.KnifeThrow then
+        return false
+    end
+
+    knifeThrowBusy = true
+    lastKnifeThrow = now
+
+    local ok = pcall(function()
+        Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetRoot.Position)
+        root.CFrame = CFrame.lookAt(
+            root.Position,
+            Vector3.new(targetRoot.Position.X, root.Position.Y, targetRoot.Position.Z)
+        )
+
+        if not Configs.KnifeThrow then return end
+
+        local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+        local throwEvent = remotes
+            and remotes:FindFirstChild("Extras")
+            and remotes.Extras:FindFirstChild("Throw")
+
+        if throwEvent then
+            throwEvent:FireServer(targetRoot.Position)
+        else
+            knife:Activate()
+        end
+    end)
+
+    knifeThrowBusy = false
+    return ok
+end
+
 _G.AkatCallbacks = {
 
     ESP = function(enabled)
         if enabled then ESP_Enable() else ESP_Disable() end
     end,
 
-    Aimbot = function(enabled) ToggleAimbot(enabled) end,
     Speed = function(enabled) Configs.Speed = enabled end,
     Reach = function(enabled) Configs.Reach = enabled end,
     AntiFling = function(enabled) Configs.AntiFling = enabled end,
@@ -536,73 +714,33 @@ _G.AkatCallbacks = {
     ["Tp to gun"] = function(enabled) Configs.TpToGun = enabled end,
     ["Tp To Gun"] = function(enabled) Configs.TpToGun = enabled end,
 
-    ["Shoot murder"]   = function(enabled) ToggleAimbot(enabled) end,
-    ["Shoot Murderer"] = function(enabled) ToggleAimbot(enabled) end,
-    AutoShoot          = function(enabled) ToggleAimbot(enabled) end,
-    
-    -- 1. Auto Knife Throw Corrigido
+    AutoShoot          = function(enabled) ToggleAutoShoot(enabled) end,
+
     KnifeThrow = function(enabled)
         Configs.KnifeThrow = enabled
-        if enabled then
-            task.spawn(function()
-                while Configs.KnifeThrow do
-                    task.wait(0.4)
-                    local char = player.Character
-                    local hum = char and char:FindFirstChildOfClass("Humanoid")
-                    if not char or not hum or hum.Health <= 0 then continue end
 
-                    local knife = char:FindFirstChild("Knife") or char:FindFirstChild("Faca")
-                    if not knife and player:FindFirstChild("Backpack") then
-                        knife = player.Backpack:FindFirstChild("Knife") or player.Backpack:FindFirstChild("Faca")
-                        if knife then
-                            hum:EquipTool(knife)
-                            task.wait(0.05)
-                        end
-                    end
-                    
-                    if knife and knife.Parent == char then
-                        local closestPlayer, closestDist = nil, math.huge
-                        local root = char:FindFirstChild("HumanoidRootPart")
-                        
-                        if root then
-                            for _, p in ipairs(Players:GetPlayers()) do
-                                if p ~= player and p.Character then
-                                    local eRoot = p.Character:FindFirstChild("HumanoidRootPart")
-                                    local eHum = p.Character:FindFirstChildOfClass("Humanoid")
-                                    if eRoot and eHum and eHum.Health > 0 then
-                                        local dist = (root.Position - eRoot.Position).Magnitude
-                                        if dist < closestDist then
-                                            closestDist = dist
-                                            closestPlayer = p
-                                        end
-                                    end
-                                end
-                            end
-                            
-                            if closestPlayer and closestPlayer.Character then
-                                local targetRoot = closestPlayer.Character:FindFirstChild("HumanoidRootPart")
-                                if targetRoot then
-                                    Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetRoot.Position)
-                                    root.CFrame = CFrame.lookAt(root.Position, Vector3.new(targetRoot.Position.X, root.Position.Y, targetRoot.Position.Z))
-                                    
-                                    pcall(function()
-                                        local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
-                                        local throwEvent = remotes and remotes:FindFirstChild("Extras") and remotes.Extras:FindFirstChild("Throw")
-                                        if throwEvent then
-                                            throwEvent:FireServer(targetRoot.Position)
-                                        else
-                                            knife:Activate()
-                                        end
-                                    end)
-                                end
-                            end
-                        end
-                    end
-                end
-            end)
+        if knifeThrowConnection then
+            knifeThrowConnection:Disconnect()
+            knifeThrowConnection = nil
+        end
+
+        if not enabled then
+            knifeThrowBusy = false
+            return
+        end
+
+        knifeThrowConnection = RunService.Heartbeat:Connect(function()
+            if not Configs.KnifeThrow then return end
+            ExecuteKnifeThrowOnce()
+        end)
+    end,
+
+    KnifeThrowOnce = function()
+        if Configs.KnifeThrow then
+            ExecuteKnifeThrowOnce()
         end
     end,
-    
+
     -- 2. X-Ray
     XRay = function(enabled)
         Configs.XRay = enabled
