@@ -1,5 +1,5 @@
 -- [[
---     AKAT MM2 MAIN LOGIC - FULLY UPDATED & OPTIMIZED [v6.0 - AUTO FARM / NUMERIC MOVEMENT / TARGETED ACTIONS 2026]
+--     AKAT MM2 MAIN LOGIC - FULLY UPDATED & OPTIMIZED [v5.9 - PERFECT AIM & UTILITIES 2026]
 --     Compatível com Delta Mobile & PC | MM2 (2026)
 --     BACKEND ONLY — sem código de interface visual
 -- ]]
@@ -29,7 +29,7 @@ _G.AkatLogicRunning = true
 local gunDroppedThisRound = false
 local lastPositionBeforeTpToGun = nil
 local trackingTpToGun = false
-local autoFarmTemporarilyDisabled = false
+local autoCollectTemporarilyDisabled = false
 local autoShootConnection = nil
 local autoShootFiring = false
 local knifeThrowFiring = false
@@ -41,14 +41,12 @@ local Configs = {
     ESP          = false,
     AutoShoot    = false,
     Speed        = false,
-    SpeedValue   = 16,
-    JumpPower    = false,
-    JumpPowerValue = 50,
     Reach        = false,
+    ReachValue   = 18,
     AntiFling    = false,
     TpToGun      = false,
     SafeSpot     = false,
-    AutoFarm  = false,
+    AutoCollect  = false,
     ChatRoles    = false,
     KnifeThrow   = false,
     XRay         = false,
@@ -159,8 +157,8 @@ local steppedConnection    = nil
 local safePlatform         = nil
 local lastPositionBeforeSafeSpot = nil
 local announcedThisRound   = false
-local currentFarmTarget = nil
-local autoFarmTween     = nil
+local currentCollectTarget = nil
+local autoCollectTween     = nil
 
 local ROLE_COLORS = {
     Murderer = Color3.fromRGB(220, 0,   0),
@@ -485,51 +483,6 @@ local function ToggleAutoShoot(enabled)
     end
 end
 
--- ==================== ESTADO DO MAPA / LOBBY ====================
-local function IsInGameMap()
-    local char = player.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if not root or not root.Parent then return false end
-
-    -- Prefer explicit round/map containers when the place exposes them.
-    local explicitMap = workspace:FindFirstChild("Map")
-        or workspace:FindFirstChild("MapModel")
-        or workspace:FindFirstChild("MapContainer")
-    local lobby = workspace:FindFirstChild("Lobby")
-        or workspace:FindFirstChild("LobbyMap")
-        or workspace:FindFirstChild("LobbyArea")
-
-    -- If the character is close to a known lobby spawn/area, treat it as Lobby.
-    if lobby then
-        local lobbyPart = lobby:IsA("BasePart") and lobby
-            or lobby:FindFirstChild("SpawnLocation", true)
-            or lobby:FindFirstChild("LobbySpawn", true)
-            or lobby:FindFirstChildWhichIsA("BasePart", true)
-
-        if lobbyPart and (root.Position - lobbyPart.Position).Magnitude < 180 then
-            return false
-        end
-    end
-
-    -- Common MM2 round maps are represented by a Map/MapModel container.
-    if explicitMap then
-        return true
-    end
-
-    -- Fallback: a live role assignment is a strong indication that the round
-    -- has started; avoid collecting while everyone is still in the lobby.
-    local hasRoundRole = false
-    for _, p in ipairs(Players:GetPlayers()) do
-        local role = PlayerRoles[p]
-        if role == "Murderer" or role == "Sheriff" then
-            hasRoundRole = true
-            break
-        end
-    end
-
-    return hasRoundRole
-end
-
 local function ObterArmaCaida(root)
     local gun = workspace:FindFirstChild("GunDrop", true)
     if gun then
@@ -609,7 +562,7 @@ local function LimparEDesligarAbsolutamente()
     if knifeThrowConnection then knifeThrowConnection:Disconnect(); knifeThrowConnection = nil end
 
     for k in pairs(Configs) do Configs[k] = false end
-    autoFarmTemporarilyDisabled = false
+    autoCollectTemporarilyDisabled = false
     autoShootFiring = false
     knifeThrowFiring = false
     knifeThrowTarget = nil
@@ -620,9 +573,9 @@ local function LimparEDesligarAbsolutamente()
         pcall(function() safePlatform:Destroy() end)
         safePlatform = nil
     end
-    if autoFarmTween then
-        autoFarmTween:Cancel()
-        autoFarmTween = nil
+    if autoCollectTween then
+        autoCollectTween:Cancel()
+        autoCollectTween = nil
     end
     
     pcall(function()
@@ -641,11 +594,7 @@ local function LimparEDesligarAbsolutamente()
                 root.Transparency = 1
             end
             local hum = char:FindFirstChildOfClass("Humanoid")
-            if hum then
-                hum.WalkSpeed = 16
-                hum.UseJumpPower = true
-                hum.JumpPower = 50
-            end
+            if hum then hum.WalkSpeed = 16 end
         end
         
         for _, d in ipairs(workspace:GetDescendants()) do
@@ -722,33 +671,29 @@ local function ExecuteKnifeThrowOnce()
         return false
     end
 
-    local closestInnocent, closestInnocentDist = nil, math.huge
-    local closestSheriff, closestSheriffDist = nil, math.huge
+    local closestPlayer, closestDist = nil, math.huge
 
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= player and p.Character then
             local role = ESP_DetectRole(p)
             PlayerRoles[p] = role
 
-            local eRoot = p.Character:FindFirstChild("HumanoidRootPart")
-            local eHum = p.Character:FindFirstChildOfClass("Humanoid")
+            -- Prefer Innocent; if the round data exposes no Innocent,
+            -- allow Sheriff as the secondary valid target.
+            if role == "Innocent" or role == "Sheriff" then
+                local eRoot = p.Character:FindFirstChild("HumanoidRootPart")
+                local eHum = p.Character:FindFirstChildOfClass("Humanoid")
 
-            if eRoot and eHum and eHum.Health > 0 then
-                local dist = (root.Position - eRoot.Position).Magnitude
-
-                if role == "Innocent" and dist < closestInnocentDist then
-                    closestInnocentDist = dist
-                    closestInnocent = p
-                elseif role == "Sheriff" and dist < closestSheriffDist then
-                    closestSheriffDist = dist
-                    closestSheriff = p
+                if eRoot and eHum and eHum.Health > 0 then
+                    local dist = (root.Position - eRoot.Position).Magnitude
+                    if dist < closestDist then
+                        closestDist = dist
+                        closestPlayer = p
+                    end
                 end
             end
         end
     end
-
-    -- Strict priority: nearest Innocent; if none exists, nearest Sheriff.
-    local closestPlayer = closestInnocent or closestSheriff
 
     if not closestPlayer or not closestPlayer.Character then
         return false
@@ -812,25 +757,15 @@ _G.AkatCallbacks = {
         if enabled then ESP_Enable() else ESP_Disable() end
     end,
 
-    Speed = function(value)
+    Speed = function(enabled) Configs.Speed = enabled end,
+    Reach = function(value)
         if type(value) == "number" then
-            Configs.SpeedValue = math.clamp(value, 0, 200)
-            Configs.Speed = Configs.SpeedValue ~= 16
+            Configs.ReachValue = math.clamp(value, 1, 50)
+            Configs.Reach = true
         else
-            Configs.Speed = value and true or false
+            Configs.Reach = value and true or false
         end
     end,
-
-    JumpPower = function(value)
-        if type(value) == "number" then
-            Configs.JumpPowerValue = math.clamp(value, 0, 200)
-            Configs.JumpPower = Configs.JumpPowerValue ~= 50
-        else
-            Configs.JumpPower = value and true or false
-        end
-    end,
-
-    Reach = function(enabled) Configs.Reach = enabled end,
     AntiFling = function(enabled) Configs.AntiFling = enabled end,
     
     ChatRoles = function(enabled)
@@ -867,11 +802,11 @@ _G.AkatCallbacks = {
         end
     end,
 
-    AutoFarm = function(enabled)
-        Configs.AutoFarm = enabled
+    AutoCollect = function(enabled)
+        Configs.AutoCollect = enabled
         if not enabled then
-            currentFarmTarget = nil
-            if autoFarmTween then autoFarmTween:Cancel(); autoFarmTween = nil end
+            currentCollectTarget = nil
+            if autoCollectTween then autoCollectTween:Cancel(); autoCollectTween = nil end
             local char = player.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
             if root then
@@ -1010,24 +945,18 @@ _G.AkatCallbacks = {
     end,
 }
 
--- ==================== THREAD DO AUTO FARM ====================
+-- ==================== THREAD DO AUTO COLLECT ====================
 task.spawn(function()
     while true do
         task.wait(0.005)
-        if Configs.AutoFarm and not IsInGameMap() then
-            if autoFarmTween then
-                autoFarmTween:Cancel()
-                autoFarmTween = nil
-            end
-            currentFarmTarget = nil
-        elseif Configs.AutoFarm and IsInGameMap() then
+        if Configs.AutoCollect then
             local char = player.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
             local hum  = char and char:FindFirstChildOfClass("Humanoid")
 
             if IsBagFull() then
-                if autoFarmTween then autoFarmTween:Cancel(); autoFarmTween = nil end
-                currentFarmTarget = nil
+                if autoCollectTween then autoCollectTween:Cancel(); autoCollectTween = nil end
+                currentCollectTarget = nil
                 task.wait(0.5)
                 continue
             end
@@ -1035,21 +964,21 @@ task.spawn(function()
             if root and hum and hum.Health > 0 then
                 local target = ObterMoedaProxima(root)
                 if target and target.Parent then
-                    if currentFarmTarget ~= target then
-                        currentFarmTarget = target
-                        if autoFarmTween then autoFarmTween:Cancel() end
+                    if currentCollectTarget ~= target then
+                        currentCollectTarget = target
+                        if autoCollectTween then autoCollectTween:Cancel() end
 
                         local goalCFrame  = CFrame.new(target.Position)
                         local dist        = (root.Position - target.Position).Magnitude
                         local timeToReach = dist / 37
 
-                        autoFarmTween = TweenService:Create(
+                        autoCollectTween = TweenService:Create(
                             root,
                             TweenInfo.new(timeToReach, Enum.EasingStyle.Linear),
                             {CFrame = goalCFrame}
                         )
-                        autoFarmTween:Play()
-                        autoFarmTween.Completed:Wait()
+                        autoCollectTween:Play()
+                        autoCollectTween.Completed:Wait()
                     end
 
                     pcall(function()
@@ -1068,8 +997,8 @@ task.spawn(function()
                         end
                     end)
                 else
-                    if autoFarmTween then autoFarmTween:Cancel(); autoFarmTween = nil end
-                    currentFarmTarget = nil
+                    if autoCollectTween then autoCollectTween:Cancel(); autoCollectTween = nil end
+                    currentCollectTarget = nil
                 end
             end
         end
@@ -1095,9 +1024,9 @@ task.spawn(function()
                 if isMurdererRole or hasKnife then
                     trackingTpToGun        = false
                     lastPositionBeforeTpToGun = nil
-                    if autoFarmTemporarilyDisabled then
-                        autoFarmTemporarilyDisabled = false
-                        Configs.AutoFarm = true
+                    if autoCollectTemporarilyDisabled then
+                        autoCollectTemporarilyDisabled = false
+                        Configs.AutoCollect = true
                     end
                     continue
                 end
@@ -1108,11 +1037,11 @@ task.spawn(function()
                         lastPositionBeforeTpToGun = root.CFrame
                         trackingTpToGun = true
 
-                        if Configs.AutoFarm then
-                            autoFarmTemporarilyDisabled = true
-                            Configs.AutoFarm = false
-                            if autoFarmTween then autoFarmTween:Cancel(); autoFarmTween = nil end
-                            currentFarmTarget = nil
+                        if Configs.AutoCollect then
+                            autoCollectTemporarilyDisabled = true
+                            Configs.AutoCollect = false
+                            if autoCollectTween then autoCollectTween:Cancel(); autoCollectTween = nil end
+                            currentCollectTarget = nil
                         end
                     end
                     root.CFrame = gunPart.CFrame * CFrame.new(0, 3, 0)
@@ -1124,9 +1053,9 @@ task.spawn(function()
                         lastPositionBeforeTpToGun = nil
                         trackingTpToGun           = false
 
-                        if autoFarmTemporarilyDisabled then
-                            autoFarmTemporarilyDisabled = false
-                            Configs.AutoFarm = true
+                        if autoCollectTemporarilyDisabled then
+                            autoCollectTemporarilyDisabled = false
+                            Configs.AutoCollect = true
                         end
                     end
                 end
@@ -1141,9 +1070,9 @@ task.spawn(function()
                 lastPositionBeforeTpToGun = nil
                 trackingTpToGun           = false
 
-                if autoFarmTemporarilyDisabled then
-                    autoFarmTemporarilyDisabled = false
-                    Configs.AutoFarm = true
+                if autoCollectTemporarilyDisabled then
+                    autoCollectTemporarilyDisabled = false
+                    Configs.AutoCollect = true
                 end
             end
         end
@@ -1152,7 +1081,7 @@ end)
 
 -- ==================== NOCLIP SEGURO ====================
 steppedConnection = RunService.Stepped:Connect(function()
-    if Configs.AutoFarm or Configs.SafeSpot or trackingTpToGun then
+    if Configs.AutoCollect or Configs.SafeSpot or trackingTpToGun then
         local char = player.Character
         if char then
             for _, part in ipairs(char:GetChildren()) do
@@ -1172,16 +1101,7 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
 
     if not root or not hum then return end
 
-    -- Slider-compatible numeric movement attributes.
-    hum.WalkSpeed = Configs.Speed and Configs.SpeedValue or 16
-
-    if Configs.JumpPower then
-        hum.UseJumpPower = true
-        hum.JumpPower = Configs.JumpPowerValue
-    else
-        hum.UseJumpPower = true
-        hum.JumpPower = 50
-    end
+    hum.WalkSpeed = Configs.Speed and 23 or 16
 
     if Configs.Reach then
         local myKnife = char:FindFirstChild("Knife") or char:FindFirstChild("Faca")
@@ -1193,7 +1113,7 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
                     local enemyHum  = p.Character:FindFirstChildOfClass("Humanoid")
                     if enemyRoot and enemyHum and enemyHum.Health > 0 then
                         local dist = (root.Position - enemyRoot.Position).Magnitude
-                        if dist <= 18 then
+                        if dist <= (Configs.ReachValue or 18) then
                             pcall(function()
                                 firetouchinterest(enemyRoot, handle, 0)
                                 firetouchinterest(enemyRoot, handle, 1)
@@ -1267,7 +1187,7 @@ task.spawn(function()
         CachedState.HasGun   = localPlayerHasGun
         CachedState.Murderer = currentMurderer
 
-        if Configs.AutoFarm and IsInGameMap() and (tick() - tempoUltimoScanMoedas > 0.3) then
+        if Configs.AutoCollect and (tick() - tempoUltimoScanMoedas > 0.3) then
             tempoUltimoScanMoedas = tick()
             local moedasEncontradas = {}
 
