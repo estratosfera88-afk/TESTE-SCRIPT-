@@ -414,7 +414,8 @@ local function ExecuteAutoShootOnce()
 end
 
 local function ToggleAutoShoot(enabled)
-    if Configs.AutoShoot == enabled then return end
+    -- A toggle somente habilita/desabilita o botão flutuante.
+    -- A execução real acontece exclusivamente por AutoShootOnce.
     Configs.AutoShoot = enabled
 
     if autoShootConnection then
@@ -425,13 +426,7 @@ local function ToggleAutoShoot(enabled)
     if not enabled then
         autoShootBusy = false
         autoShootFiring = false
-        return
     end
-
-    autoShootConnection = RunService.RenderStepped:Connect(function()
-        if not Configs.AutoShoot then return end
-        ExecuteAutoShootOnce()
-    end)
 end
 
 local function ObterArmaCaida(root)
@@ -591,18 +586,25 @@ local function ExecuteKnifeThrowOnce()
         return false
     end
 
+    -- Procura SOMENTE o Innocent vivo mais próximo.
+    -- Não altera câmera nem orientação do personagem.
     local closestPlayer, closestDist = nil, math.huge
 
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= player and p.Character then
-            local eRoot = p.Character:FindFirstChild("HumanoidRootPart")
-            local eHum = p.Character:FindFirstChildOfClass("Humanoid")
+            local role = ESP_DetectRole(p)
+            PlayerRoles[p] = role
 
-            if eRoot and eHum and eHum.Health > 0 then
-                local dist = (root.Position - eRoot.Position).Magnitude
-                if dist < closestDist then
-                    closestDist = dist
-                    closestPlayer = p
+            if role == "Innocent" then
+                local eRoot = p.Character:FindFirstChild("HumanoidRootPart")
+                local eHum = p.Character:FindFirstChildOfClass("Humanoid")
+
+                if eRoot and eHum and eHum.Health > 0 then
+                    local dist = (root.Position - eRoot.Position).Magnitude
+                    if dist < closestDist then
+                        closestDist = dist
+                        closestPlayer = p
+                    end
                 end
             end
         end
@@ -621,12 +623,7 @@ local function ExecuteKnifeThrowOnce()
     lastKnifeThrow = now
 
     local ok = pcall(function()
-        Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetRoot.Position)
-        root.CFrame = CFrame.lookAt(
-            root.Position,
-            Vector3.new(targetRoot.Position.X, root.Position.Y, targetRoot.Position.Z)
-        )
-
+        -- Silent: nenhuma alteração na câmera ou na rotação do personagem.
         if not Configs.KnifeThrow then return end
 
         local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
@@ -714,7 +711,17 @@ _G.AkatCallbacks = {
     ["Tp to gun"] = function(enabled) Configs.TpToGun = enabled end,
     ["Tp To Gun"] = function(enabled) Configs.TpToGun = enabled end,
 
-    AutoShoot          = function(enabled) ToggleAutoShoot(enabled) end,
+    AutoShoot = function(enabled)
+        ToggleAutoShoot(enabled)
+    end,
+
+    -- A toggle não dispara. O botão flutuante chama esta função uma única vez.
+    AutoShootOnce = function()
+        if not Configs.AutoShoot then
+            return false
+        end
+        return ExecuteAutoShootOnce()
+    end,
 
     KnifeThrow = function(enabled)
         Configs.KnifeThrow = enabled
@@ -724,21 +731,17 @@ _G.AkatCallbacks = {
             knifeThrowConnection = nil
         end
 
+        -- Sem loop automático: o botão flutuante é o único gatilho.
         if not enabled then
             knifeThrowBusy = false
-            return
         end
-
-        knifeThrowConnection = RunService.Heartbeat:Connect(function()
-            if not Configs.KnifeThrow then return end
-            ExecuteKnifeThrowOnce()
-        end)
     end,
 
     KnifeThrowOnce = function()
-        if Configs.KnifeThrow then
-            ExecuteKnifeThrowOnce()
+        if not Configs.KnifeThrow then
+            return false
         end
+        return ExecuteKnifeThrowOnce()
     end,
 
     -- 2. X-Ray
@@ -1079,7 +1082,10 @@ task.spawn(function()
                 ESP_UpdatePlayer(p)
             end
 
-            local role = PlayerRoles[p]
+            -- Atualiza os papéis independentemente do ESP estar ligado.
+            local role = ESP_DetectRole(p)
+            PlayerRoles[p] = role
+
             if role == "Murderer" then currentMurderer = p end
             if role == "Sheriff"  then currentSheriff  = p end
 
