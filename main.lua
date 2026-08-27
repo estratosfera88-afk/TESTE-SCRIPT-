@@ -13,6 +13,7 @@ local Lighting = game:GetService("Lighting")
 local player = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local mouse = player:GetMouse()
+local VirtualInputManager = game:GetService("VirtualInputManager")
 
 -- ==================== GUARD CONTRA EXECUÇÃO DUPLICADA ====================
 if _G.AkatLogicRunning then
@@ -31,6 +32,8 @@ local trackingTpToGun = false
 local autoCollectTemporarilyDisabled = false
 local autoShootConnection = nil
 local autoShootFiring = false
+local knifeThrowFiring = false
+local knifeThrowTarget = nil
 local autoDodgeConnection = nil
 local knifeThrowConnection = nil
 
@@ -96,25 +99,43 @@ task.spawn(function()
                 end)
             end
 
-            if Configs.AutoShoot and autoShootFiring and self == mouse then
-                if key == "Hit" or key == "hit" then
-                    local murderer = CachedState.Murderer
-                    if murderer and murderer.Character then
-                        local head = murderer.Character:FindFirstChild("Head")
-                        local root = murderer.Character:FindFirstChild("HumanoidRootPart")
-                        if head and root then
-                            local velocity = root.AssemblyLinearVelocity or root.Velocity or Vector3.zero
-                            if velocity.Magnitude > 80 then velocity = Vector3.zero end
-                            local pingCompensation = 0.045
-                            local targetPosition   = head.Position + (velocity * pingCompensation)
-                            return CFrame.new(targetPosition)
+            if self == mouse then
+                -- Silent target used only while the one-shot Auto Shoot press is active.
+                if Configs.AutoShoot and autoShootFiring then
+                    if key == "Hit" or key == "hit" then
+                        local murderer = CachedState.Murderer
+                        if murderer and murderer.Character then
+                            local head = murderer.Character:FindFirstChild("Head")
+                            local root = murderer.Character:FindFirstChild("HumanoidRootPart")
+                            if head and root then
+                                local velocity = root.AssemblyLinearVelocity or root.Velocity or Vector3.zero
+                                if velocity.Magnitude > 80 then velocity = Vector3.zero end
+                                local targetPosition = head.Position + (velocity * 0.045)
+                                return CFrame.new(targetPosition)
+                            end
                         end
+                    elseif key == "Target" or key == "target" then
+                        local murderer = CachedState.Murderer
+                        local pChar = murderer and murderer.Character
+                        local head = pChar and pChar:FindFirstChild("Head")
+                        if head then return head end
                     end
-                elseif key == "Target" or key == "target" then
-                    local murderer = CachedState.Murderer
-                    local pChar    = murderer and murderer.Character
-                    local head     = pChar and pChar:FindFirstChild("Head")
-                    if head then return head end
+                end
+
+                -- Silent target used only while the one-shot Knife Throw press is active.
+                if Configs.KnifeThrow and knifeThrowFiring and knifeThrowTarget then
+                    local targetChar = knifeThrowTarget.Character
+                    local targetHead = targetChar and targetChar:FindFirstChild("Head")
+                    local targetRoot = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
+                    if key == "Hit" or key == "hit" then
+                        if targetHead and targetRoot then
+                            local velocity = targetRoot.AssemblyLinearVelocity or targetRoot.Velocity or Vector3.zero
+                            if velocity.Magnitude > 80 then velocity = Vector3.zero end
+                            return CFrame.new(targetHead.Position + (velocity * 0.045))
+                        end
+                    elseif key == "Target" or key == "target" then
+                        if targetHead then return targetHead end
+                    end
                 end
             end
 
@@ -363,6 +384,31 @@ local function AutoShoot_GetValidTarget()
     return murderer, head
 end
 
+local function AutoShoot_ClickOnce()
+    local x, y = 0, 0
+    pcall(function()
+        local pos = UserInputService:GetMouseLocation()
+        x, y = pos.X, pos.Y
+    end)
+
+    local pressed = false
+    local ok = pcall(function()
+        VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
+        pressed = true
+        task.wait(0.025)
+        VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
+        pressed = false
+    end)
+
+    if pressed then
+        pcall(function()
+            VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
+        end)
+    end
+
+    return ok
+end
+
 local function ExecuteAutoShootOnce()
     if not Configs.AutoShoot or autoShootBusy then return false end
 
@@ -383,21 +429,25 @@ local function ExecuteAutoShootOnce()
     lastAutoShot = now
 
     local ok = pcall(function()
-        if not Configs.AutoShoot then return end
-
         if gun.Parent ~= player.Character then
             hum:EquipTool(gun)
-            task.wait()
+            task.wait(0.05)
         end
 
         if not Configs.AutoShoot or gun.Parent ~= player.Character then
             return
         end
 
-        -- O Silent Aim é aplicado pelo hook de mouse somente durante o disparo.
-        -- Nenhum movimento manual da câmera é necessário.
+        -- Keep the silent hook active only during the real press/release.
         autoShootFiring = true
-        gun:Activate()
+        local clickOK = AutoShoot_ClickOnce()
+
+        -- Some MM2 builds expose only Tool:Activate; use it only as fallback.
+        if not clickOK then
+            pcall(function() gun:Activate() end)
+        end
+
+        task.wait(0.03)
         autoShootFiring = false
     end)
 
@@ -510,6 +560,9 @@ local function LimparEDesligarAbsolutamente()
 
     for k in pairs(Configs) do Configs[k] = false end
     autoCollectTemporarilyDisabled = false
+    autoShootFiring = false
+    knifeThrowFiring = false
+    knifeThrowTarget = nil
 
     ESP_Disable()
 
@@ -556,6 +609,35 @@ local knifeThrowBusy = false
 local lastKnifeThrow = 0
 local KNIFE_THROW_COOLDOWN = 0.40
 
+local function KnifeThrow_ClickHoldRelease()
+    local x, y = 0, 0
+    pcall(function()
+        local pos = UserInputService:GetMouseLocation()
+        x, y = pos.X, pos.Y
+    end)
+
+    local pressed = false
+    local ok = pcall(function()
+        VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
+        pressed = true
+
+        -- MM2 knife throwing is commonly triggered by holding then releasing.
+        -- Keep the press long enough for the local tool script to enter throw mode.
+        task.wait(0.12)
+
+        VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
+        pressed = false
+    end)
+
+    if pressed then
+        pcall(function()
+            VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
+        end)
+    end
+
+    return ok
+end
+
 local function ExecuteKnifeThrowOnce()
     if not Configs.KnifeThrow or knifeThrowBusy then return false end
 
@@ -578,7 +660,7 @@ local function ExecuteKnifeThrowOnce()
         knife = backpack:FindFirstChild("Knife") or backpack:FindFirstChild("Faca")
         if knife then
             hum:EquipTool(knife)
-            task.wait()
+            task.wait(0.05)
         end
     end
 
@@ -586,8 +668,6 @@ local function ExecuteKnifeThrowOnce()
         return false
     end
 
-    -- Procura SOMENTE o Innocent vivo mais próximo.
-    -- Não altera câmera nem orientação do personagem.
     local closestPlayer, closestDist = nil, math.huge
 
     for _, p in ipairs(Players:GetPlayers()) do
@@ -595,7 +675,9 @@ local function ExecuteKnifeThrowOnce()
             local role = ESP_DetectRole(p)
             PlayerRoles[p] = role
 
-            if role == "Innocent" then
+            -- Prefer Innocent; if the round data exposes no Innocent,
+            -- allow Sheriff as the secondary valid target.
+            if role == "Innocent" or role == "Sheriff" then
                 local eRoot = p.Character:FindFirstChild("HumanoidRootPart")
                 local eHum = p.Character:FindFirstChildOfClass("Humanoid")
 
@@ -615,26 +697,44 @@ local function ExecuteKnifeThrowOnce()
     end
 
     local targetRoot = closestPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not targetRoot or not Configs.KnifeThrow then
+    if not targetRoot then
         return false
     end
 
     knifeThrowBusy = true
     lastKnifeThrow = now
+    knifeThrowTarget = closestPlayer
 
     local ok = pcall(function()
-        -- Silent: nenhuma alteração na câmera ou na rotação do personagem.
         if not Configs.KnifeThrow then return end
 
-        local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
-        local throwEvent = remotes
-            and remotes:FindFirstChild("Extras")
-            and remotes.Extras:FindFirstChild("Throw")
+        -- Real press/release. The mouse hook redirects Hit/Target to the
+        -- selected player while the press is active.
+        knifeThrowFiring = true
+        local clickOK = KnifeThrow_ClickHoldRelease()
 
-        if throwEvent then
-            throwEvent:FireServer(targetRoot.Position)
-        else
-            knife:Activate()
+        -- Fallback for builds that expose a direct throw remote.
+        if not clickOK then
+            local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+            local throwEvent = remotes
+                and remotes:FindFirstChild("Extras")
+                and remotes.Extras:FindFirstChild("Throw")
+            if throwEvent then
+                throwEvent:FireServer(targetRoot.Position)
+            else
+                pcall(function() knife:Activate() end)
+            end
+        end
+
+        knifeThrowFiring = false
+    end)
+
+    knifeThrowFiring = false
+    knifeThrowTarget = nil
+
+    pcall(function()
+        if hum and hum.Parent and knife and knife.Parent == char then
+            hum:UnequipTools()
         end
     end)
 
