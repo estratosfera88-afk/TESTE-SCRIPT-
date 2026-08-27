@@ -34,7 +34,6 @@ local autoShootConnection = nil
 local autoShootFiring = false
 local knifeThrowFiring = false
 local knifeThrowTarget = nil
-local autoDodgeConnection = nil
 local knifeThrowConnection = nil
 
 -- ==================== CONFIGURAÇÕES LOCAIS DO BACKEND ====================
@@ -50,7 +49,6 @@ local Configs = {
     ChatRoles    = false,
     KnifeThrow   = false,
     XRay         = false,
-    AutoDodge    = false,
     KillAll      = false,
     Invisibility = false
 }
@@ -438,13 +436,18 @@ local function ExecuteAutoShootOnce()
             return
         end
 
-        -- Keep the silent hook active only during the real press/release.
+        -- On mobile, do not synthesize a mouse click at the current pointer
+        -- position: that can steal/break the movement thumbstick. Tool:Activate()
+        -- triggers the same weapon action without consuming the joystick.
         autoShootFiring = true
-        local clickOK = AutoShoot_ClickOnce()
 
-        -- Some MM2 builds expose only Tool:Activate; use it only as fallback.
-        if not clickOK then
+        if UserInputService.TouchEnabled and not UserInputService.MouseEnabled then
             pcall(function() gun:Activate() end)
+        else
+            local clickOK = AutoShoot_ClickOnce()
+            if not clickOK then
+                pcall(function() gun:Activate() end)
+            end
         end
 
         task.wait(0.03)
@@ -555,7 +558,6 @@ local function LimparEDesligarAbsolutamente()
     if hbConnection      then hbConnection:Disconnect();      hbConnection      = nil end
     if steppedConnection then steppedConnection:Disconnect(); steppedConnection = nil end
     if autoShootConnection  then autoShootConnection:Disconnect();  autoShootConnection  = nil end
-    if autoDodgeConnection then autoDodgeConnection:Disconnect(); autoDodgeConnection = nil end
     if knifeThrowConnection then knifeThrowConnection:Disconnect(); knifeThrowConnection = nil end
 
     for k in pairs(Configs) do Configs[k] = false end
@@ -708,21 +710,27 @@ local function ExecuteKnifeThrowOnce()
     local ok = pcall(function()
         if not Configs.KnifeThrow then return end
 
-        -- Real press/release. The mouse hook redirects Hit/Target to the
-        -- selected player while the press is active.
+        -- Keep the target hook active while the actual throw is triggered.
+        -- On mobile, avoid synthetic mouse input so the movement thumbstick
+        -- remains untouched while the knife is thrown toward the selected target.
         knifeThrowFiring = true
-        local clickOK = KnifeThrow_ClickHoldRelease()
 
-        -- Fallback for builds that expose a direct throw remote.
-        if not clickOK then
-            local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
-            local throwEvent = remotes
-                and remotes:FindFirstChild("Extras")
-                and remotes.Extras:FindFirstChild("Throw")
-            if throwEvent then
-                throwEvent:FireServer(targetRoot.Position)
-            else
-                pcall(function() knife:Activate() end)
+        if UserInputService.TouchEnabled and not UserInputService.MouseEnabled then
+            pcall(function() knife:Activate() end)
+        else
+            local clickOK = KnifeThrow_ClickHoldRelease()
+
+            -- Fallback for builds that expose a direct throw remote.
+            if not clickOK then
+                local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+                local throwEvent = remotes
+                    and remotes:FindFirstChild("Extras")
+                    and remotes.Extras:FindFirstChild("Throw")
+                if throwEvent then
+                    throwEvent:FireServer(targetRoot.Position)
+                else
+                    pcall(function() knife:Activate() end)
+                end
             end
         end
 
@@ -860,41 +868,6 @@ _G.AkatCallbacks = {
                     end
                 end
             end
-        end
-    end,
-    
-    -- 3. Auto Dodge Knife Corrigido (Sem Bugs/Lag)
-    AutoDodge = function(enabled)
-        Configs.AutoDodge = enabled
-        if enabled and not autoDodgeConnection then
-            local lastDodge = 0
-            autoDodgeConnection = RunService.Heartbeat:Connect(function()
-                if not Configs.AutoDodge then return end
-                local agora = tick()
-                if agora - lastDodge < 0.45 then return end
-
-                local char = player.Character
-                local root = char and char:FindFirstChild("HumanoidRootPart")
-                if root then
-                    for _, obj in ipairs(workspace:GetDescendants()) do
-                        if obj:IsA("BasePart") and not obj:IsDescendantOf(char) then
-                            local n = obj.Name:lower()
-                            if n:find("knife") or n:find("faca") or n:find("throw") then
-                                local dist = (obj.Position - root.Position).Magnitude
-                                if dist < 25 then
-                                    lastDodge = agora
-                                    local sideDir = root.CFrame.RightVector * (math.random() > 0.5 and 14 or -14)
-                                    root.CFrame = root.CFrame + sideDir + Vector3.new(0, 3, 0)
-                                    break
-                                end
-                            end
-                        end
-                    end
-                end
-            end)
-        elseif not enabled and autoDodgeConnection then
-            autoDodgeConnection:Disconnect()
-            autoDodgeConnection = nil
         end
     end,
     
