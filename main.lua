@@ -1,5 +1,5 @@
 -- [[
---     AKAT MM2 MAIN LOGIC - FULLY UPDATED & OPTIMIZED [v6.0 - VISUALS / TELEPORTS / TARGETED ACTIONS 2026]
+--     AKAT MM2 MAIN LOGIC - FULLY UPDATED & OPTIMIZED [v6.2 - AUTOFARM FREE / AUTOSHOOT FIXED / VISUALS SYNC / REACH FEET 2026]
 --     Compatível com Delta Mobile & PC | MM2 (2026)
 --     BACKEND ONLY — sem código de interface visual
 -- ]]
@@ -263,14 +263,27 @@ local function ESP_ConnectPlayer(p)
 
     table.insert(connections, p.CharacterAdded:Connect(function(char)
         roundGeneration = roundGeneration + 1
-        task.wait(0.15)
+        -- Primeira reconstrução rápida (personagem sem cargo ainda).
+        task.wait(0.18)
         if Configs.ESP then ESP_UpdatePlayer(p) end
         if Configs.Name then UpdateName(p) end
         if Configs.Tracer then UpdateTracer(p) end
         if Configs.ViewReach then UpdateReachBox(p) end
 
+        -- Segunda reconstrução após o cargo ser atribuído pelo servidor.
+        task.spawn(function()
+            task.wait(0.55)
+            local role = ESP_DetectRole(p)
+            PlayerRoles[p] = role
+            if Configs.ESP then ESP_UpdatePlayer(p) end
+            if Configs.Name then UpdateName(p) end
+            if Configs.Tracer then UpdateTracer(p) end
+            if Configs.ViewReach then UpdateReachBox(p) end
+        end)
+
         table.insert(connections, char.ChildAdded:Connect(function()
             task.defer(function()
+                PlayerRoles[p] = ESP_DetectRole(p)
                 if Configs.ESP then ESP_UpdatePlayer(p) end
                 if Configs.Name then UpdateName(p) end
                 if Configs.Tracer then UpdateTracer(p) end
@@ -279,6 +292,7 @@ local function ESP_ConnectPlayer(p)
         end))
         table.insert(connections, char.ChildRemoved:Connect(function()
             task.defer(function()
+                PlayerRoles[p] = ESP_DetectRole(p)
                 if Configs.ESP then ESP_UpdatePlayer(p) end
                 if Configs.Name then UpdateName(p) end
                 if Configs.Tracer then UpdateTracer(p) end
@@ -348,7 +362,10 @@ local function UpdateReachCircle()
     end
     ReachCircle.Adornee = root
     ReachCircle.Radius = math.max(1, Configs.ReachValue or 18)
-    ReachCircle.CFrame = CFrame.new(0, -root.Size.Y * 0.5 - 0.05, 0)
+    -- Posiciona o círculo no chão (pés do personagem), usando metade da
+    -- altura do HumanoidRootPart mais um pequeno offset para tocar o solo.
+    local rootHalfH = root.Size.Y * 0.5
+    ReachCircle.CFrame = CFrame.new(0, -(rootHalfH + 2.8), 0)
 end
 
 local function RemoveVisual(p)
@@ -448,6 +465,10 @@ end
 local function Visuals_UpdateAll()
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= player then
+            -- Re-detecta o cargo antes de atualizar para garantir cor correta.
+            if p.Character then
+                PlayerRoles[p] = ESP_DetectRole(p)
+            end
             UpdateName(p); UpdateTracer(p); UpdateReachBox(p)
         end
     end
@@ -600,38 +621,34 @@ local function ExecuteAutoShootOnce()
     end
 
     autoShootBusy = true
-    lastAutoShot = now
+    lastAutoShot  = now
 
     local ok = pcall(function()
+        -- Equipa a arma se ainda não estiver equipada.
         if gun.Parent ~= player.Character then
             hum:EquipTool(gun)
-            task.wait(0.05)
+            task.wait(0.06)
         end
 
         if not Configs.AutoShoot or gun.Parent ~= player.Character then
             return
         end
 
-        -- On mobile, do not synthesize a mouse click at the current pointer
-        -- position: that can steal/break the movement thumbstick. Tool:Activate()
-        -- triggers the same weapon action without consuming the joystick.
+        -- Ativa o Silent Aim ANTES de disparar para que o hook do __index
+        -- redirecione o Hit/Target para a cabeça do murderer.
         autoShootFiring = true
 
-        if UserInputService.TouchEnabled and not UserInputService.MouseEnabled then
-            pcall(function() gun:Activate() end)
-        else
-            local clickOK = AutoShoot_ClickOnce()
-            if not clickOK then
-                pcall(function() gun:Activate() end)
-            end
-        end
+        -- gun:Activate() é o método mais confiável em mobile e PC:
+        -- não depende de posição do cursor, não interfere no thumbstick.
+        pcall(function() gun:Activate() end)
+        task.wait(0.04)
 
-        task.wait(0.03)
         autoShootFiring = false
     end)
 
     autoShootFiring = false
 
+    -- Desequipa após o tiro para não deixar a arma visível.
     pcall(function()
         if hum and hum.Parent and gun and gun.Parent == player.Character then
             hum:UnequipTools()
@@ -892,8 +909,8 @@ _G.AkatCallbacks = {
 
         if Configs.AutoFarm then
             if root then
-                root.Anchored = true
-                root.AssemblyLinearVelocity = Vector3.zero
+                -- Não ancora: o AutoFarm usa Tween para mover. Apenas zera rotação.
+                root.Anchored = false
                 root.AssemblyAngularVelocity = Vector3.zero
             end
             if hum then
@@ -1308,6 +1325,7 @@ local function ResetRoundState()
     autoShootBusy = false
     autoShootFiring = false
 
+    -- Limpa todos os visuais antigos antes de recriar.
     for p in pairs(PlayerRoles) do PlayerRoles[p] = nil end
     for p in pairs(NameTags) do if NameTags[p] then pcall(function() NameTags[p]:Destroy() end) end; NameTags[p] = nil end
     for p in pairs(Tracers) do
@@ -1318,11 +1336,32 @@ local function ResetRoundState()
     for p in pairs(ReachBoxes) do if ReachBoxes[p] then pcall(function() ReachBoxes[p]:Destroy() end) end; ReachBoxes[p] = nil end
     if ReachCircle then pcall(function() ReachCircle:Destroy() end); ReachCircle = nil end
 
+    -- Reconecta ESP (highlight) imediatamente.
     if Configs.ESP then
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= player then ESP_ConnectPlayer(p) end
         end
     end
+
+    -- Aguarda os personagens carregarem e os cargos serem detectados,
+    -- depois reconstrói Name, Tracer e ViewReach com as cores corretas.
+    task.spawn(function()
+        task.wait(0.5)
+        -- Re-detecta cargos para colorir corretamente.
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= player then
+                local role = ESP_DetectRole(p)
+                PlayerRoles[p] = role
+            end
+        end
+        -- Reconstrói visuais sincronizados com os cargos.
+        if Configs.Name or Configs.Tracer or Configs.ViewReach then
+            Visuals_UpdateAll()
+        end
+        if Configs.ViewReach then
+            UpdateReachCircle()
+        end
+    end)
 end
 
 characterConnection = player.CharacterAdded:Connect(function(char)
@@ -1373,8 +1412,8 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
     if not root or not hum then return end
 
     if Configs.AutoFarm then
-        root.Anchored = true
-        root.AssemblyLinearVelocity = Vector3.zero
+        -- Não ancora o personagem; o Tween movimenta o root diretamente.
+        -- Apenas garante que velocidade angular não atrapalhe o movimento suave.
         root.AssemblyAngularVelocity = Vector3.zero
         hum.WalkSpeed = 0
         hum.UseJumpPower = true
@@ -1521,7 +1560,19 @@ task.spawn(function()
         end
 
         if Configs.Name or Configs.Tracer or Configs.ViewReach then
-            Visuals_UpdateAll()
+            -- Reconstrói visuais ausentes (ex: novo jogador no lobby, nova rodada).
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= player and p.Character then
+                    local needsRebuild = false
+                    if Configs.Name    and not NameTags[p]   then needsRebuild = true end
+                    if Configs.Tracer  and not Tracers[p]    then needsRebuild = true end
+                    if Configs.ViewReach and not ReachBoxes[p] then needsRebuild = true end
+                    if needsRebuild then
+                        PlayerRoles[p] = ESP_DetectRole(p)
+                        UpdateName(p); UpdateTracer(p); UpdateReachBox(p)
+                    end
+                end
+            end
             UpdateReachCircle()
         end
         task.wait(0.2)
