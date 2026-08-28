@@ -32,14 +32,12 @@ local trackingTpToGun = false
 local autoFarmTemporarilyDisabled = false
 local autoShootConnection = nil
 local autoShootFiring = false
-local knifeThrowFiring = false
-local knifeThrowTarget = nil
-local knifeThrowConnection = nil
 local roundGeneration = 0
 local characterConnection = nil
 local xrayDescendantConnection = nil
 local XRayParts = {}
 local noclipEnabled = false
+local tpGunNoclipUntil = 0
 
 -- ==================== CONFIGURAÇÕES LOCAIS DO BACKEND ====================
 local Configs = {
@@ -61,7 +59,6 @@ local Configs = {
     SafeSpot     = false,
     AutoFarm     = false,
     ChatRoles    = false,
-    KnifeThrow   = false,
     XRay         = false,
     KillAll      = false,
     Invisibility = false
@@ -133,22 +130,7 @@ task.spawn(function()
                         if head then return head end
                     end
                 end
-
-                -- Silent target used only while the one-shot Knife Throw press is active.
-                if Configs.KnifeThrow and knifeThrowFiring and knifeThrowTarget then
-                    local targetChar = knifeThrowTarget.Character
-                    local targetHead = targetChar and targetChar:FindFirstChild("Head")
-                    local targetRoot = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
-                    if key == "Hit" or key == "hit" then
-                        if targetHead and targetRoot then
-                            local velocity = targetRoot.AssemblyLinearVelocity or targetRoot.Velocity or Vector3.zero
-                            if velocity.Magnitude > 80 then velocity = Vector3.zero end
-                            return CFrame.new(targetHead.Position + (velocity * 0.045))
-                        end
-                    elseif key == "Target" or key == "target" then
-                        if targetHead then return targetHead end
-                    end
-                end
+            end
             end
 
             return oldIndex(self, key)
@@ -409,33 +391,57 @@ local function UpdateTracer(p)
 end
 
 local function UpdateReachBox(p)
-    if p == player or not p.Character or not Configs.ViewReach then
-        if ReachBoxes[p] then pcall(function() ReachBoxes[p]:Destroy() end); ReachBoxes[p]=nil end
+    -- ViewReach now renders the player's own melee range as a flat ground circle.
+    -- The old per-player box was not a representation of the configured reach.
+    if p ~= player then
+        if ReachBoxes[p] then
+            pcall(function() ReachBoxes[p]:Destroy() end)
+            ReachBoxes[p] = nil
+        end
         return
     end
-    local char = p.Character
-    local box = ReachBoxes[p]
-    if not box or not box.Parent then
-        box = Instance.new("BoxHandleAdornment")
-        box.Name = "AkatReachView"
-        box.Adornee = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChildWhichIsA("BasePart")
-        box.Size = char:GetExtentsSize() + Vector3.new(0.35,0.35,0.35)
-        box.Color3 = Color3.fromRGB(220,0,0)
-        box.Transparency = 0.72
-        box.AlwaysOnTop = true
-        box.ZIndex = 1
-        box.Parent = char
-        ReachBoxes[p]=box
-    else
-        local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChildWhichIsA("BasePart")
-        box.Adornee=root; box.Size=char:GetExtentsSize()+Vector3.new(0.35,0.35,0.35)
+
+    if not Configs.ViewReach then
+        if ReachBoxes[player] then
+            pcall(function() ReachBoxes[player]:Destroy() end)
+            ReachBoxes[player] = nil
+        end
+        return
     end
+
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    local circle = ReachBoxes[player]
+    if not circle or not circle.Parent then
+        circle = Instance.new("CylinderHandleAdornment")
+        circle.Name = "AkatReachView"
+        circle.Adornee = root
+        circle.AlwaysOnTop = true
+        circle.Transparency = 0.62
+        circle.Color3 = Color3.fromRGB(220, 0, 0)
+        circle.ZIndex = 1
+        circle.Parent = root
+        ReachBoxes[player] = circle
+    else
+        circle.Adornee = root
+    end
+
+    circle.Radius = math.max(0.5, Configs.ReachValue or 18)
+    circle.Height = 0.08
+    circle.CFrame = CFrame.new(0, -(root.Size.Y * 0.5 + 0.04), 0)
 end
 
 local function Visuals_UpdateAll()
+    -- Own range circle
+    UpdateReachBox(player)
+
+    -- Player visuals
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= player then
-            UpdateName(p); UpdateTracer(p); UpdateReachBox(p)
+            UpdateName(p)
+            UpdateTracer(p)
         end
     end
 end
@@ -720,14 +726,12 @@ end
 local function LimparEDesligarAbsolutamente()
     if hbConnection      then hbConnection:Disconnect();      hbConnection      = nil end
     if steppedConnection then steppedConnection:Disconnect(); steppedConnection = nil end
+    if visualHeartbeatConnection then visualHeartbeatConnection:Disconnect(); visualHeartbeatConnection = nil end
     if autoShootConnection  then autoShootConnection:Disconnect();  autoShootConnection  = nil end
-    if knifeThrowConnection then knifeThrowConnection:Disconnect(); knifeThrowConnection = nil end
 
     for k in pairs(Configs) do Configs[k] = false end
     autoFarmTemporarilyDisabled = false
     autoShootFiring = false
-    knifeThrowFiring = false
-    knifeThrowTarget = nil
 
     ESP_Disable()
 
@@ -772,153 +776,6 @@ local function LimparEDesligarAbsolutamente()
 
     _G.AkatLogicRunning = false
 end
-
--- ==================== PONTE DE COMUNICAÇÃO GLOBAL ====================
-local knifeThrowBusy = false
-local lastKnifeThrow = 0
-local KNIFE_THROW_COOLDOWN = 0.40
-
-local function KnifeThrow_ClickHoldRelease()
-    local x, y = 0, 0
-    pcall(function()
-        local pos = UserInputService:GetMouseLocation()
-        x, y = pos.X, pos.Y
-    end)
-
-    local pressed = false
-    local ok = pcall(function()
-        VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
-        pressed = true
-
-        -- MM2 knife throwing is commonly triggered by holding then releasing.
-        -- Keep the press long enough for the local tool script to enter throw mode.
-        task.wait(0.12)
-
-        VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
-        pressed = false
-    end)
-
-    if pressed then
-        pcall(function()
-            VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
-        end)
-    end
-
-    return ok
-end
-
-local function ExecuteKnifeThrowOnce()
-    if not Configs.KnifeThrow or knifeThrowBusy then return false end
-
-    local now = tick()
-    if now - lastKnifeThrow < KNIFE_THROW_COOLDOWN then
-        return false
-    end
-
-    local char = player.Character
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if not char or not hum or hum.Health <= 0 or not root then
-        return false
-    end
-
-    local knife = char:FindFirstChild("Knife") or char:FindFirstChild("Faca")
-    local backpack = player:FindFirstChildOfClass("Backpack")
-
-    if not knife and backpack then
-        knife = backpack:FindFirstChild("Knife") or backpack:FindFirstChild("Faca")
-        if knife then
-            hum:EquipTool(knife)
-            task.wait(0.05)
-        end
-    end
-
-    if not Configs.KnifeThrow or not knife or knife.Parent ~= char then
-        return false
-    end
-
-    local closestPlayer, closestDist = nil, math.huge
-
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= player and p.Character then
-            local role = ESP_DetectRole(p)
-            PlayerRoles[p] = role
-
-            -- Prefer Innocent; if the round data exposes no Innocent,
-            -- allow Sheriff as the secondary valid target.
-            if role == "Innocent" or role == "Sheriff" then
-                local eRoot = p.Character:FindFirstChild("HumanoidRootPart")
-                local eHum = p.Character:FindFirstChildOfClass("Humanoid")
-
-                if eRoot and eHum and eHum.Health > 0 then
-                    local dist = (root.Position - eRoot.Position).Magnitude
-                    if dist < closestDist then
-                        closestDist = dist
-                        closestPlayer = p
-                    end
-                end
-            end
-        end
-    end
-
-    if not closestPlayer or not closestPlayer.Character then
-        return false
-    end
-
-    local targetRoot = closestPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not targetRoot then
-        return false
-    end
-
-    knifeThrowBusy = true
-    lastKnifeThrow = now
-    knifeThrowTarget = closestPlayer
-
-    local ok = pcall(function()
-        if not Configs.KnifeThrow then return end
-
-        -- Keep the target hook active while the actual throw is triggered.
-        -- On mobile, avoid synthetic mouse input so the movement thumbstick
-        -- remains untouched while the knife is thrown toward the selected target.
-        knifeThrowFiring = true
-
-        if UserInputService.TouchEnabled and not UserInputService.MouseEnabled then
-            pcall(function() knife:Activate() end)
-            task.wait(0.18)
-        else
-            local clickOK = KnifeThrow_ClickHoldRelease()
-
-            -- Fallback for builds that expose a direct throw remote.
-            if not clickOK then
-                local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
-                local throwEvent = remotes
-                    and remotes:FindFirstChild("Extras")
-                    and remotes.Extras:FindFirstChild("Throw")
-                if throwEvent then
-                    throwEvent:FireServer(targetRoot.Position)
-                else
-                    pcall(function() knife:Activate() end)
-                end
-            end
-        end
-
-        task.wait(0.18)
-        knifeThrowFiring = false
-    end)
-
-    knifeThrowFiring = false
-    knifeThrowTarget = nil
-
-    pcall(function()
-        if hum and hum.Parent and knife and knife.Parent == char then
-            hum:UnequipTools()
-        end
-    end)
-
-    knifeThrowBusy = false
-    return ok
-end
-
 _G.AkatCallbacks = {
 
     ESP = function(enabled)
@@ -929,18 +786,24 @@ _G.AkatCallbacks = {
         Configs.Name = enabled and true or false
         if not Configs.Name then
             for p,tag in pairs(NameTags) do pcall(function() tag:Destroy() end); NameTags[p]=nil end
+        else
+            task.defer(Visuals_UpdateAll)
         end
     end,
     Tracer = function(enabled)
         Configs.Tracer = enabled and true or false
         if not Configs.Tracer then
             for p,d in pairs(Tracers) do pcall(function() d.a:Destroy() end); pcall(function() d.b:Destroy() end); pcall(function() d.beam:Destroy() end); Tracers[p]=nil end
+        else
+            task.defer(Visuals_UpdateAll)
         end
     end,
     ViewReach = function(enabled)
         Configs.ViewReach = enabled and true or false
         if not Configs.ViewReach then
             for p,b in pairs(ReachBoxes) do pcall(function() b:Destroy() end); ReachBoxes[p]=nil end
+        else
+            task.defer(Visuals_UpdateAll)
         end
     end,
 
@@ -1014,9 +877,15 @@ _G.AkatCallbacks = {
         currentFarmTarget = nil
         if autoFarmTween then autoFarmTween:Cancel(); autoFarmTween = nil end
 
-        if not Configs.AutoFarm then
-            local char = player.Character
-            local root = char and char:FindFirstChild("HumanoidRootPart")
+        local char = player.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if Configs.AutoFarm then
+            if root then
+                root.Anchored = true
+                root.AssemblyLinearVelocity = Vector3.zero
+                root.AssemblyAngularVelocity = Vector3.zero
+            end
+        else
             if root then
                 root.Anchored = false
                 root.AssemblyLinearVelocity = Vector3.zero
@@ -1125,27 +994,6 @@ TpToGun = function(enabled) Configs.TpToGun = enabled end,
             return false
         end
         return ExecuteAutoShootOnce()
-    end,
-
-    KnifeThrow = function(enabled)
-        Configs.KnifeThrow = enabled
-
-        if knifeThrowConnection then
-            knifeThrowConnection:Disconnect()
-            knifeThrowConnection = nil
-        end
-
-        -- Sem loop automático: o botão flutuante é o único gatilho.
-        if not enabled then
-            knifeThrowBusy = false
-        end
-    end,
-
-    KnifeThrowOnce = function()
-        if not Configs.KnifeThrow then
-            return false
-        end
-        return ExecuteKnifeThrowOnce()
     end,
 
     -- 2. X-Ray
@@ -1352,6 +1200,7 @@ task.spawn(function()
                     if not trackingTpToGun then
                         lastPositionBeforeTpToGun = root.CFrame
                         trackingTpToGun = true
+                        tpGunNoclipUntil = tick() + 0.35
 
                         if Configs.AutoFarm then
                             autoFarmTemporarilyDisabled = true
@@ -1360,6 +1209,7 @@ task.spawn(function()
                             currentFarmTarget = nil
                         end
                     end
+                    tpGunNoclipUntil = tick() + 0.12
                     root.CFrame = gunPart.CFrame * CFrame.new(0, 3, 0)
                 else
                     if trackingTpToGun then
@@ -1368,6 +1218,7 @@ task.spawn(function()
                         end
                         lastPositionBeforeTpToGun = nil
                         trackingTpToGun           = false
+                        tpGunNoclipUntil = 0
 
                         if autoFarmTemporarilyDisabled then
                             autoFarmTemporarilyDisabled = false
@@ -1385,6 +1236,7 @@ task.spawn(function()
                 end
                 lastPositionBeforeTpToGun = nil
                 trackingTpToGun           = false
+                tpGunNoclipUntil = 0
 
                 if autoFarmTemporarilyDisabled then
                     autoFarmTemporarilyDisabled = false
@@ -1397,7 +1249,7 @@ end)
 
 -- ==================== NOCLIP SEGURO ====================
 steppedConnection = RunService.Stepped:Connect(function()
-    if Configs.AutoFarm or Configs.SafeSpot or trackingTpToGun or Configs.AntiFling then
+    if Configs.AutoFarm or Configs.SafeSpot or tick() < tpGunNoclipUntil or Configs.AntiFling then
         local char = player.Character
         if char then
             for _, part in ipairs(char:GetChildren()) do
@@ -1419,6 +1271,7 @@ local function ResetRoundState()
     if autoFarmTween then autoFarmTween:Cancel(); autoFarmTween = nil end
     gunDroppedThisRound = false
     trackingTpToGun = false
+    tpGunNoclipUntil = 0
     lastPositionBeforeTpToGun = nil
     announcedThisRound = false
     autoShootBusy = false
@@ -1525,6 +1378,34 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
     end
 end)
 
+-- ==================== VISUAL REFRESH RÁPIDO ====================
+-- Rebuilds Name/Tracer/Reach immediately after character swaps and between rounds.
+local visualHeartbeatConnection = RunService.Heartbeat:Connect(function()
+    if Configs.Name or Configs.Tracer or Configs.ViewReach then
+        Visuals_UpdateAll()
+    end
+end)
+
+Players.PlayerAdded:Connect(function(p)
+    p.CharacterAdded:Connect(function()
+        task.defer(function()
+            task.wait()
+            Visuals_UpdateAll()
+        end)
+    end)
+end)
+
+for _, p in ipairs(Players:GetPlayers()) do
+    if p ~= player then
+        p.CharacterAdded:Connect(function()
+            task.defer(function()
+                task.wait()
+                Visuals_UpdateAll()
+            end)
+        end)
+    end
+end
+
 -- ==================== THREAD CENTRAL DE SCANNER E CACHE ====================
 task.spawn(function()
     local tempoUltimoScanMoedas = 0
@@ -1537,7 +1418,7 @@ task.spawn(function()
         local currentMurderer, currentSheriff = nil, nil
 
         local agora         = tick()
-        local atualizarESP  = Configs.ESP and (agora - tempoUltimoScanESP > 0.35)
+        local atualizarESP  = Configs.ESP and (agora - tempoUltimoScanESP > 0.08)
         if atualizarESP then
             tempoUltimoScanESP = agora
         end
@@ -1620,7 +1501,7 @@ task.spawn(function()
         if Configs.Name or Configs.Tracer or Configs.ViewReach then
             Visuals_UpdateAll()
         end
-        task.wait(0.2)
+        task.wait(0.05)
     end
 end)
 
