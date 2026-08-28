@@ -35,6 +35,11 @@ local autoShootFiring = false
 local knifeThrowFiring = false
 local knifeThrowTarget = nil
 local knifeThrowConnection = nil
+local roundGeneration = 0
+local characterConnection = nil
+local xrayDescendantConnection = nil
+local XRayParts = {}
+local noclipEnabled = false
 
 -- ==================== CONFIGURAÇÕES LOCAIS DO BACKEND ====================
 local Configs = {
@@ -182,6 +187,12 @@ local function ESP_DetectRole(p)
     local function checkAttr(target)
         if not target then return nil end
         local role = target:GetAttribute("Role") or target:GetAttribute("role") or target:GetAttribute("MMRole")
+        if not role then
+            local roleValue = target:FindFirstChild("Role") or target:FindFirstChild("role") or target:FindFirstChild("MMRole")
+            if roleValue and roleValue:IsA("StringValue") then
+                role = roleValue.Value
+            end
+        end
         if not role then return nil end
         local r = tostring(role):lower()
         if r:find("murder") or r:find("assassin") then return "Murderer" end
@@ -258,43 +269,53 @@ end
 
 local function ESP_ConnectPlayer(p)
     if p == player then return end
-    if espEventConnections[p] then return end
+
+    if espEventConnections[p] then
+        for _, c in ipairs(espEventConnections[p]) do
+            pcall(function() c:Disconnect() end)
+        end
+    end
 
     local connections = {}
-
-    local c1 = p.CharacterAdded:Connect(function(char)
-        task.wait(0.5)
-        if Configs.ESP then
-            ESP_UpdatePlayer(p)
-            char.ChildAdded:Connect(function()
-                task.wait(0.1)
-                if Configs.ESP then ESP_UpdatePlayer(p) end
-            end)
-            char.ChildRemoved:Connect(function()
-                task.wait(0.1)
-                if Configs.ESP then ESP_UpdatePlayer(p) end
-            end)
-        end
-    end)
-    table.insert(connections, c1)
-
-    task.spawn(function()
-        local bp = p:WaitForChild("Backpack", 5)
-        if bp and espEventConnections[p] then
-            local c2 = bp.ChildAdded:Connect(function()
-                task.wait(0.1)
-                if Configs.ESP then ESP_UpdatePlayer(p) end
-            end)
-            local c3 = bp.ChildRemoved:Connect(function()
-                task.wait(0.1)
-                if Configs.ESP then ESP_UpdatePlayer(p) end
-            end)
-            table.insert(espEventConnections[p], c2)
-            table.insert(espEventConnections[p], c3)
-        end
-    end)
-
     espEventConnections[p] = connections
+
+    table.insert(connections, p.CharacterAdded:Connect(function(char)
+        roundGeneration = roundGeneration + 1
+        task.wait(0.15)
+        if not Configs.ESP then return end
+        ESP_UpdatePlayer(p)
+
+        table.insert(connections, char.ChildAdded:Connect(function()
+            task.defer(function()
+                if Configs.ESP then ESP_UpdatePlayer(p) end
+            end)
+        end))
+        table.insert(connections, char.ChildRemoved:Connect(function()
+            task.defer(function()
+                if Configs.ESP then ESP_UpdatePlayer(p) end
+            end)
+        end))
+    end))
+
+    table.insert(connections, p.CharacterRemoving:Connect(function()
+        RemoveVisual(p)
+        PlayerRoles[p] = nil
+    end))
+
+    local bp = p:FindFirstChildOfClass("Backpack") or p:FindFirstChild("Backpack")
+    if bp then
+        table.insert(connections, bp.ChildAdded:Connect(function()
+            task.defer(function()
+                if Configs.ESP then ESP_UpdatePlayer(p) end
+            end)
+        end))
+        table.insert(connections, bp.ChildRemoved:Connect(function()
+            task.defer(function()
+                if Configs.ESP then ESP_UpdatePlayer(p) end
+            end)
+        end))
+    end
+
     ESP_UpdatePlayer(p)
 end
 
@@ -469,16 +490,22 @@ local function AutoShoot_FindGun()
     local backpack = player:FindFirstChildOfClass("Backpack")
     if not char then return nil, nil end
 
-    local gun = char:FindFirstChild("Gun")
-        or char:FindFirstChild("Pistol")
-        or char:FindFirstChild("Revolver")
-
-    if not gun and backpack then
-        gun = backpack:FindFirstChild("Gun")
-            or backpack:FindFirstChild("Pistol")
-            or backpack:FindFirstChild("Revolver")
+    local function findGun(container)
+        if not container then return nil end
+        for _, item in ipairs(container:GetChildren()) do
+            if item:IsA("Tool") then
+                local n = item.Name:lower()
+                if item:FindFirstChild("GunScript") or item:FindFirstChild("Gun")
+                    or n:find("gun") or n:find("pistol") or n:find("revolver")
+                    or n:find("sheriff") or n:find("laser") then
+                    return item
+                end
+            end
+        end
+        return nil
     end
 
+    local gun = findGun(char) or findGun(backpack)
     local hum = char:FindFirstChildOfClass("Humanoid")
     return gun, hum
 end
@@ -508,7 +535,10 @@ local function AutoShoot_GetValidTarget()
         return nil
     end
 
-    if PlayerRoles[murderer] and PlayerRoles[murderer] ~= "Murderer" then
+    -- Revalidate the role every press so a new round cannot leave a stale cached role.
+    local freshRole = ESP_DetectRole(murderer)
+    PlayerRoles[murderer] = freshRole
+    if freshRole ~= "Murderer" then
         return nil
     end
 
@@ -940,7 +970,10 @@ _G.AkatCallbacks = {
             Configs.Reach = value and true or false
         end
     end,
-    AntiFling = function(enabled) Configs.AntiFling = enabled end,
+    AntiFling = function(enabled)
+        Configs.AntiFling = enabled and true or false
+        noclipEnabled = Configs.AntiFling
+    end,
     
     ChatRoles = function(enabled)
         Configs.ChatRoles = enabled
@@ -977,10 +1010,11 @@ _G.AkatCallbacks = {
     end,
 
     AutoFarm = function(enabled)
-        Configs.AutoFarm = enabled
-        if not enabled then
-            currentFarmTarget = nil
-            if autoFarmTween then autoFarmTween:Cancel(); autoFarmTween = nil end
+        Configs.AutoFarm = enabled and true or false
+        currentFarmTarget = nil
+        if autoFarmTween then autoFarmTween:Cancel(); autoFarmTween = nil end
+
+        if not Configs.AutoFarm then
             local char = player.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
             if root then
@@ -990,57 +1024,94 @@ _G.AkatCallbacks = {
                 rayParams.FilterDescendantsInstances = {char}
                 rayParams.FilterType = Enum.RaycastFilterType.Exclude
                 local result = workspace:Raycast(root.Position, Vector3.new(0, -1000, 0), rayParams)
-                if result then
-                    root.CFrame = CFrame.new(result.Position + Vector3.new(0, 3, 0))
+                if result then root.CFrame = CFrame.new(result.Position + Vector3.new(0, 3, 0)) end
+            end
+        end
+    end,
+
+TpLobby = function(enabled)
+        Configs.TpLobby = false
+        if not enabled then return false end
+
+        local char = player.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if not root then return false end
+
+        local function scorePart(part)
+            local n = part.Name:lower()
+            local score = 0
+            if n:find("lobby") then score += 8 end
+            if n:find("spawn") then score += 6 end
+            if part:IsA("SpawnLocation") then score += 10 end
+            return score
+        end
+
+        local candidates = {}
+        for _, d in ipairs(workspace:GetDescendants()) do
+            if d:IsA("SpawnLocation") or (d:IsA("BasePart") and (d.Name:lower():find("lobby") or d.Name:lower():find("spawn"))) then
+                table.insert(candidates, d)
+            end
+        end
+
+        table.sort(candidates, function(a,b) return scorePart(a) > scorePart(b) end)
+        local target = candidates[1]
+        if target then
+            root.CFrame = target.CFrame + Vector3.new(0, 4, 0)
+            return true
+        end
+        return false
+    end,
+
+    TpMap = function(enabled)
+        Configs.TpMap = false
+        if not enabled then return false end
+
+        local char = player.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if not root then return false end
+
+        local lobbyNames = {Lobby=true, LobbyMap=true, LobbyArea=true}
+        local bestPart, bestScore = nil, -math.huge
+
+        for _, container in ipairs(workspace:GetChildren()) do
+            if not lobbyNames[container.Name] then
+                local isCandidate = container:IsA("Model") or container:IsA("Folder")
+                if isCandidate then
+                    for _, d in ipairs(container:GetDescendants()) do
+                        if d:IsA("BasePart") then
+                            local n = d.Name:lower()
+                            local score = 0
+                            if n:find("spawn") or n:find("player") then score += 25 end
+                            if n:find("map") then score += 8 end
+                            if d.Size.X > 6 and d.Size.Z > 6 then score += 2 end
+                            if score > bestScore then bestScore, bestPart = score, d end
+                        end
+                    end
                 end
             end
         end
-    end,
 
-    TpLobby = function(enabled)
-        Configs.TpLobby = false
-        if not enabled then return end
-        local char=player.Character; local root=char and char:FindFirstChild("HumanoidRootPart")
-        if not root then return end
-        local candidates={}
-        local lobby=workspace:FindFirstChild("Lobby") or workspace:FindFirstChild("LobbyMap") or workspace:FindFirstChild("LobbyArea")
-        if lobby then
-            for _,d in ipairs(lobby:GetDescendants()) do if d:IsA("SpawnLocation") or (d:IsA("BasePart") and (d.Name:lower():find("spawn") or d.Name:lower():find("lobby"))) then table.insert(candidates,d) end end
-        end
-        if #candidates==0 then
-            for _,d in ipairs(workspace:GetDescendants()) do if d:IsA("SpawnLocation") then table.insert(candidates,d) end end
-        end
-        local target=candidates[1]
-        if target then root.CFrame=target.CFrame+Vector3.new(0,3,0) end
-    end,
-    TpMap = function(enabled)
-        Configs.TpMap = false
-        if not enabled then return end
-        local char=player.Character; local root=char and char:FindFirstChild("HumanoidRootPart")
-        if not root then return end
-        local map=workspace:FindFirstChild("Map") or workspace:FindFirstChild("MapModel") or workspace:FindFirstChild("MapContainer")
-        local targetPos=nil
-        if map then
-            local sp=map:FindFirstChild("Spawn",true) or map:FindFirstChild("SpawnLocation",true) or map:FindFirstChild("PlayerSpawn",true)
-            if sp and sp:IsA("BasePart") then
-                targetPos=sp.Position
-            elseif map:IsA("Model") then
-                local cf,size=map:GetBoundingBox()
-                local rayParams=RaycastParams.new(); rayParams.FilterDescendantsInstances={char}; rayParams.FilterType=Enum.RaycastFilterType.Exclude
-                local origin=cf.Position+Vector3.new(0,size.Y*0.5+250,0)
-                local result=workspace:Raycast(origin,Vector3.new(0,-(size.Y+500),0),rayParams)
-                if result then targetPos=result.Position end
+        if not bestPart then
+            -- Fallback: use a large non-lobby floor part, then place the player above it.
+            for _, d in ipairs(workspace:GetDescendants()) do
+                if d:IsA("BasePart") and d.Size.X > 12 and d.Size.Z > 12
+                    and not d:IsDescendantOf(char)
+                    and not d.Name:lower():find("lobby") then
+                    bestPart = d
+                    break
+                end
             end
         end
-        if targetPos then
-            local rayParams=RaycastParams.new(); rayParams.FilterDescendantsInstances={char}; rayParams.FilterType=Enum.RaycastFilterType.Exclude
-            local ground=workspace:Raycast(targetPos+Vector3.new(0,250,0),Vector3.new(0,-500,0),rayParams)
-            if ground then targetPos=ground.Position end
-            root.CFrame=CFrame.new(targetPos+Vector3.new(0,3,0))
+
+        if bestPart then
+            local pos = bestPart.Position + Vector3.new(0, math.max(4, bestPart.Size.Y * 0.5 + 3), 0)
+            root.CFrame = CFrame.new(pos)
+            return true
         end
+        return false
     end,
 
-    TpToGun = function(enabled) Configs.TpToGun = enabled end,
+TpToGun = function(enabled) Configs.TpToGun = enabled end,
     ["Tp to gun"] = function(enabled) Configs.TpToGun = enabled end,
     ["Tp To Gun"] = function(enabled) Configs.TpToGun = enabled end,
 
@@ -1079,23 +1150,44 @@ _G.AkatCallbacks = {
 
     -- 2. X-Ray
     XRay = function(enabled)
-        Configs.XRay = enabled
-        for _, d in ipairs(workspace:GetDescendants()) do
-            if d:IsA("BasePart") and not d:IsDescendantOf(player.Character) and not d:IsDescendantOf(Camera) then
-                if enabled then
-                    if not d:GetAttribute("OriginalTransparency") then
-                        d:SetAttribute("OriginalTransparency", d.Transparency)
-                    end
-                    d.Transparency = 0.5
-                else
-                    if d:GetAttribute("OriginalTransparency") then
-                        d.Transparency = d:GetAttribute("OriginalTransparency")
-                    end
-                end
-            end
+        Configs.XRay = enabled and true or false
+
+        if xrayDescendantConnection then
+            xrayDescendantConnection:Disconnect()
+            xrayDescendantConnection = nil
         end
+
+        if not Configs.XRay then
+            for part, original in pairs(XRayParts) do
+                if part and part.Parent then
+                    part.LocalTransparencyModifier = original
+                end
+                XRayParts[part] = nil
+            end
+            return
+        end
+
+        local function apply(part)
+            if not Configs.XRay or not part:IsA("BasePart") then return end
+            local char = player.Character
+            if part:IsDescendantOf(char) or part:IsDescendantOf(Camera) then return end
+            if XRayParts[part] == nil then
+                XRayParts[part] = part.LocalTransparencyModifier
+            end
+            part.LocalTransparencyModifier = 0.55
+        end
+
+        for _, d in ipairs(workspace:GetDescendants()) do
+            apply(d)
+        end
+
+        xrayDescendantConnection = workspace.DescendantAdded:Connect(function(d)
+            if d:IsA("BasePart") then
+                task.defer(function() apply(d) end)
+            end
+        end)
     end,
-    
+
     -- 4. Kill All Automático Corrigido (Pega a faca e ataca no ar)
     KillAll = function(enabled)
         Configs.KillAll = enabled
@@ -1195,7 +1287,14 @@ task.spawn(function()
                             {CFrame = goalCFrame}
                         )
                         autoFarmTween:Play()
-                        autoFarmTween.Completed:Wait()
+                        -- Do not block the worker on a stale tween; round transitions can destroy the target.
+                        task.wait(math.min(timeToReach, 0.12))
+                    end
+
+                    if not Configs.AutoFarm or not root.Parent or not target.Parent then
+                        currentFarmTarget = nil
+                        if autoFarmTween then autoFarmTween:Cancel(); autoFarmTween = nil end
+                        continue
                     end
 
                     pcall(function()
@@ -1298,7 +1397,7 @@ end)
 
 -- ==================== NOCLIP SEGURO ====================
 steppedConnection = RunService.Stepped:Connect(function()
-    if Configs.AutoFarm or Configs.SafeSpot or trackingTpToGun then
+    if Configs.AutoFarm or Configs.SafeSpot or trackingTpToGun or Configs.AntiFling then
         local char = player.Character
         if char then
             for _, part in ipairs(char:GetChildren()) do
@@ -1308,6 +1407,68 @@ steppedConnection = RunService.Stepped:Connect(function()
             end
         end
     end
+end)
+
+-- ==================== CICLO DE VIDA DA RODADA / RESPAWN ====================
+local function ResetRoundState()
+    roundGeneration += 1
+    CachedState.Murderer = nil
+    CachedState.HasGun = false
+    CachedState.Coins = {}
+    currentFarmTarget = nil
+    if autoFarmTween then autoFarmTween:Cancel(); autoFarmTween = nil end
+    gunDroppedThisRound = false
+    trackingTpToGun = false
+    lastPositionBeforeTpToGun = nil
+    announcedThisRound = false
+    autoShootBusy = false
+    autoShootFiring = false
+
+    for p in pairs(PlayerRoles) do PlayerRoles[p] = nil end
+    for p in pairs(NameTags) do if NameTags[p] then pcall(function() NameTags[p]:Destroy() end) end; NameTags[p] = nil end
+    for p in pairs(Tracers) do
+        local d = Tracers[p]
+        pcall(function() d.a:Destroy() end); pcall(function() d.b:Destroy() end); pcall(function() d.beam:Destroy() end)
+        Tracers[p] = nil
+    end
+    for p in pairs(ReachBoxes) do if ReachBoxes[p] then pcall(function() ReachBoxes[p]:Destroy() end) end; ReachBoxes[p] = nil end
+
+    if Configs.ESP then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= player then ESP_ConnectPlayer(p) end
+        end
+    end
+end
+
+characterConnection = player.CharacterAdded:Connect(function(char)
+    ResetRoundState()
+    task.wait(0.2)
+
+    if Configs.Invisibility and char.Parent then
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                part.Transparency = 1
+            elseif part:IsA("Decal") then
+                part.Transparency = 1
+            end
+        end
+    end
+    if Configs.XRay then
+        if xrayDescendantConnection then xrayDescendantConnection:Disconnect() end
+        -- Reapply only to the current workspace once after respawn.
+        task.defer(function()
+            if Configs.XRay then _G.AkatCallbacks.XRay(true) end
+        end)
+    end
+end)
+
+Players.PlayerAdded:Connect(function(p)
+    if Configs.ESP then ESP_ConnectPlayer(p) end
+end)
+
+Players.PlayerRemoving:Connect(function(p)
+    ESP_DisconnectPlayer(p)
+    PlayerRoles[p] = nil
 end)
 
 -- ==================== LOOP PRINCIPAL ====================
@@ -1345,6 +1506,10 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
     end
 
     if Configs.AntiFling then
+        -- Anti-Fling also silently keeps our own character noclip.
+        for _, part in ipairs(char:GetChildren()) do
+            if part:IsA("BasePart") then part.CanCollide = false end
+        end
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= player and p.Character then
                 for _, part in ipairs(p.Character:GetChildren()) do
@@ -1372,7 +1537,7 @@ task.spawn(function()
         local currentMurderer, currentSheriff = nil, nil
 
         local agora         = tick()
-        local atualizarESP  = Configs.ESP and (agora - tempoUltimoScanESP > 1.0)
+        local atualizarESP  = Configs.ESP and (agora - tempoUltimoScanESP > 0.35)
         if atualizarESP then
             tempoUltimoScanESP = agora
         end
