@@ -1,5 +1,5 @@
 -- [[
---     AKAT MM2 MAIN LOGIC - FULLY UPDATED & OPTIMIZED [v5.9 - PERFECT AIM & UTILITIES 2026]
+--     AKAT MM2 MAIN LOGIC - FULLY UPDATED & OPTIMIZED [v6.0 - VISUALS / TELEPORTS / TARGETED ACTIONS 2026]
 --     Compatível com Delta Mobile & PC | MM2 (2026)
 --     BACKEND ONLY — sem código de interface visual
 -- ]]
@@ -39,6 +39,9 @@ local knifeThrowConnection = nil
 -- ==================== CONFIGURAÇÕES LOCAIS DO BACKEND ====================
 local Configs = {
     ESP          = false,
+    Name         = false,
+    Tracer       = false,
+    ViewReach    = false,
     AutoShoot    = false,
     Speed        = false,
     SpeedValue   = 16,
@@ -48,6 +51,8 @@ local Configs = {
     ReachValue   = 18,
     AntiFling    = false,
     TpToGun      = false,
+    TpLobby      = false,
+    TpMap        = false,
     SafeSpot     = false,
     AutoFarm     = false,
     ChatRoles    = false,
@@ -307,6 +312,119 @@ local function ESP_DisconnectPlayer(p)
     PlayerRoles[p] = nil
 end
 
+-- ==================== NAME / TRACER / VIEW REACH ====================
+local NameTags = {}
+local Tracers = {}
+local ReachBoxes = {}
+
+local function RemoveVisual(p)
+    if NameTags[p] then pcall(function() NameTags[p]:Destroy() end); NameTags[p] = nil end
+    if Tracers[p] then
+        pcall(function() Tracers[p].a:Destroy() end)
+        pcall(function() Tracers[p].b:Destroy() end)
+        pcall(function() Tracers[p].beam:Destroy() end)
+        Tracers[p] = nil
+    end
+    if ReachBoxes[p] then pcall(function() ReachBoxes[p]:Destroy() end); ReachBoxes[p] = nil end
+end
+
+local function UpdateName(p)
+    if p == player or not p.Character or not Configs.Name then
+        if NameTags[p] then pcall(function() NameTags[p]:Destroy() end); NameTags[p]=nil end
+        return
+    end
+    local head = p.Character:FindFirstChild("Head")
+    if not head then return end
+    local role = ESP_DetectRole(p); PlayerRoles[p] = role
+    local color = ROLE_COLORS[role] or ROLE_COLORS.Innocent
+    local tag = NameTags[p]
+    if not tag or not tag.Parent then
+        tag = Instance.new("BillboardGui")
+        tag.Name = "AkatName"
+        tag.Size = UDim2.fromOffset(140, 26)
+        tag.StudsOffset = Vector3.new(0, 2.8, 0)
+        tag.AlwaysOnTop = true
+        tag.Parent = head
+        local label = Instance.new("TextLabel")
+        label.Name = "Name"
+        label.Size = UDim2.fromScale(1,1)
+        label.BackgroundTransparency = 1
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 12
+        label.TextStrokeTransparency = 0.55
+        label.Parent = tag
+        NameTags[p] = tag
+    end
+    local label = tag:FindFirstChild("Name")
+    if label then label.Text = "[" .. p.DisplayName .. "]"; label.TextColor3 = color end
+end
+
+local function UpdateTracer(p)
+    if p == player or not p.Character or not Configs.Tracer then
+        if Tracers[p] then
+            pcall(function() Tracers[p].a:Destroy() end); pcall(function() Tracers[p].b:Destroy() end); pcall(function() Tracers[p].beam:Destroy() end)
+            Tracers[p]=nil
+        end
+        return
+    end
+    local targetRoot = p.Character:FindFirstChild("HumanoidRootPart")
+    local myChar = player.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not targetRoot or not myRoot then return end
+    local role = ESP_DetectRole(p); PlayerRoles[p]=role
+    local color = ROLE_COLORS[role] or ROLE_COLORS.Innocent
+    local data = Tracers[p]
+    if not data or not data.a.Parent or not data.b.Parent or not data.beam.Parent then
+        local a = Instance.new("Attachment"); a.Name="AkatTracerStart"; a.Parent=myRoot
+        local b = Instance.new("Attachment"); b.Name="AkatTracerEnd"; b.Parent=targetRoot
+        local beam = Instance.new("Beam"); beam.Name="AkatTracer"; beam.Attachment0=a; beam.Attachment1=b; beam.FaceCamera=true; beam.LightEmission=0; beam.Width0=0.035; beam.Width1=0.01; beam.Transparency=NumberSequence.new(0.15); beam.Parent=myRoot
+        data={a=a,b=b,beam=beam}; Tracers[p]=data
+    end
+    data.beam.Color = ColorSequence.new(color)
+    -- Dynamic thickness/distance keeps distant tracers subtle and nearby ones readable.
+    local d = (myRoot.Position-targetRoot.Position).Magnitude
+    local w = math.clamp(0.055 - d*0.00006, 0.012, 0.055)
+    data.beam.Width0=w; data.beam.Width1=w*0.28
+end
+
+local function UpdateReachBox(p)
+    if p == player or not p.Character or not Configs.ViewReach then
+        if ReachBoxes[p] then pcall(function() ReachBoxes[p]:Destroy() end); ReachBoxes[p]=nil end
+        return
+    end
+    local char = p.Character
+    local box = ReachBoxes[p]
+    if not box or not box.Parent then
+        box = Instance.new("BoxHandleAdornment")
+        box.Name = "AkatReachView"
+        box.Adornee = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChildWhichIsA("BasePart")
+        box.Size = char:GetExtentsSize() + Vector3.new(0.35,0.35,0.35)
+        box.Color3 = Color3.fromRGB(220,0,0)
+        box.Transparency = 0.72
+        box.AlwaysOnTop = true
+        box.ZIndex = 1
+        box.Parent = char
+        ReachBoxes[p]=box
+    else
+        local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChildWhichIsA("BasePart")
+        box.Adornee=root; box.Size=char:GetExtentsSize()+Vector3.new(0.35,0.35,0.35)
+    end
+end
+
+local function Visuals_UpdateAll()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= player then
+            UpdateName(p); UpdateTracer(p); UpdateReachBox(p)
+        end
+    end
+end
+
+local function Visuals_ClearAll()
+    for p in pairs(NameTags) do if NameTags[p] then pcall(function() NameTags[p]:Destroy() end) end; NameTags[p]=nil end
+    for p in pairs(Tracers) do local d=Tracers[p]; pcall(function() d.a:Destroy() end); pcall(function() d.b:Destroy() end); pcall(function() d.beam:Destroy() end); Tracers[p]=nil end
+    for p in pairs(ReachBoxes) do pcall(function() ReachBoxes[p]:Destroy() end); ReachBoxes[p]=nil end
+end
+
 local function ESP_Enable()
     Configs.ESP = true
     if espPlayerAddedConn    then espPlayerAddedConn:Disconnect() end
@@ -368,8 +486,19 @@ end
 local function AutoShoot_GetValidTarget()
     local murderer = CachedState.Murderer
     if not murderer or murderer == player or not murderer.Parent then
-        return nil
+        murderer = nil
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= player and p.Character then
+                local role = ESP_DetectRole(p)
+                PlayerRoles[p] = role
+                if role == "Murderer" then
+                    murderer = p
+                    break
+                end
+            end
+        end
     end
+    if not murderer or murderer == player or not murderer.Parent then return nil end
 
     local char = murderer.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -725,6 +854,7 @@ local function ExecuteKnifeThrowOnce()
 
         if UserInputService.TouchEnabled and not UserInputService.MouseEnabled then
             pcall(function() knife:Activate() end)
+            task.wait(0.18)
         else
             local clickOK = KnifeThrow_ClickHoldRelease()
 
@@ -742,6 +872,7 @@ local function ExecuteKnifeThrowOnce()
             end
         end
 
+        task.wait(0.18)
         knifeThrowFiring = false
     end)
 
@@ -762,6 +893,25 @@ _G.AkatCallbacks = {
 
     ESP = function(enabled)
         if enabled then ESP_Enable() else ESP_Disable() end
+    end,
+
+    Name = function(enabled)
+        Configs.Name = enabled and true or false
+        if not Configs.Name then
+            for p,tag in pairs(NameTags) do pcall(function() tag:Destroy() end); NameTags[p]=nil end
+        end
+    end,
+    Tracer = function(enabled)
+        Configs.Tracer = enabled and true or false
+        if not Configs.Tracer then
+            for p,d in pairs(Tracers) do pcall(function() d.a:Destroy() end); pcall(function() d.b:Destroy() end); pcall(function() d.beam:Destroy() end); Tracers[p]=nil end
+        end
+    end,
+    ViewReach = function(enabled)
+        Configs.ViewReach = enabled and true or false
+        if not Configs.ViewReach then
+            for p,b in pairs(ReachBoxes) do pcall(function() b:Destroy() end); ReachBoxes[p]=nil end
+        end
     end,
 
     Speed = function(value)
@@ -844,6 +994,49 @@ _G.AkatCallbacks = {
                     root.CFrame = CFrame.new(result.Position + Vector3.new(0, 3, 0))
                 end
             end
+        end
+    end,
+
+    TpLobby = function(enabled)
+        Configs.TpLobby = false
+        if not enabled then return end
+        local char=player.Character; local root=char and char:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+        local candidates={}
+        local lobby=workspace:FindFirstChild("Lobby") or workspace:FindFirstChild("LobbyMap") or workspace:FindFirstChild("LobbyArea")
+        if lobby then
+            for _,d in ipairs(lobby:GetDescendants()) do if d:IsA("SpawnLocation") or (d:IsA("BasePart") and (d.Name:lower():find("spawn") or d.Name:lower():find("lobby"))) then table.insert(candidates,d) end end
+        end
+        if #candidates==0 then
+            for _,d in ipairs(workspace:GetDescendants()) do if d:IsA("SpawnLocation") then table.insert(candidates,d) end end
+        end
+        local target=candidates[1]
+        if target then root.CFrame=target.CFrame+Vector3.new(0,3,0) end
+    end,
+    TpMap = function(enabled)
+        Configs.TpMap = false
+        if not enabled then return end
+        local char=player.Character; local root=char and char:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+        local map=workspace:FindFirstChild("Map") or workspace:FindFirstChild("MapModel") or workspace:FindFirstChild("MapContainer")
+        local targetPos=nil
+        if map then
+            local sp=map:FindFirstChild("Spawn",true) or map:FindFirstChild("SpawnLocation",true) or map:FindFirstChild("PlayerSpawn",true)
+            if sp and sp:IsA("BasePart") then
+                targetPos=sp.Position
+            elseif map:IsA("Model") then
+                local cf,size=map:GetBoundingBox()
+                local rayParams=RaycastParams.new(); rayParams.FilterDescendantsInstances={char}; rayParams.FilterType=Enum.RaycastFilterType.Exclude
+                local origin=cf.Position+Vector3.new(0,size.Y*0.5+250,0)
+                local result=workspace:Raycast(origin,Vector3.new(0,-(size.Y+500),0),rayParams)
+                if result then targetPos=result.Position end
+            end
+        end
+        if targetPos then
+            local rayParams=RaycastParams.new(); rayParams.FilterDescendantsInstances={char}; rayParams.FilterType=Enum.RaycastFilterType.Exclude
+            local ground=workspace:Raycast(targetPos+Vector3.new(0,250,0),Vector3.new(0,-500,0),rayParams)
+            if ground then targetPos=ground.Position end
+            root.CFrame=CFrame.new(targetPos+Vector3.new(0,3,0))
         end
     end,
 
@@ -1259,6 +1452,9 @@ task.spawn(function()
             EnviarMensagemChat(msg)
         end
 
+        if Configs.Name or Configs.Tracer or Configs.ViewReach then
+            Visuals_UpdateAll()
+        end
         task.wait(0.2)
     end
 end)
