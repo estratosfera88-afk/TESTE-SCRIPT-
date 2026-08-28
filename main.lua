@@ -37,7 +37,7 @@ local characterConnection = nil
 local xrayDescendantConnection = nil
 local XRayParts = {}
 local noclipEnabled = false
-local tpGunNoclipUntil = 0
+local tpGunNoclip = false
 
 -- ==================== CONFIGURAÇÕES LOCAIS DO BACKEND ====================
 local Configs = {
@@ -130,7 +130,7 @@ task.spawn(function()
                         if head then return head end
                     end
                 end
-            end
+
             end
 
             return oldIndex(self, key)
@@ -264,17 +264,25 @@ local function ESP_ConnectPlayer(p)
     table.insert(connections, p.CharacterAdded:Connect(function(char)
         roundGeneration = roundGeneration + 1
         task.wait(0.15)
-        if not Configs.ESP then return end
-        ESP_UpdatePlayer(p)
+        if Configs.ESP then ESP_UpdatePlayer(p) end
+        if Configs.Name then UpdateName(p) end
+        if Configs.Tracer then UpdateTracer(p) end
+        if Configs.ViewReach then UpdateReachBox(p) end
 
         table.insert(connections, char.ChildAdded:Connect(function()
             task.defer(function()
                 if Configs.ESP then ESP_UpdatePlayer(p) end
+                if Configs.Name then UpdateName(p) end
+                if Configs.Tracer then UpdateTracer(p) end
+                if Configs.ViewReach then UpdateReachBox(p) end
             end)
         end))
         table.insert(connections, char.ChildRemoved:Connect(function()
             task.defer(function()
                 if Configs.ESP then ESP_UpdatePlayer(p) end
+                if Configs.Name then UpdateName(p) end
+                if Configs.Tracer then UpdateTracer(p) end
+                if Configs.ViewReach then UpdateReachBox(p) end
             end)
         end))
     end))
@@ -319,6 +327,29 @@ end
 local NameTags = {}
 local Tracers = {}
 local ReachBoxes = {}
+local ReachCircle = nil
+
+local function UpdateReachCircle()
+    if not Configs.ViewReach then
+        if ReachCircle then pcall(function() ReachCircle:Destroy() end); ReachCircle = nil end
+        return
+    end
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    if not ReachCircle or not ReachCircle.Parent then
+        ReachCircle = Instance.new("CylinderHandleAdornment")
+        ReachCircle.Name = "AkatMyReachCircle"
+        ReachCircle.AlwaysOnTop = true
+        ReachCircle.Transparency = 0.72
+        ReachCircle.Color3 = Color3.fromRGB(220, 0, 0)
+        ReachCircle.Height = 0.08
+        ReachCircle.Parent = char
+    end
+    ReachCircle.Adornee = root
+    ReachCircle.Radius = math.max(1, Configs.ReachValue or 18)
+    ReachCircle.CFrame = CFrame.new(0, -root.Size.Y * 0.5 - 0.05, 0)
+end
 
 local function RemoveVisual(p)
     if NameTags[p] then pcall(function() NameTags[p]:Destroy() end); NameTags[p] = nil end
@@ -391,57 +422,33 @@ local function UpdateTracer(p)
 end
 
 local function UpdateReachBox(p)
-    -- ViewReach now renders the player's own melee range as a flat ground circle.
-    -- The old per-player box was not a representation of the configured reach.
-    if p ~= player then
-        if ReachBoxes[p] then
-            pcall(function() ReachBoxes[p]:Destroy() end)
-            ReachBoxes[p] = nil
-        end
+    if p == player or not p.Character or not Configs.ViewReach then
+        if ReachBoxes[p] then pcall(function() ReachBoxes[p]:Destroy() end); ReachBoxes[p]=nil end
         return
     end
-
-    if not Configs.ViewReach then
-        if ReachBoxes[player] then
-            pcall(function() ReachBoxes[player]:Destroy() end)
-            ReachBoxes[player] = nil
-        end
-        return
-    end
-
-    local char = player.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if not root then return end
-
-    local circle = ReachBoxes[player]
-    if not circle or not circle.Parent then
-        circle = Instance.new("CylinderHandleAdornment")
-        circle.Name = "AkatReachView"
-        circle.Adornee = root
-        circle.AlwaysOnTop = true
-        circle.Transparency = 0.62
-        circle.Color3 = Color3.fromRGB(220, 0, 0)
-        circle.ZIndex = 1
-        circle.Parent = root
-        ReachBoxes[player] = circle
+    local char = p.Character
+    local box = ReachBoxes[p]
+    if not box or not box.Parent then
+        box = Instance.new("BoxHandleAdornment")
+        box.Name = "AkatReachView"
+        box.Adornee = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChildWhichIsA("BasePart")
+        box.Size = char:GetExtentsSize() + Vector3.new(0.35,0.35,0.35)
+        box.Color3 = Color3.fromRGB(220,0,0)
+        box.Transparency = 0.72
+        box.AlwaysOnTop = true
+        box.ZIndex = 1
+        box.Parent = char
+        ReachBoxes[p]=box
     else
-        circle.Adornee = root
+        local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChildWhichIsA("BasePart")
+        box.Adornee=root; box.Size=char:GetExtentsSize()+Vector3.new(0.35,0.35,0.35)
     end
-
-    circle.Radius = math.max(0.5, Configs.ReachValue or 18)
-    circle.Height = 0.08
-    circle.CFrame = CFrame.new(0, -(root.Size.Y * 0.5 + 0.04), 0)
 end
 
 local function Visuals_UpdateAll()
-    -- Own range circle
-    UpdateReachBox(player)
-
-    -- Player visuals
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= player then
-            UpdateName(p)
-            UpdateTracer(p)
+            UpdateName(p); UpdateTracer(p); UpdateReachBox(p)
         end
     end
 end
@@ -726,8 +733,8 @@ end
 local function LimparEDesligarAbsolutamente()
     if hbConnection      then hbConnection:Disconnect();      hbConnection      = nil end
     if steppedConnection then steppedConnection:Disconnect(); steppedConnection = nil end
-    if visualHeartbeatConnection then visualHeartbeatConnection:Disconnect(); visualHeartbeatConnection = nil end
     if autoShootConnection  then autoShootConnection:Disconnect();  autoShootConnection  = nil end
+    if knifeThrowConnection then knifeThrowConnection:Disconnect(); knifeThrowConnection = nil end
 
     for k in pairs(Configs) do Configs[k] = false end
     autoFarmTemporarilyDisabled = false
@@ -776,6 +783,7 @@ local function LimparEDesligarAbsolutamente()
 
     _G.AkatLogicRunning = false
 end
+
 _G.AkatCallbacks = {
 
     ESP = function(enabled)
@@ -787,7 +795,7 @@ _G.AkatCallbacks = {
         if not Configs.Name then
             for p,tag in pairs(NameTags) do pcall(function() tag:Destroy() end); NameTags[p]=nil end
         else
-            task.defer(Visuals_UpdateAll)
+            Visuals_UpdateAll()
         end
     end,
     Tracer = function(enabled)
@@ -795,15 +803,16 @@ _G.AkatCallbacks = {
         if not Configs.Tracer then
             for p,d in pairs(Tracers) do pcall(function() d.a:Destroy() end); pcall(function() d.b:Destroy() end); pcall(function() d.beam:Destroy() end); Tracers[p]=nil end
         else
-            task.defer(Visuals_UpdateAll)
+            Visuals_UpdateAll()
         end
     end,
     ViewReach = function(enabled)
         Configs.ViewReach = enabled and true or false
         if not Configs.ViewReach then
             for p,b in pairs(ReachBoxes) do pcall(function() b:Destroy() end); ReachBoxes[p]=nil end
+            if ReachCircle then pcall(function() ReachCircle:Destroy() end); ReachCircle = nil end
         else
-            task.defer(Visuals_UpdateAll)
+            UpdateReachCircle()
         end
     end,
 
@@ -879,21 +888,34 @@ _G.AkatCallbacks = {
 
         local char = player.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+
         if Configs.AutoFarm then
             if root then
                 root.Anchored = true
                 root.AssemblyLinearVelocity = Vector3.zero
                 root.AssemblyAngularVelocity = Vector3.zero
             end
+            if hum then
+                hum.WalkSpeed = 0
+                hum.UseJumpPower = true
+                hum.JumpPower = 0
+            end
         else
             if root then
                 root.Anchored = false
                 root.AssemblyLinearVelocity = Vector3.zero
+                root.AssemblyAngularVelocity = Vector3.zero
                 local rayParams = RaycastParams.new()
                 rayParams.FilterDescendantsInstances = {char}
                 rayParams.FilterType = Enum.RaycastFilterType.Exclude
                 local result = workspace:Raycast(root.Position, Vector3.new(0, -1000, 0), rayParams)
                 if result then root.CFrame = CFrame.new(result.Position + Vector3.new(0, 3, 0)) end
+            end
+            if hum then
+                hum.WalkSpeed = Configs.Speed and Configs.SpeedValue or 16
+                hum.UseJumpPower = true
+                hum.JumpPower = Configs.JumpPower and Configs.JumpPowerValue or 50
             end
         end
     end,
@@ -980,9 +1002,18 @@ TpLobby = function(enabled)
         return false
     end,
 
-TpToGun = function(enabled) Configs.TpToGun = enabled end,
-    ["Tp to gun"] = function(enabled) Configs.TpToGun = enabled end,
-    ["Tp To Gun"] = function(enabled) Configs.TpToGun = enabled end,
+TpToGun = function(enabled)
+        Configs.TpToGun = enabled and true or false
+        if not Configs.TpToGun then tpGunNoclip = false end
+    end,
+    ["Tp to gun"] = function(enabled)
+        Configs.TpToGun = enabled and true or false
+        if not Configs.TpToGun then tpGunNoclip = false end
+    end,
+    ["Tp To Gun"] = function(enabled)
+        Configs.TpToGun = enabled and true or false
+        if not Configs.TpToGun then tpGunNoclip = false end
+    end,
 
     AutoShoot = function(enabled)
         ToggleAutoShoot(enabled)
@@ -1188,6 +1219,7 @@ task.spawn(function()
                 if isMurdererRole or hasKnife then
                     trackingTpToGun        = false
                     lastPositionBeforeTpToGun = nil
+                    tpGunNoclip = false
                     if autoFarmTemporarilyDisabled then
                         autoFarmTemporarilyDisabled = false
                         Configs.AutoFarm = true
@@ -1200,7 +1232,7 @@ task.spawn(function()
                     if not trackingTpToGun then
                         lastPositionBeforeTpToGun = root.CFrame
                         trackingTpToGun = true
-                        tpGunNoclipUntil = tick() + 0.35
+                        tpGunNoclip = true
 
                         if Configs.AutoFarm then
                             autoFarmTemporarilyDisabled = true
@@ -1209,7 +1241,6 @@ task.spawn(function()
                             currentFarmTarget = nil
                         end
                     end
-                    tpGunNoclipUntil = tick() + 0.12
                     root.CFrame = gunPart.CFrame * CFrame.new(0, 3, 0)
                 else
                     if trackingTpToGun then
@@ -1218,7 +1249,7 @@ task.spawn(function()
                         end
                         lastPositionBeforeTpToGun = nil
                         trackingTpToGun           = false
-                        tpGunNoclipUntil = 0
+                        tpGunNoclip = false
 
                         if autoFarmTemporarilyDisabled then
                             autoFarmTemporarilyDisabled = false
@@ -1236,7 +1267,7 @@ task.spawn(function()
                 end
                 lastPositionBeforeTpToGun = nil
                 trackingTpToGun           = false
-                tpGunNoclipUntil = 0
+                tpGunNoclip = false
 
                 if autoFarmTemporarilyDisabled then
                     autoFarmTemporarilyDisabled = false
@@ -1249,7 +1280,7 @@ end)
 
 -- ==================== NOCLIP SEGURO ====================
 steppedConnection = RunService.Stepped:Connect(function()
-    if Configs.AutoFarm or Configs.SafeSpot or tick() < tpGunNoclipUntil or Configs.AntiFling then
+    if Configs.AutoFarm or Configs.SafeSpot or tpGunNoclip or Configs.AntiFling then
         local char = player.Character
         if char then
             for _, part in ipairs(char:GetChildren()) do
@@ -1271,8 +1302,8 @@ local function ResetRoundState()
     if autoFarmTween then autoFarmTween:Cancel(); autoFarmTween = nil end
     gunDroppedThisRound = false
     trackingTpToGun = false
-    tpGunNoclipUntil = 0
     lastPositionBeforeTpToGun = nil
+    tpGunNoclip = false
     announcedThisRound = false
     autoShootBusy = false
     autoShootFiring = false
@@ -1285,6 +1316,7 @@ local function ResetRoundState()
         Tracers[p] = nil
     end
     for p in pairs(ReachBoxes) do if ReachBoxes[p] then pcall(function() ReachBoxes[p]:Destroy() end) end; ReachBoxes[p] = nil end
+    if ReachCircle then pcall(function() ReachCircle:Destroy() end); ReachCircle = nil end
 
     if Configs.ESP then
         for _, p in ipairs(Players:GetPlayers()) do
@@ -1305,6 +1337,14 @@ characterConnection = player.CharacterAdded:Connect(function(char)
                 part.Transparency = 1
             end
         end
+    end
+    if Configs.Name or Configs.Tracer or Configs.ViewReach then
+        task.defer(function()
+            if char and char.Parent then
+                Visuals_UpdateAll()
+                UpdateReachCircle()
+            end
+        end)
     end
     if Configs.XRay then
         if xrayDescendantConnection then xrayDescendantConnection:Disconnect() end
@@ -1332,9 +1372,19 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
 
     if not root or not hum then return end
 
-    hum.WalkSpeed = Configs.Speed and Configs.SpeedValue or 16
-    hum.UseJumpPower = true
-    hum.JumpPower = Configs.JumpPower and Configs.JumpPowerValue or 50
+    if Configs.AutoFarm then
+        root.Anchored = true
+        root.AssemblyLinearVelocity = Vector3.zero
+        root.AssemblyAngularVelocity = Vector3.zero
+        hum.WalkSpeed = 0
+        hum.UseJumpPower = true
+        hum.JumpPower = 0
+    else
+        root.Anchored = false
+        hum.WalkSpeed = Configs.Speed and Configs.SpeedValue or 16
+        hum.UseJumpPower = true
+        hum.JumpPower = Configs.JumpPower and Configs.JumpPowerValue or 50
+    end
 
     if Configs.Reach then
         local myKnife = char:FindFirstChild("Knife") or char:FindFirstChild("Faca")
@@ -1378,34 +1428,6 @@ hbConnection = RunService.Heartbeat:Connect(function(dt)
     end
 end)
 
--- ==================== VISUAL REFRESH RÁPIDO ====================
--- Rebuilds Name/Tracer/Reach immediately after character swaps and between rounds.
-local visualHeartbeatConnection = RunService.Heartbeat:Connect(function()
-    if Configs.Name or Configs.Tracer or Configs.ViewReach then
-        Visuals_UpdateAll()
-    end
-end)
-
-Players.PlayerAdded:Connect(function(p)
-    p.CharacterAdded:Connect(function()
-        task.defer(function()
-            task.wait()
-            Visuals_UpdateAll()
-        end)
-    end)
-end)
-
-for _, p in ipairs(Players:GetPlayers()) do
-    if p ~= player then
-        p.CharacterAdded:Connect(function()
-            task.defer(function()
-                task.wait()
-                Visuals_UpdateAll()
-            end)
-        end)
-    end
-end
-
 -- ==================== THREAD CENTRAL DE SCANNER E CACHE ====================
 task.spawn(function()
     local tempoUltimoScanMoedas = 0
@@ -1418,7 +1440,7 @@ task.spawn(function()
         local currentMurderer, currentSheriff = nil, nil
 
         local agora         = tick()
-        local atualizarESP  = Configs.ESP and (agora - tempoUltimoScanESP > 0.08)
+        local atualizarESP  = Configs.ESP and (agora - tempoUltimoScanESP > 0.35)
         if atualizarESP then
             tempoUltimoScanESP = agora
         end
@@ -1500,8 +1522,9 @@ task.spawn(function()
 
         if Configs.Name or Configs.Tracer or Configs.ViewReach then
             Visuals_UpdateAll()
+            UpdateReachCircle()
         end
-        task.wait(0.05)
+        task.wait(0.2)
     end
 end)
 
