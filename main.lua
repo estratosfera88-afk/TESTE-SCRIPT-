@@ -381,7 +381,7 @@ UpdateReachSphere = function()
         return
     end
 
-    local reach  = math.max(1, Configs.ReachValue or 5)
+    local reach  = math.max(1, Configs.ReachValue or 18)
 
     -- Se já existe e está no root correto, só atualiza o raio
     if ReachSphere and ReachSphere.Parent == root then
@@ -617,20 +617,29 @@ local AUTO_SHOOT_PREDICTION = 0.05
 -- Encontra o RemoteEvent ou RemoteFunction de disparo dentro da arma.
 -- O MM2 geralmente usa um Remote chamado "Fire", "Shoot", "OnFire" ou similar.
 local function AutoShoot_FindFireRemote(gun)
-    if not gun then return nil end
-    local priority = {"Fire", "Shoot", "OnFire", "Fired", "BulletFired", "ShootEvent", "shoot"}
-    for _, name in ipairs(priority) do
-        local r = gun:FindFirstChild(name, true)
-        if r and (r:IsA("RemoteEvent") or r:IsA("RemoteFunction")) then
-            return r
+    -- MM2: o disparo do Sheriff é feito pelo RemoteFunction CreateBeam
+    -- dentro de Gun > KnifeLocal. O remote global ShootGun também é
+    -- mantido como fallback para versões/replicações diferentes.
+    if gun then
+        local knifeLocal = gun:FindFirstChild("KnifeLocal", true)
+        local createBeam = knifeLocal and knifeLocal:FindFirstChild("CreateBeam", true)
+        local rf = createBeam and createBeam:FindFirstChild("RemoteFunction")
+        if rf and rf:IsA("RemoteFunction") then
+            return rf
+        end
+
+        local named = gun:FindFirstChild("RemoteFunction", true)
+        if named and named:IsA("RemoteFunction") then
+            return named
         end
     end
 
-    -- Fallback: qualquer Remote dentro da arma.
-    for _, d in ipairs(gun:GetDescendants()) do
-        if d:IsA("RemoteEvent") or d:IsA("RemoteFunction") then
-            return d
-        end
+    local rs = game:GetService("ReplicatedStorage")
+    local remotes = rs:FindFirstChild("Remotes")
+    local gameplay = remotes and remotes:FindFirstChild("Gameplay")
+    local shootGun = gameplay and gameplay:FindFirstChild("ShootGun")
+    if shootGun and shootGun:IsA("RemoteFunction") then
+        return shootGun
     end
 
     return nil
@@ -766,43 +775,42 @@ local function AutoShoot_Predict(head, root)
     return head.Position + vel * AUTO_SHOOT_PREDICTION
 end
 
--- MÉTODO PRINCIPAL: dispara o Remote da arma com a posição do murder.
--- Testa os argumentos mais comuns do MM2 (CFrame, Vector3, BasePart).
+-- MÉTODO PRINCIPAL: usa o RemoteFunction real do Sheriff Gun (CreateBeam/RemoteFunction)
+-- e envia a posição prevista da cabeça do Murderer na assinatura do MM2.
 local function AutoShoot_FireRemote(gun, predictedPos)
-    if not gun or not predictedPos then return false end
+    local remote = AutoShoot_FindFireRemote(gun)
+    if not remote then
+        DebugLog("AutoShoot", "ShootGun/CreateBeam não encontrado")
+        return false
+    end
 
-    -- MM2: o disparo real do Sheriff passa por este RemoteFunction.
-    -- O remote fica dentro de Gun > KnifeLocal > CreateBeam, portanto
-    -- procurar apenas por "Fire/Shoot" fazia o mobile cair no Activate()
-    -- (que apenas equipava a arma).
-    local createBeam = gun:FindFirstChild("CreateBeam", true)
-    local remote = createBeam and createBeam:FindFirstChildOfClass("RemoteFunction")
-
-    if remote then
+    -- Assinatura usada pelo MM2 para o Sheriff Gun.
+    -- [1] = tiro, [2] = posição do disparo/alvo, [3] = identificador do beam.
+    if remote:IsA("RemoteFunction") then
         local ok = pcall(function()
             remote:InvokeServer(1, predictedPos, "AH2")
         end)
         if ok then
+            DebugLog("AutoShoot", "Disparo enviado via RemoteFunction: " .. remote:GetFullName())
             return true
         end
+
+        -- Algumas versões usam somente os dois primeiros argumentos.
+        ok = pcall(function()
+            remote:InvokeServer(1, predictedPos)
+        end)
+        if ok then
+            DebugLog("AutoShoot", "Disparo enviado via RemoteFunction (2 args)")
+            return true
+        end
+    elseif remote:IsA("RemoteEvent") then
+        local ok = pcall(function()
+            remote:FireServer(1, predictedPos, "AH2")
+        end)
+        if ok then return true end
     end
 
-    -- Compatibilidade com variações/versões que mantêm um remote nomeado.
-    remote = AutoShoot_FindFireRemote(gun)
-    if not remote then return false end
-
-    local hitCF = CFrame.new(predictedPos)
-    local ok = false
-
-    if remote:IsA("RemoteEvent") then
-        ok = pcall(function() remote:FireServer(predictedPos) end)
-        if not ok then ok = pcall(function() remote:FireServer(hitCF) end) end
-    elseif remote:IsA("RemoteFunction") then
-        ok = pcall(function() remote:InvokeServer(1, predictedPos, "AH2") end)
-        if not ok then ok = pcall(function() remote:InvokeServer(predictedPos) end) end
-    end
-
-    return ok
+    return false
 end
 
 -- FALLBACK: gun:Activate() com o Silent Aim ativo no __index apenas por
@@ -812,54 +820,14 @@ local function AutoShoot_FallbackActivate(gun, predictedPos)
         return false
     end
 
-    -- Seta temporariamente o hit para o ponto previsto via upvalue local.
-    -- Não usa mais o hook global — apenas uma variável de controle local.
-    local overrideActive = true
-    local overrideCF     = CFrame.new(
-        predictedPos,
-        predictedPos + Vector3.new(0, 0, -1)
-    )
-
-    -- Hook local mínimo: só existe durante esta chamada.
-    local gmt    = getrawmetatable and getrawmetatable(game)
-    local oldIdx = gmt and rawget(gmt, "__index")
-    local hooked = false
-
-    if gmt and oldIdx and setreadonly then
-        pcall(function()
-            setreadonly(gmt, false)
-
-            local prev = rawget(gmt, "__index")
-
-            rawset(gmt, "__index", newcclosure(function(self, key)
-                if overrideActive and self == mouse and (key == "Hit" or key == "hit") then
-                    return overrideCF
-                end
-
-                return prev(self, key)
-            end))
-
-            hooked = true
-            setreadonly(gmt, true)
-        end)
-    end
-
+    -- Compatibilidade para experiências que não expõem o RemoteFunction.
+    -- O método principal continua sendo o RemoteFunction do MM2.
     local ok = pcall(function()
         gun:Activate()
     end)
-
-    task.wait(0.02)
-
-    -- Remove hook imediatamente.
-    if hooked and gmt and oldIdx and setreadonly then
-        pcall(function()
-            setreadonly(gmt, false)
-            rawset(gmt, "__index", oldIdx)
-            setreadonly(gmt, true)
-        end)
+    if ok then
+        task.wait(0.03)
     end
-
-    overrideActive = false
     return ok
 end
 
@@ -1700,7 +1668,7 @@ task.spawn(function()
         local handle = myKnife:FindFirstChild("Handle") or myKnife:FindFirstChildOfClass("BasePart")
         if not handle then continue end
 
-        local reachDist = Configs.ReachValue or 5
+        local reachDist = Configs.ReachValue or 18
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= player and p.Character then
                 local er = p.Character:FindFirstChild("HumanoidRootPart")
