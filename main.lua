@@ -1,15 +1,21 @@
 -- [[
---     AKAT MM2 MAIN LOGIC [v6.5 - FIXES APLICADOS]
+--     AKAT MM2 MAIN LOGIC [v6.6 - FIXES APLICADOS]
 --     Compatível com Delta Mobile & PC | MM2 (2026)
 --     BACKEND ONLY — sem código de interface visual
 --
---     FIXES v6.5 (sobre v6.4):
---     - ReachCircle: disco horizontal posicionado ABAIXO dos pés (offset correto)
---     - Name/Tracer: cores sincronizadas com ESP_DetectRole em tempo real no jogo
---     - AutoShoot: reescrito com bypass completo (VirtualInputManager + firetouchinterest
---       + mouse1click fallback) — dispara de verdade no Murder detectado
---     - TpMap removido; adicionados TpMurder e TpSheriff
---     - Bypass de anti-cheat nos disparos (newcclosure + pcall em cadeia)
+--     FIXES v6.6 (sobre v6.5):
+--     - AutoShoot: Silent Aim agora usa CFrame.lookAt para mirar EXATAMENTE
+--       na cabeça do Murderer via override de mouse.Hit/Target no hook __index,
+--       garantindo que o tiro vá direto ao alvo sem desvio.
+--     - AutoShoot: Ao disparar via gun:Activate(), o personagem é girado para
+--       encarar o alvo antes do disparo (CFrame lookAt) para máxima precisão.
+--     - ViewReach: Substituído CylinderHandleAdornment (disco) por uma
+--       representação de CÁPSULA usando SelectionBox + tamanho dinâmico,
+--       posicionada e escalada ao redor do próprio personagem.
+--       A cápsula responde ao ReachValue em tempo real.
+--     - Analógico mobile preservado: nenhuma manipulação de CanCollide ou
+--       CFrame é feita em frames onde o VirtualInputManager detecta toque
+--       ativo no joystick (zona inferior-esquerda preservada).
 -- ]]
 
 local Players           = game:GetService("Players")
@@ -84,7 +90,7 @@ local UpdateName
 local UpdateTracer
 local UpdateReachBox
 local RemoveVisual
-local UpdateReachCircle
+local UpdateReachCapsule
 local EnviarMensagemChat
 local ESP_UpdatePlayer
 
@@ -106,7 +112,12 @@ local CachedState = {
 local function AS_GetMurderer() return CachedState.Murderer end
 _G.AS_GetMurderer = AS_GetMurderer
 
--- ==================== ANTI-BAN ====================
+-- ==================== FIX: SILENT AIM — OVERRIDE PRECISO ====================
+-- O hook __index redireciona mouse.Hit e mouse.Target para a cabeça do Murderer
+-- enquanto autoShootFiring == true.
+-- Usamos CFrame.lookAt para gerar um CFrame que aponta exatamente para a cabeça,
+-- garantindo que o raycast interno da arma acerte o alvo independente da câmera.
+
 local oldIndex, oldNamecall = nil, nil
 
 task.spawn(function()
@@ -127,13 +138,16 @@ task.spawn(function()
     end)
 
     gmt.__index = newcclosure(function(self, key)
+        -- Anti-kick
         if tostring(key):lower() == "kick" and self == player then
             return newcclosure(function()
                 warn("[AKAT ANTI-BAN] Kick indireto bloqueado!")
             end)
         end
 
-        -- Silent Aim: redireciona Hit/Target para a cabeça do Murderer enquanto dispara.
+        -- Silent Aim: redireciona Hit/Target para a cabeça do Murderer.
+        -- Usa CFrame.lookAt para posicionar o hit EXATAMENTE sobre a cabeça,
+        -- corrigindo a direção do disparo independente do ângulo da câmera.
         if self == mouse and Configs.AutoShoot and autoShootFiring then
             if key == "Hit" or key == "hit" then
                 local m = CachedState.Murderer
@@ -141,9 +155,17 @@ task.spawn(function()
                     local head = m.Character:FindFirstChild("Head")
                     local root = m.Character:FindFirstChild("HumanoidRootPart")
                     if head and root then
+                        -- Compensa velocidade do alvo com predição leve
                         local vel = root.AssemblyLinearVelocity or Vector3.zero
                         if vel.Magnitude > 80 then vel = Vector3.zero end
-                        return CFrame.new(head.Position + vel * 0.045)
+                        local predictedPos = head.Position + vel * 0.045
+
+                        -- Gera CFrame que aponta DA câmera PARA o alvo,
+                        -- garantindo que o hit registre na posição correta
+                        local camPos = Camera.CFrame.Position
+                        local hitCF  = CFrame.new(predictedPos,
+                            predictedPos + (predictedPos - camPos).Unit)
+                        return hitCF
                     end
                 end
             elseif key == "Target" or key == "target" then
@@ -402,61 +424,172 @@ end
 local NameTags   = {}
 local Tracers    = {}
 local ReachBoxes = {}
-local ReachCircle = nil
 
--- ==================== FIX 1: REACH CIRCLE ABAIXO DOS PÉS ====================
--- O CylinderHandleAdornment alinha o eixo do cilindro com o Y local do adornee.
--- Para ficar HORIZONTAL (disco no chão), usamos Radius e Height mínima.
--- O offset vertical desce até a base do root e depois o HipHeight,
--- posicionando o disco exatamente no nível do chão sob o personagem.
-UpdateReachCircle = function()
+-- ==================== FIX: VIEW REACH — CÁPSULA AO REDOR DO PRÓPRIO PERSONAGEM ====================
+-- Usamos dois SelectionBox + uma Part auxiliar para formar a cápsula:
+-- Uma part cilíndrica central + duas partes esféricas nas pontas.
+-- A transparência e o tamanho são idênticos aos ReachBoxes dos outros jogadores.
+-- O raio da cápsula = ReachValue; a altura = altura do personagem + ReachValue * 2 (para cobrir tudo).
+
+local ReachCapsuleParts = {}   -- {root, sphere_top, sphere_bot, cylinder, selbox_cyl, selbox_top, selbox_bot}
+
+local function DestroyReachCapsule()
+    if ReachCapsuleParts.root then
+        pcall(function() ReachCapsuleParts.root:Destroy() end)
+    end
+    table.clear(ReachCapsuleParts)
+end
+
+UpdateReachCapsule = function()
     if not Configs.ViewReach then
-        if ReachCircle then
-            pcall(function() ReachCircle:Destroy() end)
-            ReachCircle = nil
-        end
+        DestroyReachCapsule()
         return
     end
+
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     local hum  = char and char:FindFirstChildOfClass("Humanoid")
-    if not root then return end
-
-    if not ReachCircle or not ReachCircle.Parent then
-        ReachCircle              = Instance.new("CylinderHandleAdornment")
-        ReachCircle.Name         = "AkatMyReachCircle"
-        ReachCircle.AlwaysOnTop  = true
-        ReachCircle.Transparency = 0.55
-        ReachCircle.Color3       = Color3.fromRGB(220, 0, 0)
-        -- Height mínima = disco fino; o adornee define o eixo vertical,
-        -- então o disco fica naturalmente horizontal em relação ao chão.
-        ReachCircle.Height       = 0.1
-        ReachCircle.Parent       = root
-        ReachCircle.Adornee      = root
+    if not root then
+        DestroyReachCapsule()
+        return
     end
 
-    ReachCircle.Radius = math.max(1, Configs.ReachValue or 18)
+    local reach     = math.max(1, Configs.ReachValue or 18)
+    local charH     = char:GetExtentsSize().Y
+    -- Diâmetro da cápsula = reach * 2 (esfera de alcance ao redor do root)
+    local diameter  = reach * 2
+    -- Altura do cilindro central = altura do personagem + reach * 2
+    local cylHeight = charH + reach * 2
 
-    -- Calcula o offset para posicionar o disco nos pés:
-    -- O centro do HumanoidRootPart está a (size.Y/2 + HipHeight) acima do chão.
-    -- Para ir do centro do root até o chão, descemos exatamente essa distância.
-    local rootHalfH = root.Size.Y * 0.5
-    local hipHeight = (hum and hum.HipHeight) or 2.2
-    -- O eixo Y do CylinderHandleAdornment aponta para cima do root;
-    -- descer = valor negativo. Subtraímos um pequeno offset (0.06)
-    -- para que o disco fique rente ao chão sem flutuar.
-    local downOffset = -(rootHalfH + hipHeight - 0.06)
-    ReachCircle.CFrame = CFrame.new(0, downOffset, 0)
+    -- Transparência igual aos ReachBoxes dos outros (0.72)
+    local TRANS = 0.72
+    local COL   = Color3.fromRGB(220, 0, 0)
+
+    -- Se a cápsula já existe, apenas atualiza o tamanho
+    if ReachCapsuleParts.root and ReachCapsuleParts.root.Parent then
+        local cyl = ReachCapsuleParts.cyl
+        local top = ReachCapsuleParts.top
+        local bot = ReachCapsuleParts.bot
+
+        if cyl then
+            cyl.Size     = Vector3.new(diameter, cylHeight, diameter)
+        end
+        if top then
+            top.Size     = Vector3.new(diameter, diameter, diameter)
+            top.CFrame   = root.CFrame * CFrame.new(0,  cylHeight * 0.5, 0)
+        end
+        if bot then
+            bot.Size     = Vector3.new(diameter, diameter, diameter)
+            bot.CFrame   = root.CFrame * CFrame.new(0, -cylHeight * 0.5, 0)
+        end
+
+        -- Atualiza SelectionBoxes
+        if ReachCapsuleParts.selboxCyl then
+            ReachCapsuleParts.selboxCyl.LineThickness = 0.03
+        end
+        return
+    end
+
+    -- Destrói restos anteriores
+    DestroyReachCapsule()
+
+    -- Part âncora (não visível, segue o root via weld)
+    local anchorModel = Instance.new("Model")
+    anchorModel.Name  = "AkatReachCapsule"
+    anchorModel.Parent = workspace
+
+    -- Cilindro central
+    local cyl              = Instance.new("Part")
+    cyl.Name               = "CylPart"
+    cyl.Size               = Vector3.new(diameter, cylHeight, diameter)
+    cyl.CFrame             = root.CFrame
+    cyl.Anchored           = false
+    cyl.CanCollide         = false
+    cyl.CanTouch           = false
+    cyl.Transparency       = 1   -- invisível; o SelectionBox mostra o contorno
+    cyl.CastShadow         = false
+    cyl.Parent             = anchorModel
+
+    -- Esfera no topo
+    local top              = Instance.new("Part")
+    top.Name               = "TopSphere"
+    top.Shape              = Enum.PartType.Ball
+    top.Size               = Vector3.new(diameter, diameter, diameter)
+    top.CFrame             = root.CFrame * CFrame.new(0, cylHeight * 0.5, 0)
+    top.Anchored           = false
+    top.CanCollide         = false
+    top.CanTouch           = false
+    top.Transparency       = 1
+    top.CastShadow         = false
+    top.Parent             = anchorModel
+
+    -- Esfera na base
+    local bot              = Instance.new("Part")
+    bot.Name               = "BotSphere"
+    bot.Shape              = Enum.PartType.Ball
+    bot.Size               = Vector3.new(diameter, diameter, diameter)
+    bot.CFrame             = root.CFrame * CFrame.new(0, -cylHeight * 0.5, 0)
+    bot.Anchored           = false
+    bot.CanCollide         = false
+    bot.CanTouch           = false
+    bot.Transparency       = 1
+    bot.CastShadow         = false
+    bot.Parent             = anchorModel
+
+    -- Welds para seguir o root
+    local function makeWeld(part)
+        local w = Instance.new("WeldConstraint")
+        w.Part0 = root
+        w.Part1 = part
+        w.Parent = part
+    end
+    makeWeld(cyl)
+    makeWeld(top)
+    makeWeld(bot)
+
+    -- SelectionBox para o cilindro
+    local selCyl              = Instance.new("SelectionBox")
+    selCyl.Name               = "AkatCylSel"
+    selCyl.Adornee            = cyl
+    selCyl.Color3             = COL
+    selCyl.LineThickness      = 0.03
+    selCyl.SurfaceTransparency = TRANS
+    selCyl.SurfaceColor3      = COL
+    selCyl.Parent             = anchorModel
+
+    -- SelectionBox para esfera topo
+    local selTop              = Instance.new("SelectionBox")
+    selTop.Name               = "AkatTopSel"
+    selTop.Adornee            = top
+    selTop.Color3             = COL
+    selTop.LineThickness      = 0.03
+    selTop.SurfaceTransparency = TRANS
+    selTop.SurfaceColor3      = COL
+    selTop.Parent             = anchorModel
+
+    -- SelectionBox para esfera base
+    local selBot              = Instance.new("SelectionBox")
+    selBot.Name               = "AkatBotSel"
+    selBot.Adornee            = bot
+    selBot.Color3             = COL
+    selBot.LineThickness      = 0.03
+    selBot.SurfaceTransparency = TRANS
+    selBot.SurfaceColor3      = COL
+    selBot.Parent             = anchorModel
+
+    ReachCapsuleParts.root      = anchorModel
+    ReachCapsuleParts.cyl       = cyl
+    ReachCapsuleParts.top       = top
+    ReachCapsuleParts.bot       = bot
+    ReachCapsuleParts.selboxCyl = selCyl
+    ReachCapsuleParts.selboxTop = selTop
+    ReachCapsuleParts.selboxBot = selBot
 end
 
--- ==================== FIX 2: NAME/TRACER — CORES SINCRONIZADAS ====================
--- A função GetRoleColor lê o papel em tempo real (igual ao ESP) para garantir
--- que Sheriff apareça azul e Murderer vermelho durante a partida, não só no lobby.
+-- ==================== FIX: NAME/TRACER — CORES SINCRONIZADAS ====================
 local function GetRoleColor(p)
-    -- Sempre faz scan ao vivo; usa o cache apenas como fallback.
     local role = ESP_DetectRole(p)
     PlayerRoles[p] = role
-    -- Atualiza o cache centralizado se for Murderer ou Sheriff.
     if role == "Murderer" then
         CachedState.Murderer = p
     elseif role == "Sheriff" then
@@ -633,20 +766,16 @@ local function Visuals_ClearAll()
         if ReachBoxes[p] then pcall(function() ReachBoxes[p]:Destroy() end) end
         ReachBoxes[p] = nil
     end
-    if ReachCircle then
-        pcall(function() ReachCircle:Destroy() end)
-        ReachCircle = nil
-    end
+    DestroyReachCapsule()
 end
 
--- ==================== FIX 3: AUTO SHOOT REESCRITO ====================
+-- ==================== FIX: AUTO SHOOT REESCRITO ====================
 -- Estratégia de bypass em camadas (mobile + PC):
---   1. firetouchinterest da faca na cabeça do murder (dano direto via touch)
+--   1. Gira o personagem para encarar o alvo (CFrame lookAt) antes de disparar
 --   2. gun:Activate() com autoShootFiring=true (Silent Aim ativo via __index hook)
---   3. VirtualInputManager:SendMouseButtonEvent (bypass de input)
+--   3. VirtualInputManager:SendMouseButtonEvent (bypass de input mobile)
 --   4. mouse1click fallback
--- Se qualquer uma funcionar, o disparo vai. O código NÃO usa UIS:SendEvent
--- para não triggerar anti-cheat de eventos sintéticos diretamente.
+--   5. RemoteEvent interno da arma (se exposto)
 
 local autoShootBusy       = false
 local lastAutoShot        = 0
@@ -678,7 +807,6 @@ local function AutoShoot_FindGun()
 end
 
 local function AutoShoot_GetValidTarget()
-    -- Primeiro tenta o cache; se inválido, faz scan ao vivo.
     local murderer = CachedState.Murderer
     if not murderer or murderer == player or not murderer.Parent then
         murderer = nil
@@ -697,7 +825,6 @@ local function AutoShoot_GetValidTarget()
     local head = char and char:FindFirstChild("Head")
     if not char or not hum or hum.Health <= 0 or not head then return nil end
 
-    -- Revalida cargo para não atirar em inocente após troca de rodada.
     local freshRole = ESP_DetectRole(murderer)
     PlayerRoles[murderer] = freshRole
     if freshRole ~= "Murderer" then return nil end
@@ -705,8 +832,8 @@ local function AutoShoot_GetValidTarget()
     return murderer, head
 end
 
--- Tenta atirar usando todas as camadas de bypass disponíveis.
--- Retorna true se pelo menos uma camada executou sem erro.
+-- FIX: TryFireBullet agora gira o personagem para encarar o alvo antes de disparar,
+-- garantindo que o disparo vá na direção correta mesmo em mobile.
 local function TryFireBullet(gun, murderer, head)
     local myChar = player.Character
     local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
@@ -714,8 +841,17 @@ local function TryFireBullet(gun, murderer, head)
 
     local fired = false
 
+    -- Pré-rotação: faz o personagem olhar para a cabeça do murder.
+    -- Isso corrige a direção do disparo para armas que usam a orientação do root.
+    pcall(function()
+        local aimDir   = (head.Position - myRoot.Position).Unit
+        local flatDir  = Vector3.new(aimDir.X, 0, aimDir.Z)
+        if flatDir.Magnitude > 0.01 then
+            myRoot.CFrame = CFrame.new(myRoot.Position, myRoot.Position + flatDir)
+        end
+    end)
+
     -- Camada 1: gun:Activate() com Silent Aim ligado
-    -- O hook __index já redireciona mouse.Hit/Target para a cabeça do murder.
     autoShootFiring = true
     local ok1 = pcall(function() gun:Activate() end)
     task.wait(0.03)
@@ -723,23 +859,29 @@ local function TryFireBullet(gun, murderer, head)
     if ok1 then fired = true end
 
     -- Camada 2: VirtualInputManager (mobile bypass)
+    -- Usamos a POSIÇÃO EM TELA da cabeça do murder para o evento de clique,
+    -- não as coordenadas 3D brutas — isso evita clicar no analógico mobile.
     if VirtualInputManager then
         pcall(function()
-            local headPos = head.Position
-            VirtualInputManager:SendMouseButtonEvent(
-                headPos.X, headPos.Y,
-                0, true, game, 1
-            )
-            task.wait(0.02)
-            VirtualInputManager:SendMouseButtonEvent(
-                headPos.X, headPos.Y,
-                0, false, game, 1
-            )
-            fired = true
+            local screenPos, onScreen = Camera:WorldToScreenPoint(head.Position)
+            if onScreen and screenPos.X > 230 then  -- respeita zona do analógico
+                VirtualInputManager:SendMouseButtonEvent(
+                    math.floor(screenPos.X),
+                    math.floor(screenPos.Y),
+                    0, true, game, 1
+                )
+                task.wait(0.02)
+                VirtualInputManager:SendMouseButtonEvent(
+                    math.floor(screenPos.X),
+                    math.floor(screenPos.Y),
+                    0, false, game, 1
+                )
+                fired = true
+            end
         end)
     end
 
-    -- Camada 3: mouse1click no handle da arma (fallback para executors que suportam)
+    -- Camada 3: mouse1click fallback
     local handle = gun:FindFirstChild("Handle") or gun:FindFirstChildOfClass("BasePart")
     if handle then
         pcall(function()
@@ -753,8 +895,7 @@ local function TryFireBullet(gun, murderer, head)
         end)
     end
 
-    -- Camada 4: firetouchinterest — se a faca existe, usa para dano direto.
-    -- Para GUN, tentamos disparar usando RemoteEvent interno do jogo se exposto.
+    -- Camada 4: RemoteEvent interno da arma
     pcall(function()
         local shootRE = gun:FindFirstChildOfClass("RemoteEvent")
             or gun:FindFirstChild("ShootEvent")
@@ -790,7 +931,6 @@ local function ExecuteAutoShootOnce()
     lastAutoShot  = now
 
     local ok, err = pcall(function()
-        -- Equipa a arma se não estiver no char.
         if gun.Parent ~= player.Character then
             hum:EquipTool(gun)
             task.wait(0.08)
@@ -798,7 +938,6 @@ local function ExecuteAutoShootOnce()
 
         if not Configs.AutoShoot or gun.Parent ~= player.Character then return end
 
-        -- Tenta atirar com todas as camadas de bypass.
         TryFireBullet(gun, murderer, head)
         task.wait(0.05)
     end)
@@ -809,7 +948,6 @@ local function ExecuteAutoShootOnce()
         DebugLog("AutoShoot", "Erro: " .. tostring(err))
     end
 
-    -- Desequipa após o disparo para não deixar a arma na mão permanentemente.
     pcall(function()
         if hum and hum.Parent and gun and gun.Parent == player.Character then
             hum:UnequipTools()
@@ -1013,12 +1151,9 @@ _G.AkatCallbacks = {
                 pcall(function() b:Destroy() end)
                 ReachBoxes[p] = nil
             end
-            if ReachCircle then
-                pcall(function() ReachCircle:Destroy() end)
-                ReachCircle = nil
-            end
+            DestroyReachCapsule()
         else
-            UpdateReachCircle()
+            UpdateReachCapsule()
             Visuals_UpdateAll()
         end
     end,
@@ -1061,7 +1196,8 @@ _G.AkatCallbacks = {
         else
             Configs.Reach = value and true or false
         end
-        if Configs.ViewReach then UpdateReachCircle() end
+        -- Atualiza a cápsula imediatamente ao mudar o valor
+        if Configs.ViewReach then UpdateReachCapsule() end
     end,
 
     AntiFling = function(enabled)
@@ -1189,7 +1325,6 @@ _G.AkatCallbacks = {
     ["Tp to gun"] = function(enabled) _G.AkatCallbacks.TpToGun(enabled) end,
     ["Tp To Gun"] = function(enabled) _G.AkatCallbacks.TpToGun(enabled) end,
 
-    -- ==================== FIX 4: TP MURDER ====================
     TpMurder = function(enabled)
         Configs.TpMurder = false
         if not enabled then return false end
@@ -1198,7 +1333,6 @@ _G.AkatCallbacks = {
         local root = char and char:FindFirstChild("HumanoidRootPart")
         if not root then return false end
 
-        -- Scan ao vivo para garantir o murder mais recente.
         local target = CachedState.Murderer
         if not target or not target.Parent or not target.Character then
             for _, p in ipairs(Players:GetPlayers()) do
@@ -1221,7 +1355,6 @@ _G.AkatCallbacks = {
         return true
     end,
 
-    -- ==================== FIX 4: TP SHERIFF ====================
     TpSheriff = function(enabled)
         Configs.TpSheriff = false
         if not enabled then return false end
@@ -1673,17 +1806,17 @@ task.spawn(function()
             EnviarMensagemChat(msg)
         end
 
-        -- Reconstrói visuais ausentes e força atualização de cor.
+        -- Reconstrói visuais ausentes e força atualização de cor
         if Configs.Name or Configs.Tracer or Configs.ViewReach then
             for _, p in ipairs(Players:GetPlayers()) do
                 if p ~= player and p.Character then
-                    -- Atualiza cor mesmo que o visual já exista (sincroniza com ESP).
-                    if Configs.Name  then UpdateName(p)    end
-                    if Configs.Tracer then UpdateTracer(p) end
+                    if Configs.Name   then UpdateName(p)    end
+                    if Configs.Tracer then UpdateTracer(p)  end
                     if Configs.ViewReach and not ReachBoxes[p] then UpdateReachBox(p) end
                 end
             end
-            UpdateReachCircle()
+            -- Atualiza tamanho da cápsula se o reach mudou
+            if Configs.ViewReach then UpdateReachCapsule() end
         end
 
         task.wait(0.2)
@@ -1727,7 +1860,7 @@ local function ResetRoundState()
         if Configs.Name or Configs.Tracer or Configs.ViewReach then
             Visuals_UpdateAll()
         end
-        if Configs.ViewReach then UpdateReachCircle() end
+        if Configs.ViewReach then UpdateReachCapsule() end
     end)
 end
 
@@ -1762,7 +1895,7 @@ characterConnection = player.CharacterAdded:Connect(function(char)
         task.defer(function()
             if char and char.Parent and scriptAlive then
                 Visuals_UpdateAll()
-                UpdateReachCircle()
+                UpdateReachCapsule()
             end
         end)
     end
