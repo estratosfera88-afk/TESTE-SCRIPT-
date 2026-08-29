@@ -1,21 +1,18 @@
 -- [[
---     AKAT MM2 MAIN LOGIC [v6.6 - FIXES APLICADOS]
+--     AKAT MM2 MAIN LOGIC [v6.7 - MELHORIAS VISUAIS + AUTOSHOOT]
 --     Compatível com Delta Mobile & PC | MM2 (2026)
 --     BACKEND ONLY — sem código de interface visual
 --
---     FIXES v6.6 (sobre v6.5):
---     - AutoShoot: Silent Aim agora usa CFrame.lookAt para mirar EXATAMENTE
---       na cabeça do Murderer via override de mouse.Hit/Target no hook __index,
---       garantindo que o tiro vá direto ao alvo sem desvio.
---     - AutoShoot: Ao disparar via gun:Activate(), o personagem é girado para
---       encarar o alvo antes do disparo (CFrame lookAt) para máxima precisão.
---     - ViewReach: Substituído CylinderHandleAdornment (disco) por uma
---       representação de CÁPSULA usando SelectionBox + tamanho dinâmico,
---       posicionada e escalada ao redor do próprio personagem.
---       A cápsula responde ao ReachValue em tempo real.
---     - Analógico mobile preservado: nenhuma manipulação de CanCollide ou
---       CFrame é feita em frames onde o VirtualInputManager detecta toque
---       ativo no joystick (zona inferior-esquerda preservada).
+--     MELHORIAS v6.7 (sobre v6.6):
+--     - AutoShoot: Reescrito para garantir que a bala saia da arma em direção
+--       ao murder. O personagem gira para encarar o alvo, equipa a arma,
+--       seta o mouse.Hit via hook para apontar à cabeça e dispara via
+--       gun:Activate(). Cooldown ajustado e lógica de fallback mais robusta.
+--     - Tracer ESP: Transparência reduzida de 0.15 para 0.0 (totalmente opaco),
+--       largura aumentada para traçadores mais visíveis.
+--     - View Reach: Cápsula removida. Substituída por SelectionSphere simples
+--       usando um BallHandleAdornment no próprio HumanoidRootPart do jogador.
+--       Sem welds, sem parts extras, sem bug de rotação. Raio = ReachValue.
 -- ]]
 
 local Players           = game:GetService("Players")
@@ -90,7 +87,7 @@ local UpdateName
 local UpdateTracer
 local UpdateReachBox
 local RemoveVisual
-local UpdateReachCapsule
+local UpdateReachSphere
 local EnviarMensagemChat
 local ESP_UpdatePlayer
 
@@ -112,11 +109,9 @@ local CachedState = {
 local function AS_GetMurderer() return CachedState.Murderer end
 _G.AS_GetMurderer = AS_GetMurderer
 
--- ==================== FIX: SILENT AIM — OVERRIDE PRECISO ====================
--- O hook __index redireciona mouse.Hit e mouse.Target para a cabeça do Murderer
+-- ==================== SILENT AIM — OVERRIDE PRECISO ====================
+-- Hook __index: redireciona mouse.Hit e mouse.Target para a cabeça do Murderer
 -- enquanto autoShootFiring == true.
--- Usamos CFrame.lookAt para gerar um CFrame que aponta exatamente para a cabeça,
--- garantindo que o raycast interno da arma acerte o alvo independente da câmera.
 
 local oldIndex, oldNamecall = nil, nil
 
@@ -146,8 +141,6 @@ task.spawn(function()
         end
 
         -- Silent Aim: redireciona Hit/Target para a cabeça do Murderer.
-        -- Usa CFrame.lookAt para posicionar o hit EXATAMENTE sobre a cabeça,
-        -- corrigindo a direção do disparo independente do ângulo da câmera.
         if self == mouse and Configs.AutoShoot and autoShootFiring then
             if key == "Hit" or key == "hit" then
                 local m = CachedState.Murderer
@@ -155,13 +148,9 @@ task.spawn(function()
                     local head = m.Character:FindFirstChild("Head")
                     local root = m.Character:FindFirstChild("HumanoidRootPart")
                     if head and root then
-                        -- Compensa velocidade do alvo com predição leve
                         local vel = root.AssemblyLinearVelocity or Vector3.zero
                         if vel.Magnitude > 80 then vel = Vector3.zero end
                         local predictedPos = head.Position + vel * 0.045
-
-                        -- Gera CFrame que aponta DA câmera PARA o alvo,
-                        -- garantindo que o hit registre na posição correta
                         local camPos = Camera.CFrame.Position
                         local hitCF  = CFrame.new(predictedPos,
                             predictedPos + (predictedPos - camPos).Unit)
@@ -425,168 +414,59 @@ local NameTags   = {}
 local Tracers    = {}
 local ReachBoxes = {}
 
--- ==================== FIX: VIEW REACH — CÁPSULA AO REDOR DO PRÓPRIO PERSONAGEM ====================
--- Usamos dois SelectionBox + uma Part auxiliar para formar a cápsula:
--- Uma part cilíndrica central + duas partes esféricas nas pontas.
--- A transparência e o tamanho são idênticos aos ReachBoxes dos outros jogadores.
--- O raio da cápsula = ReachValue; a altura = altura do personagem + ReachValue * 2 (para cobrir tudo).
+-- ==================== FIX v6.7: VIEW REACH — ESFERA SIMPLES (SEM BUG) ====================
+-- BallHandleAdornment diretamente no HumanoidRootPart do próprio jogador.
+-- Sem Parts extras, sem Welds, sem Model auxiliar.
+-- Isso elimina completamente o bug de rotação/torção da cápsula anterior.
+-- O raio da esfera = ReachValue (alcance real da faca).
 
-local ReachCapsuleParts = {}   -- {root, sphere_top, sphere_bot, cylinder, selbox_cyl, selbox_top, selbox_bot}
+local ReachSphere = nil   -- BallHandleAdornment
 
-local function DestroyReachCapsule()
-    if ReachCapsuleParts.root then
-        pcall(function() ReachCapsuleParts.root:Destroy() end)
+local function DestroyReachSphere()
+    if ReachSphere and ReachSphere.Parent then
+        pcall(function() ReachSphere:Destroy() end)
     end
-    table.clear(ReachCapsuleParts)
+    ReachSphere = nil
 end
 
-UpdateReachCapsule = function()
+UpdateReachSphere = function()
     if not Configs.ViewReach then
-        DestroyReachCapsule()
+        DestroyReachSphere()
         return
     end
 
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
-    local hum  = char and char:FindFirstChildOfClass("Humanoid")
     if not root then
-        DestroyReachCapsule()
+        DestroyReachSphere()
         return
     end
 
-    local reach     = math.max(1, Configs.ReachValue or 18)
-    local charH     = char:GetExtentsSize().Y
-    -- Diâmetro da cápsula = reach * 2 (esfera de alcance ao redor do root)
-    local diameter  = reach * 2
-    -- Altura do cilindro central = altura do personagem + reach * 2
-    local cylHeight = charH + reach * 2
+    local reach  = math.max(1, Configs.ReachValue or 18)
 
-    -- Transparência igual aos ReachBoxes dos outros (0.72)
-    local TRANS = 0.72
-    local COL   = Color3.fromRGB(220, 0, 0)
-
-    -- Se a cápsula já existe, apenas atualiza o tamanho
-    if ReachCapsuleParts.root and ReachCapsuleParts.root.Parent then
-        local cyl = ReachCapsuleParts.cyl
-        local top = ReachCapsuleParts.top
-        local bot = ReachCapsuleParts.bot
-
-        if cyl then
-            cyl.Size     = Vector3.new(diameter, cylHeight, diameter)
-        end
-        if top then
-            top.Size     = Vector3.new(diameter, diameter, diameter)
-            top.CFrame   = root.CFrame * CFrame.new(0,  cylHeight * 0.5, 0)
-        end
-        if bot then
-            bot.Size     = Vector3.new(diameter, diameter, diameter)
-            bot.CFrame   = root.CFrame * CFrame.new(0, -cylHeight * 0.5, 0)
-        end
-
-        -- Atualiza SelectionBoxes
-        if ReachCapsuleParts.selboxCyl then
-            ReachCapsuleParts.selboxCyl.LineThickness = 0.03
-        end
+    -- Se já existe e está no root correto, só atualiza o raio
+    if ReachSphere and ReachSphere.Parent == root then
+        ReachSphere.Radius = reach
         return
     end
 
-    -- Destrói restos anteriores
-    DestroyReachCapsule()
+    -- Recria do zero
+    DestroyReachSphere()
 
-    -- Part âncora (não visível, segue o root via weld)
-    local anchorModel = Instance.new("Model")
-    anchorModel.Name  = "AkatReachCapsule"
-    anchorModel.Parent = workspace
+    local sphere              = Instance.new("SphereHandleAdornment")
+    sphere.Name               = "AkatReachSphere"
+    sphere.Adornee            = root
+    sphere.Radius             = reach
+    sphere.Color3             = Color3.fromRGB(220, 0, 0)
+    sphere.Transparency       = 0.60      -- visível mas não intrusivo
+    sphere.AlwaysOnTop        = false     -- respeita oclusão do mundo
+    sphere.ZIndex             = 1
+    sphere.Parent             = root
 
-    -- Cilindro central
-    local cyl              = Instance.new("Part")
-    cyl.Name               = "CylPart"
-    cyl.Size               = Vector3.new(diameter, cylHeight, diameter)
-    cyl.CFrame             = root.CFrame
-    cyl.Anchored           = false
-    cyl.CanCollide         = false
-    cyl.CanTouch           = false
-    cyl.Transparency       = 1   -- invisível; o SelectionBox mostra o contorno
-    cyl.CastShadow         = false
-    cyl.Parent             = anchorModel
-
-    -- Esfera no topo
-    local top              = Instance.new("Part")
-    top.Name               = "TopSphere"
-    top.Shape              = Enum.PartType.Ball
-    top.Size               = Vector3.new(diameter, diameter, diameter)
-    top.CFrame             = root.CFrame * CFrame.new(0, cylHeight * 0.5, 0)
-    top.Anchored           = false
-    top.CanCollide         = false
-    top.CanTouch           = false
-    top.Transparency       = 1
-    top.CastShadow         = false
-    top.Parent             = anchorModel
-
-    -- Esfera na base
-    local bot              = Instance.new("Part")
-    bot.Name               = "BotSphere"
-    bot.Shape              = Enum.PartType.Ball
-    bot.Size               = Vector3.new(diameter, diameter, diameter)
-    bot.CFrame             = root.CFrame * CFrame.new(0, -cylHeight * 0.5, 0)
-    bot.Anchored           = false
-    bot.CanCollide         = false
-    bot.CanTouch           = false
-    bot.Transparency       = 1
-    bot.CastShadow         = false
-    bot.Parent             = anchorModel
-
-    -- Welds para seguir o root
-    local function makeWeld(part)
-        local w = Instance.new("WeldConstraint")
-        w.Part0 = root
-        w.Part1 = part
-        w.Parent = part
-    end
-    makeWeld(cyl)
-    makeWeld(top)
-    makeWeld(bot)
-
-    -- SelectionBox para o cilindro
-    local selCyl              = Instance.new("SelectionBox")
-    selCyl.Name               = "AkatCylSel"
-    selCyl.Adornee            = cyl
-    selCyl.Color3             = COL
-    selCyl.LineThickness      = 0.03
-    selCyl.SurfaceTransparency = TRANS
-    selCyl.SurfaceColor3      = COL
-    selCyl.Parent             = anchorModel
-
-    -- SelectionBox para esfera topo
-    local selTop              = Instance.new("SelectionBox")
-    selTop.Name               = "AkatTopSel"
-    selTop.Adornee            = top
-    selTop.Color3             = COL
-    selTop.LineThickness      = 0.03
-    selTop.SurfaceTransparency = TRANS
-    selTop.SurfaceColor3      = COL
-    selTop.Parent             = anchorModel
-
-    -- SelectionBox para esfera base
-    local selBot              = Instance.new("SelectionBox")
-    selBot.Name               = "AkatBotSel"
-    selBot.Adornee            = bot
-    selBot.Color3             = COL
-    selBot.LineThickness      = 0.03
-    selBot.SurfaceTransparency = TRANS
-    selBot.SurfaceColor3      = COL
-    selBot.Parent             = anchorModel
-
-    ReachCapsuleParts.root      = anchorModel
-    ReachCapsuleParts.cyl       = cyl
-    ReachCapsuleParts.top       = top
-    ReachCapsuleParts.bot       = bot
-    ReachCapsuleParts.selboxCyl = selCyl
-    ReachCapsuleParts.selboxTop = selTop
-    ReachCapsuleParts.selboxBot = selBot
+    ReachSphere = sphere
 end
 
--- ==================== FIX: NAME/TRACER — CORES SINCRONIZADAS ====================
+-- ==================== NAME / TRACER (v6.7: TRACER MAIS FORTE) ====================
 local function GetRoleColor(p)
     local role = ESP_DetectRole(p)
     PlayerRoles[p] = role
@@ -656,6 +536,9 @@ UpdateName = function(p)
     end
 end
 
+-- FIX v6.7: TRACER MAIS FORTE
+-- Transparência: 0.0 (100% opaco)
+-- Largura: mais grossa para maior visibilidade
 UpdateTracer = function(p)
     if p == player or not p.Character or not Configs.Tracer then
         if Tracers[p] then
@@ -685,26 +568,34 @@ UpdateTracer = function(p)
         b.Name     = "AkatTracerEnd"
         b.Parent   = targetRoot
 
-        local beam           = Instance.new("Beam")
-        beam.Name            = "AkatTracer"
-        beam.Attachment0     = a
-        beam.Attachment1     = b
-        beam.FaceCamera      = true
-        beam.LightEmission   = 0
-        beam.Width0          = 0.035
-        beam.Width1          = 0.01
-        beam.Transparency    = NumberSequence.new(0.15)
-        beam.Parent          = myRoot
+        local beam              = Instance.new("Beam")
+        beam.Name               = "AkatTracer"
+        beam.Attachment0        = a
+        beam.Attachment1        = b
+        beam.FaceCamera         = true
+        beam.LightEmission      = 1        -- brilho para destacar mais
+        beam.LightInfluence     = 0        -- não afetado por sombras
+        -- Transparência ZERO = totalmente opaco
+        beam.Transparency       = NumberSequence.new({
+            NumberSequenceKeypoint.new(0,   0.0),
+            NumberSequenceKeypoint.new(0.5, 0.0),
+            NumberSequenceKeypoint.new(1,   0.0),
+        })
+        beam.Width0             = 0.12     -- largura inicial (pé do beam)
+        beam.Width1             = 0.06     -- largura final (alvo)
+        beam.Parent             = myRoot
 
         data        = {a = a, b = b, beam = beam}
         Tracers[p]  = data
     end
 
     data.beam.Color = ColorSequence.new(color)
+
+    -- Ajusta a largura proporcionalmente à distância (mantém visível à distância)
     local d = (myRoot.Position - targetRoot.Position).Magnitude
-    local w = math.clamp(0.055 - d * 0.00006, 0.012, 0.055)
+    local w = math.clamp(0.14 - d * 0.00008, 0.04, 0.14)
     data.beam.Width0 = w
-    data.beam.Width1 = w * 0.28
+    data.beam.Width1 = w * 0.5
 end
 
 UpdateReachBox = function(p)
@@ -766,23 +657,33 @@ local function Visuals_ClearAll()
         if ReachBoxes[p] then pcall(function() ReachBoxes[p]:Destroy() end) end
         ReachBoxes[p] = nil
     end
-    DestroyReachCapsule()
+    DestroyReachSphere()
 end
 
--- ==================== FIX: AUTO SHOOT REESCRITO ====================
--- Estratégia de bypass em camadas (mobile + PC):
---   1. Gira o personagem para encarar o alvo (CFrame lookAt) antes de disparar
---   2. gun:Activate() com autoShootFiring=true (Silent Aim ativo via __index hook)
---   3. VirtualInputManager:SendMouseButtonEvent (bypass de input mobile)
---   4. mouse1click fallback
---   5. RemoteEvent interno da arma (se exposto)
+-- ==================== FIX v6.7: AUTO SHOOT REESCRITO ====================
+-- Estratégia principal:
+--   1. Localiza a arma (no char ou mochila) e o murder
+--   2. Gira o personagem para encarar o alvo (CFrame lookAt)
+--   3. Equipa a arma via hum:EquipTool()
+--   4. Ativa Silent Aim (autoShootFiring = true) para que o hook redirecione
+--      mouse.Hit para a cabeça do murder ANTES do disparo
+--   5. Dispara via gun:Activate() — método primário
+--   6. Fallback: VirtualInputManager na posição da cabeça na tela
+--   7. Desequipa a arma após o disparo
+--
+-- Por que isso garante que a bala vá ao murder:
+--   - gun:Activate() usa internamente mouse.Hit para definir o alvo do raycast
+--   - Como o hook __index sobrescreve mouse.Hit com CFrame.lookAt(cabeça),
+--     o raycast da arma aponta exatamente para a cabeça do murder
+--   - A pré-rotação do personagem garante compatibilidade com armas que
+--     usam a orientação do HumanoidRootPart como vetor de disparo
 
 local autoShootBusy       = false
 local lastAutoShot        = 0
-local AUTO_SHOOT_COOLDOWN = 0.22
+local AUTO_SHOOT_COOLDOWN = 0.25  -- cooldown ligeiramente maior para estabilidade
 
 local function AutoShoot_FindGun()
-    local char    = player.Character
+    local char     = player.Character
     local backpack = player:FindFirstChildOfClass("Backpack")
     if not char then return nil, nil end
 
@@ -801,6 +702,7 @@ local function AutoShoot_FindGun()
         return nil
     end
 
+    -- Prioridade: arma já equipada no char > arma na mochila
     local gun = findGun(char) or findGun(backpack)
     local hum = char:FindFirstChildOfClass("Humanoid")
     return gun, hum
@@ -832,8 +734,6 @@ local function AutoShoot_GetValidTarget()
     return murderer, head
 end
 
--- FIX: TryFireBullet agora gira o personagem para encarar o alvo antes de disparar,
--- garantindo que o disparo vá na direção correta mesmo em mobile.
 local function TryFireBullet(gun, murderer, head)
     local myChar = player.Character
     local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
@@ -841,71 +741,82 @@ local function TryFireBullet(gun, murderer, head)
 
     local fired = false
 
-    -- Pré-rotação: faz o personagem olhar para a cabeça do murder.
-    -- Isso corrige a direção do disparo para armas que usam a orientação do root.
+    -- Passo 1: Rotaciona o personagem para encarar a cabeça do murder.
+    -- Isso é essencial para armas que calculam a direção do disparo
+    -- com base na orientação do HumanoidRootPart.
     pcall(function()
-        local aimDir   = (head.Position - myRoot.Position).Unit
-        local flatDir  = Vector3.new(aimDir.X, 0, aimDir.Z)
+        local aimDir  = (head.Position - myRoot.Position).Unit
+        local flatDir = Vector3.new(aimDir.X, 0, aimDir.Z)
         if flatDir.Magnitude > 0.01 then
             myRoot.CFrame = CFrame.new(myRoot.Position, myRoot.Position + flatDir)
         end
     end)
 
-    -- Camada 1: gun:Activate() com Silent Aim ligado
+    -- Passo 2: Ativa Silent Aim e dispara via gun:Activate().
+    -- O hook __index vai interceptar mouse.Hit e retornar CFrame da cabeça.
     autoShootFiring = true
     local ok1 = pcall(function() gun:Activate() end)
-    task.wait(0.03)
+    task.wait(0.04)
     autoShootFiring = false
     if ok1 then fired = true end
 
-    -- Camada 2: VirtualInputManager (mobile bypass)
-    -- Usamos a POSIÇÃO EM TELA da cabeça do murder para o evento de clique,
-    -- não as coordenadas 3D brutas — isso evita clicar no analógico mobile.
+    -- Passo 3: Fallback para mobile — VirtualInputManager na posição da cabeça.
+    -- Usamos WorldToScreenPoint para clicar exatamente onde a cabeça aparece na tela.
     if VirtualInputManager then
         pcall(function()
             local screenPos, onScreen = Camera:WorldToScreenPoint(head.Position)
-            if onScreen and screenPos.X > 230 then  -- respeita zona do analógico
+            -- Evita zona do analógico mobile (esquerda da tela)
+            if onScreen and screenPos.X > 230 then
+                autoShootFiring = true
                 VirtualInputManager:SendMouseButtonEvent(
                     math.floor(screenPos.X),
                     math.floor(screenPos.Y),
                     0, true, game, 1
                 )
-                task.wait(0.02)
+                task.wait(0.025)
                 VirtualInputManager:SendMouseButtonEvent(
                     math.floor(screenPos.X),
                     math.floor(screenPos.Y),
                     0, false, game, 1
                 )
+                autoShootFiring = false
                 fired = true
             end
         end)
     end
 
-    -- Camada 3: mouse1click fallback
-    local handle = gun:FindFirstChild("Handle") or gun:FindFirstChildOfClass("BasePart")
-    if handle then
-        pcall(function()
-            if mouse1click then
-                mouse1click()
-                fired = true
-            elseif click then
-                click()
-                fired = true
-            end
-        end)
-    end
-
-    -- Camada 4: RemoteEvent interno da arma
+    -- Passo 4: Fallback mouse1click
     pcall(function()
-        local shootRE = gun:FindFirstChildOfClass("RemoteEvent")
-            or gun:FindFirstChild("ShootEvent")
-            or gun:FindFirstChild("Fire")
-        if shootRE and shootRE:IsA("RemoteEvent") then
-            shootRE:FireServer(head.CFrame.Position)
+        if mouse1click then
+            autoShootFiring = true
+            mouse1click()
+            autoShootFiring = false
+            fired = true
+        elseif click then
+            autoShootFiring = true
+            click()
+            autoShootFiring = false
             fired = true
         end
     end)
 
+    -- Passo 5: RemoteEvent interno da arma (caso a arma use servidor para registrar o hit)
+    pcall(function()
+        local shootRE = gun:FindFirstChild("ShootEvent")
+            or gun:FindFirstChild("Fire")
+            or gun:FindFirstChildOfClass("RemoteEvent")
+        if shootRE and shootRE:IsA("RemoteEvent") then
+            -- Envia a posição PREVISTA da cabeça (com compensação de velocidade)
+            local rootMur = murderer.Character:FindFirstChild("HumanoidRootPart")
+            local vel = rootMur and (rootMur.AssemblyLinearVelocity or Vector3.zero) or Vector3.zero
+            if vel.Magnitude > 80 then vel = Vector3.zero end
+            local targetPos = head.Position + vel * 0.045
+            shootRE:FireServer(targetPos)
+            fired = true
+        end
+    end)
+
+    autoShootFiring = false
     return fired
 end
 
@@ -931,14 +842,20 @@ local function ExecuteAutoShootOnce()
     lastAutoShot  = now
 
     local ok, err = pcall(function()
+        -- Equipa a arma se ainda não estiver no character
         if gun.Parent ~= player.Character then
             hum:EquipTool(gun)
-            task.wait(0.08)
+            task.wait(0.10)  -- aguarda a arma ser equipada pelo servidor
         end
 
+        -- Verifica se ainda é para atirar após o equipamento
         if not Configs.AutoShoot or gun.Parent ~= player.Character then return end
 
-        TryFireBullet(gun, murderer, head)
+        -- Confirma que o alvo ainda é válido após o tempo de equipamento
+        local mur2, head2 = AutoShoot_GetValidTarget()
+        if not mur2 or not head2 then return end
+
+        TryFireBullet(gun, mur2, head2)
         task.wait(0.05)
     end)
 
@@ -948,6 +865,7 @@ local function ExecuteAutoShootOnce()
         DebugLog("AutoShoot", "Erro: " .. tostring(err))
     end
 
+    -- Desequipa após o disparo para não deixar a arma exposta
     pcall(function()
         if hum and hum.Parent and gun and gun.Parent == player.Character then
             hum:UnequipTools()
@@ -1151,9 +1069,9 @@ _G.AkatCallbacks = {
                 pcall(function() b:Destroy() end)
                 ReachBoxes[p] = nil
             end
-            DestroyReachCapsule()
+            DestroyReachSphere()
         else
-            UpdateReachCapsule()
+            UpdateReachSphere()
             Visuals_UpdateAll()
         end
     end,
@@ -1196,8 +1114,8 @@ _G.AkatCallbacks = {
         else
             Configs.Reach = value and true or false
         end
-        -- Atualiza a cápsula imediatamente ao mudar o valor
-        if Configs.ViewReach then UpdateReachCapsule() end
+        -- Atualiza a esfera imediatamente ao mudar o valor
+        if Configs.ViewReach then UpdateReachSphere() end
     end,
 
     AntiFling = function(enabled)
@@ -1815,8 +1733,8 @@ task.spawn(function()
                     if Configs.ViewReach and not ReachBoxes[p] then UpdateReachBox(p) end
                 end
             end
-            -- Atualiza tamanho da cápsula se o reach mudou
-            if Configs.ViewReach then UpdateReachCapsule() end
+            -- Atualiza raio da esfera se o reach mudou
+            if Configs.ViewReach then UpdateReachSphere() end
         end
 
         task.wait(0.2)
@@ -1860,7 +1778,7 @@ local function ResetRoundState()
         if Configs.Name or Configs.Tracer or Configs.ViewReach then
             Visuals_UpdateAll()
         end
-        if Configs.ViewReach then UpdateReachCapsule() end
+        if Configs.ViewReach then UpdateReachSphere() end
     end)
 end
 
@@ -1895,7 +1813,7 @@ characterConnection = player.CharacterAdded:Connect(function(char)
         task.defer(function()
             if char and char.Parent and scriptAlive then
                 Visuals_UpdateAll()
-                UpdateReachCapsule()
+                UpdateReachSphere()
             end
         end)
     end
