@@ -381,7 +381,7 @@ UpdateReachSphere = function()
         return
     end
 
-    local reach  = math.max(1, Configs.ReachValue or 18)
+    local reach  = math.max(1, Configs.ReachValue or 5)
 
     -- Se já existe e está no root correto, só atualiza o raio
     if ReachSphere and ReachSphere.Parent == root then
@@ -769,48 +769,37 @@ end
 -- MÉTODO PRINCIPAL: dispara o Remote da arma com a posição do murder.
 -- Testa os argumentos mais comuns do MM2 (CFrame, Vector3, BasePart).
 local function AutoShoot_FireRemote(gun, predictedPos)
-    local remote = AutoShoot_FindFireRemote(gun)
+    if not gun or not predictedPos then return false end
+
+    -- MM2: o disparo real do Sheriff passa por este RemoteFunction.
+    -- O remote fica dentro de Gun > KnifeLocal > CreateBeam, portanto
+    -- procurar apenas por "Fire/Shoot" fazia o mobile cair no Activate()
+    -- (que apenas equipava a arma).
+    local createBeam = gun:FindFirstChild("CreateBeam", true)
+    local remote = createBeam and createBeam:FindFirstChildOfClass("RemoteFunction")
+
+    if remote then
+        local ok = pcall(function()
+            remote:InvokeServer(1, predictedPos, "AH2")
+        end)
+        if ok then
+            return true
+        end
+    end
+
+    -- Compatibilidade com variações/versões que mantêm um remote nomeado.
+    remote = AutoShoot_FindFireRemote(gun)
     if not remote then return false end
 
-    local hitCF   = CFrame.new(predictedPos)
-    local hitPart = workspace:FindFirstChildOfClass("BasePart") -- placeholder inócuo
-
+    local hitCF = CFrame.new(predictedPos)
     local ok = false
 
     if remote:IsA("RemoteEvent") then
-        -- Tenta as assinaturas mais comuns do MM2 em ordem.
-        ok = pcall(function()
-            remote:FireServer(hitCF, hitPart)
-        end)
-
-        if not ok then
-            ok = pcall(function()
-                remote:FireServer(predictedPos, hitPart)
-            end)
-        end
-
-        if not ok then
-            ok = pcall(function()
-                remote:FireServer(hitCF)
-            end)
-        end
-
-        if not ok then
-            ok = pcall(function()
-                remote:FireServer(predictedPos)
-            end)
-        end
-
+        ok = pcall(function() remote:FireServer(predictedPos) end)
+        if not ok then ok = pcall(function() remote:FireServer(hitCF) end) end
     elseif remote:IsA("RemoteFunction") then
-        ok = pcall(function()
-            remote:InvokeServer(hitCF, hitPart)
-        end)
-
-        if not ok then
-            ok = pcall(function()
-                remote:InvokeServer(predictedPos, hitPart)
-            end)
-        end
+        ok = pcall(function() remote:InvokeServer(1, predictedPos, "AH2") end)
+        if not ok then ok = pcall(function() remote:InvokeServer(predictedPos) end) end
     end
 
     return ok
@@ -1711,7 +1700,7 @@ task.spawn(function()
         local handle = myKnife:FindFirstChild("Handle") or myKnife:FindFirstChildOfClass("BasePart")
         if not handle then continue end
 
-        local reachDist = Configs.ReachValue or 18
+        local reachDist = Configs.ReachValue or 5
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= player and p.Character then
                 local er = p.Character:FindFirstChild("HumanoidRootPart")
