@@ -599,343 +599,177 @@ local function Visuals_ClearAll()
     DestroyReachSphere()
 end
 
--- ==================== AUTO SHOOT: REESCRITO v6.8 (MOBILE-SAFE) ====================
--- Princípio: dispara o RemoteEvent/RemoteFunction de tiro da arma diretamente,
--- passando a posição prevista da cabeça do murder como argumento.
--- NÃO rota o personagem. NÃO altera a câmera. NÃO toca no analógico.
--- NÃO usa mouse.Hit nem gun:Activate() como método principal.
--- Silent Aim removido do __index — não é mais necessário.
+-- ==================== AUTO SHOOT / SHOOT MURDER ====================
+-- Baseado diretamente no método funcional do Shoot Murder fornecido.
+-- O tiro usa Gun.Shoot + GunRaycastAttachment e envia o CFrame de origem
+-- e o CFrame previsto do Murderer. Não depende de mouse.Hit, câmera ou Activate().
 
 local autoShootBusy       = false
 local autoShootRunning    = false
 local lastAutoShot        = 0
 local AUTO_SHOOT_COOLDOWN = 0.35
 local AUTO_SHOOT_INTERVAL = 0.06
-local AUTO_SHOOT_MAX_DIST = 1500
-local AUTO_SHOOT_PREDICTION = 0.05
+local AUTO_SHOOT_PREDICTION = 0.15
 
--- Encontra o RemoteEvent ou RemoteFunction de disparo dentro da arma.
--- O MM2 geralmente usa um Remote chamado "Fire", "Shoot", "OnFire" ou similar.
-local function AutoShoot_FindFireRemote(gun)
-    -- MM2: o disparo do Sheriff é feito pelo RemoteFunction CreateBeam
-    -- dentro de Gun > KnifeLocal. O remote global ShootGun também é
-    -- mantido como fallback para versões/replicações diferentes.
-    if gun then
-        local knifeLocal = gun:FindFirstChild("KnifeLocal", true)
-        local createBeam = knifeLocal and knifeLocal:FindFirstChild("CreateBeam", true)
-        local rf = createBeam and createBeam:FindFirstChild("RemoteFunction")
-        if rf and rf:IsA("RemoteFunction") then
-            return rf
-        end
+local function AutoShoot_FindGun()
+    local char = player.Character
+    local backpack = player:FindFirstChildOfClass("Backpack")
+    if not char then return nil end
 
-        local named = gun:FindFirstChild("RemoteFunction", true)
-        if named and named:IsA("RemoteFunction") then
-            return named
+    -- Prioridade absoluta para a Tool chamada Gun, igual ao Shoot Murder funcional.
+    local gun = char:FindFirstChild("Gun")
+    if gun and gun:IsA("Tool") then
+        return gun
+    end
+
+    if backpack then
+        gun = backpack:FindFirstChild("Gun")
+        if gun and gun:IsA("Tool") then
+            return gun
         end
     end
 
-    local rs = game:GetService("ReplicatedStorage")
-    local remotes = rs:FindFirstChild("Remotes")
-    local gameplay = remotes and remotes:FindFirstChild("Gameplay")
-    local shootGun = gameplay and gameplay:FindFirstChild("ShootGun")
-    if shootGun and shootGun:IsA("RemoteFunction") then
-        return shootGun
+    -- Fallback apenas para nomes equivalentes, sem escolher qualquer Tool aleatória.
+    local function findNamedGun(container)
+        if not container then return nil end
+        for _, item in ipairs(container:GetChildren()) do
+            if item:IsA("Tool") then
+                local n = item.Name:lower()
+                if n == "gun" or n:find("sheriff") or n:find("revolver") or n:find("pistol") then
+                    return item
+                end
+            end
+        end
+        return nil
+    end
+
+    return findNamedGun(char) or findNamedGun(backpack)
+end
+
+-- Mesmo detector do Shoot Murder funcional: Knife no Character ou Backpack.
+local function AutoShoot_GetMurderer()
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= player then
+            local char = plr.Character
+            local backpack = plr:FindFirstChildOfClass("Backpack")
+            local knife = (char and char:FindFirstChild("Knife"))
+                or (backpack and backpack:FindFirstChild("Knife"))
+
+            if knife and char and char:FindFirstChild("HumanoidRootPart") then
+                return plr
+            end
+        end
     end
 
     return nil
 end
 
--- Encontra a arma no Character ou Backpack do player local.
-local function AutoShoot_FindGun()
-    local char     = player.Character
-    local backpack = player:FindFirstChildOfClass("Backpack")
-    if not char then return nil end
+-- Disparo copiado/adaptado do Shoot Murder que funciona:
+-- Gun.Shoot:FireServer(GunRaycastAttachment.WorldCFrame, CFrame.new(predictedPosition))
+local function ShootMurdererOnce()
+    local char = player.Character
+    if not char then return false end
 
-    local function findGun(container)
-        if not container then return nil end
-
-        for _, item in ipairs(container:GetChildren()) do
-            if item:IsA("Tool") then
-                local n = item.Name:lower()
-
-                if item:FindFirstChild("GunScript") or item:FindFirstChild("Gun")
-                    or n:find("gun") or n:find("pistol") or n:find("revolver")
-                    or n:find("sheriff") or n:find("laser") or n:find("seer")
-                    or n:find("luger") or n:find("blaster") then
-                    return item
-                end
-            end
-        end
-
-        return nil
-    end
-
-    return findGun(char) or findGun(backpack)
-end
-
--- Valida e retorna o Murderer atual do cache ou varre os jogadores.
-local function AutoShoot_FindValidMurderer()
-    local cached = CachedState.Murderer
-
-    local function validate(p)
-        if not p or p == player or not p.Parent or not p.Character then
-            return false
-        end
-
-        local char = p.Character
-        local hum  = char:FindFirstChildOfClass("Humanoid")
-        local head = char:FindFirstChild("Head")
-        local root = char:FindFirstChild("HumanoidRootPart")
-
-        if not hum or hum.Health <= 0 or not head or not root then
-            return false
-        end
-
-        local role = ESP_DetectRole(p)
-        PlayerRoles[p] = role
-
-        return role == "Murderer"
-    end
-
-    if validate(cached) then
-        return cached,
-            cached.Character:FindFirstChild("Head"),
-            cached.Character:FindFirstChild("HumanoidRootPart")
-    end
-
-    CachedState.Murderer = nil
-
-    for _, p in ipairs(Players:GetPlayers()) do
-        if validate(p) then
-            CachedState.Murderer = p
-            return p,
-                p.Character:FindFirstChild("Head"),
-                p.Character:FindFirstChild("HumanoidRootPart")
-        end
-    end
-
-    return nil, nil, nil
-end
-
--- Verifica distância e linha de visão real (sem restrição de FOV — mobile).
-local function AutoShoot_CheckTarget(murderer, head)
-    local myChar = player.Character
-    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-
-    if not myChar or not myRoot or not murderer or not head then
-        return false, "missing"
-    end
-
-    local mChar = murderer.Character
-    local mHum  = mChar and mChar:FindFirstChildOfClass("Humanoid")
-    local mRoot = mChar and mChar:FindFirstChild("HumanoidRootPart")
-
-    if not mChar or not mHum or mHum.Health <= 0 or not mRoot then
-        return false, "dead"
-    end
-
-    local dist = (myRoot.Position - head.Position).Magnitude
-
-    if dist <= 0.01 or dist > AUTO_SHOOT_MAX_DIST then
-        return false, "distance"
-    end
-
-    -- Raycast a partir da câmera até a cabeça — ignora o próprio personagem.
-    local camera = workspace.CurrentCamera or Camera
-    if not camera then
-        return false, "camera"
-    end
-
-    local params = RaycastParams.new()
-    params.FilterType = Enum.RaycastFilterType.Exclude
-    params.FilterDescendantsInstances = {myChar, camera}
-    params.IgnoreWater = true
-
-    local result = workspace:Raycast(
-        camera.CFrame.Position,
-        head.Position - camera.CFrame.Position,
-        params
-    )
-
-    if result and not result.Instance:IsDescendantOf(mChar) then
-        return false, "blocked"
-    end
-
-    return true, "ok"
-end
-
--- Predição simples de posição com base na velocidade do alvo.
-local function AutoShoot_Predict(head, root)
-    local vel = root and (root.AssemblyLinearVelocity or Vector3.zero) or Vector3.zero
-
-    if vel.Magnitude > 80 then
-        vel = Vector3.zero
-    end
-
-    return head.Position + vel * AUTO_SHOOT_PREDICTION
-end
-
--- MÉTODO PRINCIPAL: usa o RemoteFunction real do Sheriff Gun (CreateBeam/RemoteFunction)
--- e envia a posição prevista da cabeça do Murderer na assinatura do MM2.
-local function AutoShoot_FireRemote(gun, predictedPos)
-    local remote = AutoShoot_FindFireRemote(gun)
-    if not remote then
-        DebugLog("AutoShoot", "ShootGun/CreateBeam não encontrado")
+    local gun = AutoShoot_FindGun()
+    if not gun then
+        DebugLog("AutoShoot", "Gun não encontrada")
         return false
     end
 
-    -- Assinatura usada pelo MM2 para o Sheriff Gun.
-    -- [1] = tiro, [2] = posição do disparo/alvo, [3] = identificador do beam.
-    if remote:IsA("RemoteFunction") then
-        local ok = pcall(function()
-            remote:InvokeServer(1, predictedPos, "AH2")
+    -- O script funcional coloca a Gun diretamente no Character.
+    if gun.Parent ~= char then
+        pcall(function()
+            gun.Parent = char
         end)
-        if ok then
-            DebugLog("AutoShoot", "Disparo enviado via RemoteFunction: " .. remote:GetFullName())
-            return true
-        end
-
-        -- Algumas versões usam somente os dois primeiros argumentos.
-        ok = pcall(function()
-            remote:InvokeServer(1, predictedPos)
-        end)
-        if ok then
-            DebugLog("AutoShoot", "Disparo enviado via RemoteFunction (2 args)")
-            return true
-        end
-    elseif remote:IsA("RemoteEvent") then
-        local ok = pcall(function()
-            remote:FireServer(1, predictedPos, "AH2")
-        end)
-        if ok then return true end
+        task.wait(0.05)
     end
 
+    if gun.Parent ~= char then
+        DebugLog("AutoShoot", "Não foi possível equipar Gun")
+        return false
+    end
+
+    local shoot = gun:FindFirstChild("Shoot")
+    if not shoot or not shoot:IsA("RemoteEvent") then
+        DebugLog("AutoShoot", "Gun.Shoot não encontrado")
+        return false
+    end
+
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return false end
+
+    local attachment = root:FindFirstChild("GunRaycastAttachment")
+    if not attachment or not attachment:IsA("Attachment") then
+        DebugLog("AutoShoot", "GunRaycastAttachment não encontrado")
+        return false
+    end
+
+    local murderer = AutoShoot_GetMurderer()
+    if not murderer or not murderer.Character then
+        DebugLog("AutoShoot", "Murderer não encontrado")
+        return false
+    end
+
+    local mroot = murderer.Character:FindFirstChild("HumanoidRootPart")
+    local mhum = murderer.Character:FindFirstChildOfClass("Humanoid")
+    if not mroot or (mhum and mhum.Health <= 0) then
+        return false
+    end
+
+    local velocity = mroot.AssemblyLinearVelocity or Vector3.zero
+    if velocity.Magnitude > 100 then
+        velocity = Vector3.zero
+    end
+
+    local predictedPosition = mroot.Position + velocity * AUTO_SHOOT_PREDICTION
+
+    local ok, err = pcall(function()
+        shoot:FireServer(
+            attachment.WorldCFrame,
+            CFrame.new(predictedPosition)
+        )
+    end)
+
+    if ok then
+        lastAutoShot = tick()
+        DebugLog("AutoShoot", "Shoot Murder enviado para " .. murderer.Name)
+        return true
+    end
+
+    DebugLog("AutoShoot", "Falha no Shoot: " .. tostring(err))
     return false
 end
 
--- FALLBACK: gun:Activate() com o Silent Aim ativo no __index apenas por
--- esta janela de tempo mínima. Só é chamado se o Remote não for encontrado.
-local function AutoShoot_FallbackActivate(gun, predictedPos)
-    if not gun or gun.Parent ~= player.Character then
+-- Wrapper usado pelo Auto Shoot automático e pelo botão flutuante.
+-- O botão chama esta função diretamente; portanto não precisa depender de Activate().
+local function ExecuteAutoShootOnce(force)
+    if autoShootBusy or not scriptAlive then
         return false
     end
 
-    -- Compatibilidade para experiências que não expõem o RemoteFunction.
-    -- O método principal continua sendo o RemoteFunction do MM2.
-    local ok = pcall(function()
-        gun:Activate()
-    end)
-    if ok then
-        task.wait(0.03)
-    end
-    return ok
-end
-
--- Orquestrador: equipa se necessário, depois dispara pelo Remote ou fallback.
-local function ExecuteAutoShootOnce()
-    if not Configs.AutoShoot or autoShootBusy or not scriptAlive then
+    -- O botão flutuante pode disparar mesmo quando a rotina automática está parada.
+    if not force and not Configs.AutoShoot then
         return false
     end
 
     local now = tick()
-
     if now - lastAutoShot < AUTO_SHOOT_COOLDOWN then
         return false
     end
 
-    -- 1. Valida personagem local.
-    local myChar = player.Character
-    local myHum  = myChar and myChar:FindFirstChildOfClass("Humanoid")
-
-    if not myChar or not myHum or myHum.Health <= 0 then
-        return false
-    end
-
-    -- 2. Encontra Murderer válido.
-    local murderer, head, mRoot = AutoShoot_FindValidMurderer()
-
-    if not murderer or not head or not mRoot then
-        DebugLog("AutoShoot", "Nenhum Murderer válido.")
-        return false
-    end
-
-    -- 3. Verifica linha de visão e distância.
-    local valid, reason = AutoShoot_CheckTarget(murderer, head)
-
-    if not valid then
-        DebugLog("AutoShoot", "Alvo recusado: " .. tostring(reason))
-        return false
-    end
-
-    -- 4. Encontra arma.
-    local gun = AutoShoot_FindGun()
-
-    if not gun then
-        DebugLog("AutoShoot", "Nenhuma arma encontrada.")
-        return false
-    end
-
     autoShootBusy = true
-    local fired   = false
+    local fired = false
 
     local ok, err = pcall(function()
-        -- 5. Equipa se estiver na Backpack (sem espera longa).
-        if gun.Parent ~= myChar then
-            myHum:EquipTool(gun)
-            task.wait(0.08)
-
-            -- Revalida tudo após equipar.
-            if not Configs.AutoShoot or not scriptAlive then
-                return
-            end
-
-            local m2, h2, r2 = AutoShoot_FindValidMurderer()
-
-            if not m2 or not h2 then
-                return
-            end
-
-            local v2, rsn2 = AutoShoot_CheckTarget(m2, h2)
-
-            if not v2 then
-                DebugLog("AutoShoot", "Revalidação recusada: " .. tostring(rsn2))
-                return
-            end
-
-            murderer, head, mRoot = m2, h2, r2
-        end
-
-        if gun.Parent ~= myChar then
-            return
-        end
-
-        -- 6. Posição prevista (com predição de movimento).
-        local predictedPos = AutoShoot_Predict(head, mRoot)
-
-        -- 7. Registra o instante do tiro.
-        lastAutoShot = tick()
-
-        -- 8. Tenta disparar via Remote (sem mover personagem/câmera).
-        local remoteOK = AutoShoot_FireRemote(gun, predictedPos)
-
-        if remoteOK then
-            fired = true
-            DebugLog("AutoShoot", "Tiro via Remote OK")
-            return
-        end
-
-        -- 9. Fallback: gun:Activate() com override mínimo do Hit.
-        DebugLog("AutoShoot", "Fallback para Activate()")
-        fired = AutoShoot_FallbackActivate(gun, predictedPos)
+        fired = ShootMurdererOnce()
     end)
 
     if not ok then
         DebugLog("AutoShoot", "Erro: " .. tostring(err))
     end
 
-    autoShootBusy   = false
+    autoShootBusy = false
     autoShootFiring = false
-
     return fired
 end
 
@@ -1394,8 +1228,7 @@ _G.AkatCallbacks = {
     end,
 
     AutoShootOnce = function()
-        if not Configs.AutoShoot then return false end
-        return ExecuteAutoShootOnce()
+        return ExecuteAutoShootOnce(true)
     end,
 
     XRay = function(enabled)
