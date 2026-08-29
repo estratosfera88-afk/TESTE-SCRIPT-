@@ -773,35 +773,13 @@ local function ExecuteAutoShootOnce(force)
     return fired
 end
 
-local function StartAutoShootLoop()
-    if autoShootRunning then
-        return
-    end
-
-    autoShootRunning = true
-
-    task.spawn(function()
-        while Configs.AutoShoot and scriptAlive do
-            task.wait(AUTO_SHOOT_INTERVAL)
-
-            if Configs.AutoShoot and scriptAlive then
-                ExecuteAutoShootOnce()
-            end
-        end
-
-        autoShootRunning = false
-        autoShootBusy    = false
-        autoShootFiring  = false
-    end)
-end
-
+-- Auto Shoot é somente o estado que habilita o botão flutuante.
+-- NÃO existe loop automático: cada tiro acontece exclusivamente quando
+-- o usuário toca/clica no botão flutuante AUTO SHOOT.
 local function ToggleAutoShoot(enabled)
     Configs.AutoShoot = enabled and true or false
     autoShootFiring   = false
-
-    if Configs.AutoShoot then
-        StartAutoShootLoop()
-    end
+    autoShootRunning  = false
 end
 
 -- ==================== FUNÇÕES AUXILIARES ====================
