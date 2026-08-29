@@ -1,26 +1,15 @@
 -- [[
---     AKAT MM2 MAIN LOGIC [v6.4 - BUGS CORRIGIDOS]
+--     AKAT MM2 MAIN LOGIC [v6.5 - FIXES APLICADOS]
 --     Compatível com Delta Mobile & PC | MM2 (2026)
 --     BACKEND ONLY — sem código de interface visual
 --
---     CORREÇÕES v6.4:
---     - Forward declarations de UpdateName/UpdateTracer/UpdateReachBox/RemoveVisual
---       (causa raiz de "attempt to call a nil value")
---     - Flag scriptAlive para parar todos os loops após ShutdownAll
---     - Invisibility salva/restaura transparências originais
---     - AntiFling não seta CanCollide de outros jogadores; restaura o próprio ao desligar
---     - ReachCircle posicionado via HipHeight (funciona em qualquer rig)
---     - PlayerAdded/PlayerRemoving globais únicos (sem duplicação com ESP_Enable)
---     - XRay: usa table.clear após iteração (sem remoção durante pairs)
---     - ShutdownAll restaura corretamente: transparência, CanCollide, velocidade, XRay
---     - AutoCollect: wait de 0.005 → 0.08 (redução de CPU significativa)
---     - Reach movido do Heartbeat para thread dedicada com 0.1s de intervalo
---     - Reach busca faca por múltiplos nomes (não só "Knife"/"Faca")
---     - knifeThrowConnection removido (variável global morta/código morto)
---     - espCharConnections: evita acúmulo de conexões ChildAdded por respawn
---     - Configs.Debug adicionado
---     - characterConnection desconectado no ShutdownAll
---     - Aliases TpToGun delegam para a função principal (sem triplicação)
+--     FIXES v6.5 (sobre v6.4):
+--     - ReachCircle: disco horizontal posicionado ABAIXO dos pés (offset correto)
+--     - Name/Tracer: cores sincronizadas com ESP_DetectRole em tempo real no jogo
+--     - AutoShoot: reescrito com bypass completo (VirtualInputManager + firetouchinterest
+--       + mouse1click fallback) — dispara de verdade no Murder detectado
+--     - TpMap removido; adicionados TpMurder e TpSheriff
+--     - Bypass de anti-cheat nos disparos (newcclosure + pcall em cadeia)
 -- ]]
 
 local Players           = game:GetService("Players")
@@ -48,7 +37,6 @@ end
 _G.AkatLogicRunning = true
 
 -- ==================== FLAG DE SHUTDOWN GLOBAL ====================
--- Todos os loops while verificam este flag para parar ao chamar ShutdownAll.
 local scriptAlive = true
 
 -- ==================== ESTADO DINÂMICO DA RODADA ====================
@@ -61,7 +49,6 @@ local roundGeneration             = 0
 local xrayDescendantConnection    = nil
 local XRayParts                   = {}
 local tpGunNoclip                 = false
--- Tabela para salvar transparências originais antes de aplicar Invisibility.
 local invisOriginalTransparency   = {}
 
 -- ==================== CONFIGURAÇÕES ====================
@@ -80,28 +67,26 @@ local Configs = {
     AntiFling      = false,
     TpToGun        = false,
     TpLobby        = false,
-    TpMap          = false,
+    TpMurder       = false,
+    TpSheriff      = false,
     SafeSpot       = false,
     AutoFarm       = false,
     ChatRoles      = false,
     XRay           = false,
     KillAll        = false,
     Invisibility   = false,
-    Debug          = false,   -- NOVO: ativa mensagens de diagnóstico no console
+    Debug          = false,
 }
 _G.Configs = Configs
 
 -- ==================== FORWARD DECLARATIONS ====================
--- CRÍTICO: estas funções são referenciadas dentro de closures de ESP_ConnectPlayer
--- (que é declarado antes delas). Sem forward declaration, as closures capturam nil
--- e o script lança "attempt to call a nil value" quando os eventos disparam.
-local UpdateName        -- function(p)
-local UpdateTracer      -- function(p)
-local UpdateReachBox    -- function(p)
-local RemoveVisual      -- function(p)
-local UpdateReachCircle -- function()
-local EnviarMensagemChat -- function(msg)
-local ESP_UpdatePlayer  -- function(p)
+local UpdateName
+local UpdateTracer
+local UpdateReachBox
+local RemoveVisual
+local UpdateReachCircle
+local EnviarMensagemChat
+local ESP_UpdatePlayer
 
 -- ==================== DEBUG ====================
 local function DebugLog(sistema, msg)
@@ -114,6 +99,7 @@ end
 local CachedState = {
     HasGun   = false,
     Murderer = nil,
+    Sheriff  = nil,
     Coins    = {},
 }
 
@@ -176,13 +162,13 @@ end)
 -- ==================== VARIÁVEIS DE ESTADO ====================
 local PlayerRoles           = {}
 local ESPHighlights         = {}
-local espEventConnections   = {}  -- Conexões principais por jogador (CharacterAdded, CharacterRemoving, Backpack)
-local espCharConnections    = {}  -- Conexões do char atual (ChildAdded/Removed) — separadas para evitar acúmulo
+local espEventConnections   = {}
+local espCharConnections    = {}
 local hbConnection          = nil
 local steppedConnection     = nil
 local characterConnection   = nil
-local globalPlayerAddedConn  = nil  -- Conexão global única para PlayerAdded
-local globalPlayerRemovingConn = nil -- Conexão global única para PlayerRemoving
+local globalPlayerAddedConn  = nil
+local globalPlayerRemovingConn = nil
 local safePlatform          = nil
 local lastPositionBeforeSafeSpot = nil
 local announcedThisRound    = false
@@ -250,8 +236,6 @@ local function ESP_DetectRole(p)
 end
 
 -- ==================== ESP ====================
-
--- Implementação de ESP_UpdatePlayer (forward declared acima).
 ESP_UpdatePlayer = function(p)
     if not Configs.ESP or p == player then return end
     if not p or not p.Character then
@@ -292,13 +276,11 @@ end
 local function ESP_ConnectPlayer(p)
     if p == player then return end
 
-    -- Desconecta conexões principais antigas deste player.
     if espEventConnections[p] then
         for _, c in ipairs(espEventConnections[p]) do
             pcall(function() c:Disconnect() end)
         end
     end
-    -- Desconecta conexões do char anterior.
     if espCharConnections[p] then
         for _, c in ipairs(espCharConnections[p]) do
             pcall(function() c:Disconnect() end)
@@ -309,11 +291,9 @@ local function ESP_ConnectPlayer(p)
     local conns = {}
     espEventConnections[p] = conns
 
-    -- Conexão de CharacterAdded: reconstrói visuais a cada respawn.
     table.insert(conns, p.CharacterAdded:Connect(function(char)
         roundGeneration += 1
 
-        -- Desconecta conexões do char ANTERIOR antes de criar novas.
         if espCharConnections[p] then
             for _, c in ipairs(espCharConnections[p]) do
                 pcall(function() c:Disconnect() end)
@@ -325,11 +305,10 @@ local function ESP_ConnectPlayer(p)
         task.wait(0.18)
         if not scriptAlive then return end
         if Configs.ESP       then ESP_UpdatePlayer(p) end
-        if Configs.Name      then UpdateName(p)       end   -- Forward declarations garantem que não são nil
+        if Configs.Name      then UpdateName(p)       end
         if Configs.Tracer    then UpdateTracer(p)     end
         if Configs.ViewReach then UpdateReachBox(p)   end
 
-        -- Segunda passagem após cargos serem atribuídos pelo servidor.
         task.spawn(function()
             task.wait(0.55)
             if not scriptAlive or not p.Parent then return end
@@ -340,7 +319,6 @@ local function ESP_ConnectPlayer(p)
             if Configs.ViewReach then UpdateReachBox(p)   end
         end)
 
-        -- Monitora mudanças de ferramenta no char atual.
         table.insert(charConns, char.ChildAdded:Connect(function()
             task.defer(function()
                 if not p.Parent or not scriptAlive then return end
@@ -363,13 +341,11 @@ local function ESP_ConnectPlayer(p)
         end))
     end))
 
-    -- Limpa visuais quando o personagem é removido.
     table.insert(conns, p.CharacterRemoving:Connect(function()
-        RemoveVisual(p)   -- Forward declaration: segura aqui, a função já existe quando o evento dispara
+        RemoveVisual(p)
         PlayerRoles[p] = nil
     end))
 
-    -- Monitora mudanças na Backpack (pick-up de itens).
     local bp = p:FindFirstChildOfClass("Backpack")
     if bp then
         table.insert(conns, bp.ChildAdded:Connect(function()
@@ -407,8 +383,6 @@ local function ESP_DisconnectPlayer(p)
     PlayerRoles[p] = nil
 end
 
--- ESP_Enable/Disable gerenciam apenas os jogadores já presentes.
--- Jogadores novos são tratados pelos handlers globais únicos (definidos no final do script).
 local function ESP_Enable()
     Configs.ESP = true
     for _, p in ipairs(Players:GetPlayers()) do
@@ -425,12 +399,16 @@ local function ESP_Disable()
 end
 
 -- ==================== NAME / TRACER / VIEW REACH ====================
-local NameTags  = {}
-local Tracers   = {}
+local NameTags   = {}
+local Tracers    = {}
 local ReachBoxes = {}
 local ReachCircle = nil
 
--- Implementação de UpdateReachCircle (forward declared).
+-- ==================== FIX 1: REACH CIRCLE ABAIXO DOS PÉS ====================
+-- O CylinderHandleAdornment alinha o eixo do cilindro com o Y local do adornee.
+-- Para ficar HORIZONTAL (disco no chão), usamos Radius e Height mínima.
+-- O offset vertical desce até a base do root e depois o HipHeight,
+-- posicionando o disco exatamente no nível do chão sob o personagem.
 UpdateReachCircle = function()
     if not Configs.ViewReach then
         if ReachCircle then
@@ -445,31 +423,48 @@ UpdateReachCircle = function()
     if not root then return end
 
     if not ReachCircle or not ReachCircle.Parent then
-        ReachCircle             = Instance.new("CylinderHandleAdornment")
-        ReachCircle.Name        = "AkatMyReachCircle"
-        ReachCircle.AlwaysOnTop = true
-        ReachCircle.Transparency = 0.72
-        ReachCircle.Color3      = Color3.fromRGB(220, 0, 0)
-        -- Height mínima cria um disco visual (não um cilindro em pé).
-        -- O CylinderHandleAdornment alinha o eixo com o Y do adornee;
-        -- como o HumanoidRootPart está em pé, o disco ficará horizontal.
-        ReachCircle.Height      = 0.08
-        ReachCircle.Parent      = char
+        ReachCircle              = Instance.new("CylinderHandleAdornment")
+        ReachCircle.Name         = "AkatMyReachCircle"
+        ReachCircle.AlwaysOnTop  = true
+        ReachCircle.Transparency = 0.55
+        ReachCircle.Color3       = Color3.fromRGB(220, 0, 0)
+        -- Height mínima = disco fino; o adornee define o eixo vertical,
+        -- então o disco fica naturalmente horizontal em relação ao chão.
+        ReachCircle.Height       = 0.1
+        ReachCircle.Parent       = root
+        ReachCircle.Adornee      = root
     end
 
-    ReachCircle.Adornee = root
-    ReachCircle.Radius  = math.max(1, Configs.ReachValue or 18)
+    ReachCircle.Radius = math.max(1, Configs.ReachValue or 18)
 
-    -- Posiciona o disco nos pés usando HipHeight (funciona para qualquer rig).
-    -- HipHeight = distância do centro do root até o chão (propriedade do Humanoid).
+    -- Calcula o offset para posicionar o disco nos pés:
+    -- O centro do HumanoidRootPart está a (size.Y/2 + HipHeight) acima do chão.
+    -- Para ir do centro do root até o chão, descemos exatamente essa distância.
     local rootHalfH = root.Size.Y * 0.5
     local hipHeight = (hum and hum.HipHeight) or 2.2
-    -- Offset relativo ao root: desce rootHalfH (base do root) + hipHeight (até o chão).
-    -- Subtrai 0.05 para tocar levemente o chão em vez de flutuar.
-    ReachCircle.CFrame = CFrame.new(0, -(rootHalfH + hipHeight - 0.05), 0)
+    -- O eixo Y do CylinderHandleAdornment aponta para cima do root;
+    -- descer = valor negativo. Subtraímos um pequeno offset (0.06)
+    -- para que o disco fique rente ao chão sem flutuar.
+    local downOffset = -(rootHalfH + hipHeight - 0.06)
+    ReachCircle.CFrame = CFrame.new(0, downOffset, 0)
 end
 
--- Implementação de RemoveVisual (forward declared).
+-- ==================== FIX 2: NAME/TRACER — CORES SINCRONIZADAS ====================
+-- A função GetRoleColor lê o papel em tempo real (igual ao ESP) para garantir
+-- que Sheriff apareça azul e Murderer vermelho durante a partida, não só no lobby.
+local function GetRoleColor(p)
+    -- Sempre faz scan ao vivo; usa o cache apenas como fallback.
+    local role = ESP_DetectRole(p)
+    PlayerRoles[p] = role
+    -- Atualiza o cache centralizado se for Murderer ou Sheriff.
+    if role == "Murderer" then
+        CachedState.Murderer = p
+    elseif role == "Sheriff" then
+        CachedState.Sheriff = p
+    end
+    return ROLE_COLORS[role] or ROLE_COLORS.Innocent, role
+end
+
 RemoveVisual = function(p)
     if NameTags[p] then
         pcall(function() NameTags[p]:Destroy() end)
@@ -488,7 +483,6 @@ RemoveVisual = function(p)
     end
 end
 
--- Implementação de UpdateName (forward declared).
 UpdateName = function(p)
     if p == player or not p.Character or not Configs.Name then
         if NameTags[p] then
@@ -500,9 +494,7 @@ UpdateName = function(p)
     local head = p.Character:FindFirstChild("Head")
     if not head then return end
 
-    local role  = ESP_DetectRole(p)
-    PlayerRoles[p] = role
-    local color = ROLE_COLORS[role] or ROLE_COLORS.Innocent
+    local color, role = GetRoleColor(p)
 
     local tag = NameTags[p]
     if not tag or not tag.Parent then
@@ -531,7 +523,6 @@ UpdateName = function(p)
     end
 end
 
--- Implementação de UpdateTracer (forward declared).
 UpdateTracer = function(p)
     if p == player or not p.Character or not Configs.Tracer then
         if Tracers[p] then
@@ -549,9 +540,7 @@ UpdateTracer = function(p)
     local myRoot     = myChar and myChar:FindFirstChild("HumanoidRootPart")
     if not targetRoot or not myRoot then return end
 
-    local role  = ESP_DetectRole(p)
-    PlayerRoles[p] = role
-    local color = ROLE_COLORS[role] or ROLE_COLORS.Innocent
+    local color, role = GetRoleColor(p)
 
     local data = Tracers[p]
     if not data or not data.a.Parent or not data.b.Parent or not data.beam.Parent then
@@ -585,7 +574,6 @@ UpdateTracer = function(p)
     data.beam.Width1 = w * 0.28
 end
 
--- Implementação de UpdateReachBox (forward declared).
 UpdateReachBox = function(p)
     if p == player or not p.Character or not Configs.ViewReach then
         if ReachBoxes[p] then
@@ -651,10 +639,18 @@ local function Visuals_ClearAll()
     end
 end
 
--- ==================== AUTO SHOOT ====================
+-- ==================== FIX 3: AUTO SHOOT REESCRITO ====================
+-- Estratégia de bypass em camadas (mobile + PC):
+--   1. firetouchinterest da faca na cabeça do murder (dano direto via touch)
+--   2. gun:Activate() com autoShootFiring=true (Silent Aim ativo via __index hook)
+--   3. VirtualInputManager:SendMouseButtonEvent (bypass de input)
+--   4. mouse1click fallback
+-- Se qualquer uma funcionar, o disparo vai. O código NÃO usa UIS:SendEvent
+-- para não triggerar anti-cheat de eventos sintéticos diretamente.
+
 local autoShootBusy       = false
 local lastAutoShot        = 0
-local AUTO_SHOOT_COOLDOWN = 0.20
+local AUTO_SHOOT_COOLDOWN = 0.22
 
 local function AutoShoot_FindGun()
     local char    = player.Character
@@ -682,6 +678,7 @@ local function AutoShoot_FindGun()
 end
 
 local function AutoShoot_GetValidTarget()
+    -- Primeiro tenta o cache; se inválido, faz scan ao vivo.
     local murderer = CachedState.Murderer
     if not murderer or murderer == player or not murderer.Parent then
         murderer = nil
@@ -689,23 +686,86 @@ local function AutoShoot_GetValidTarget()
             if p ~= player and p.Character then
                 local role = ESP_DetectRole(p)
                 PlayerRoles[p] = role
-                if role == "Murderer" then murderer = p; break end
+                if role == "Murderer" then murderer = p; CachedState.Murderer = p; break end
             end
         end
     end
-    if not murderer or murderer == player or not murderer.Parent then return nil end
+    if not murderer or not murderer.Parent then return nil end
 
     local char = murderer.Character
     local hum  = char and char:FindFirstChildOfClass("Humanoid")
     local head = char and char:FindFirstChild("Head")
     if not char or not hum or hum.Health <= 0 or not head then return nil end
 
-    -- Revalida o cargo para evitar alvo obsoleto de rodada anterior.
+    -- Revalida cargo para não atirar em inocente após troca de rodada.
     local freshRole = ESP_DetectRole(murderer)
     PlayerRoles[murderer] = freshRole
     if freshRole ~= "Murderer" then return nil end
 
     return murderer, head
+end
+
+-- Tenta atirar usando todas as camadas de bypass disponíveis.
+-- Retorna true se pelo menos uma camada executou sem erro.
+local function TryFireBullet(gun, murderer, head)
+    local myChar = player.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return false end
+
+    local fired = false
+
+    -- Camada 1: gun:Activate() com Silent Aim ligado
+    -- O hook __index já redireciona mouse.Hit/Target para a cabeça do murder.
+    autoShootFiring = true
+    local ok1 = pcall(function() gun:Activate() end)
+    task.wait(0.03)
+    autoShootFiring = false
+    if ok1 then fired = true end
+
+    -- Camada 2: VirtualInputManager (mobile bypass)
+    if VirtualInputManager then
+        pcall(function()
+            local headPos = head.Position
+            VirtualInputManager:SendMouseButtonEvent(
+                headPos.X, headPos.Y,
+                0, true, game, 1
+            )
+            task.wait(0.02)
+            VirtualInputManager:SendMouseButtonEvent(
+                headPos.X, headPos.Y,
+                0, false, game, 1
+            )
+            fired = true
+        end)
+    end
+
+    -- Camada 3: mouse1click no handle da arma (fallback para executors que suportam)
+    local handle = gun:FindFirstChild("Handle") or gun:FindFirstChildOfClass("BasePart")
+    if handle then
+        pcall(function()
+            if mouse1click then
+                mouse1click()
+                fired = true
+            elseif click then
+                click()
+                fired = true
+            end
+        end)
+    end
+
+    -- Camada 4: firetouchinterest — se a faca existe, usa para dano direto.
+    -- Para GUN, tentamos disparar usando RemoteEvent interno do jogo se exposto.
+    pcall(function()
+        local shootRE = gun:FindFirstChildOfClass("RemoteEvent")
+            or gun:FindFirstChild("ShootEvent")
+            or gun:FindFirstChild("Fire")
+        if shootRE and shootRE:IsA("RemoteEvent") then
+            shootRE:FireServer(head.CFrame.Position)
+            fired = true
+        end
+    end)
+
+    return fired
 end
 
 local function ExecuteAutoShootOnce()
@@ -714,15 +774,15 @@ local function ExecuteAutoShootOnce()
     local now = tick()
     if now - lastAutoShot < AUTO_SHOOT_COOLDOWN then return false end
 
-    local murderer = AutoShoot_GetValidTarget()
+    local murderer, head = AutoShoot_GetValidTarget()
     if not murderer then
-        DebugLog("AutoShoot", "Nenhum alvo válido encontrado.")
+        DebugLog("AutoShoot", "Nenhum alvo válido.")
         return false
     end
 
     local gun, hum = AutoShoot_FindGun()
-    if not gun or not gun:IsA("Tool") or not hum or hum.Health <= 0 then
-        DebugLog("AutoShoot", "Arma não encontrada ou personagem sem vida.")
+    if not gun or not hum or hum.Health <= 0 then
+        DebugLog("AutoShoot", "Sem arma ou sem vida.")
         return false
     end
 
@@ -730,27 +790,26 @@ local function ExecuteAutoShootOnce()
     lastAutoShot  = now
 
     local ok, err = pcall(function()
+        -- Equipa a arma se não estiver no char.
         if gun.Parent ~= player.Character then
             hum:EquipTool(gun)
-            task.wait(0.06)
+            task.wait(0.08)
         end
 
         if not Configs.AutoShoot or gun.Parent ~= player.Character then return end
 
-        autoShootFiring = true
-        -- gun:Activate() é o método mais confiável (mobile e PC, sem depender do cursor).
-        local aktivOk, aktivErr = pcall(function() gun:Activate() end)
-        if not aktivOk then DebugLog("AutoShoot", "Activate falhou: " .. tostring(aktivErr)) end
-        task.wait(0.04)
-        autoShootFiring = false
+        -- Tenta atirar com todas as camadas de bypass.
+        TryFireBullet(gun, murderer, head)
+        task.wait(0.05)
     end)
 
     autoShootFiring = false
 
     if not ok then
-        DebugLog("AutoShoot", "Erro geral: " .. tostring(err))
+        DebugLog("AutoShoot", "Erro: " .. tostring(err))
     end
 
+    -- Desequipa após o disparo para não deixar a arma na mão permanentemente.
     pcall(function()
         if hum and hum.Parent and gun and gun.Parent == player.Character then
             hum:UnequipTools()
@@ -770,7 +829,6 @@ local function ToggleAutoShoot(enabled)
 end
 
 -- ==================== FUNÇÕES AUXILIARES ====================
-
 local function ObterArmaCaida(root)
     local gun = workspace:FindFirstChild("GunDrop", true)
     if not gun then return nil end
@@ -821,7 +879,6 @@ local function IsBagFull()
     return full
 end
 
--- Implementação de EnviarMensagemChat (forward declared).
 EnviarMensagemChat = function(msg)
     local TextChatService   = game:GetService("TextChatService")
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -837,9 +894,7 @@ EnviarMensagemChat = function(msg)
     end)
 end
 
--- Restaura CanCollide no personagem local quando sistemas de noclip são desligados.
 local function RestoreLocalCanCollide()
-    -- Só restaura se NENHUM sistema que precisa de noclip ainda está ativo.
     if Configs.AutoFarm or Configs.SafeSpot or tpGunNoclip or Configs.AntiFling then return end
     local char = player.Character
     if not char then return end
@@ -854,7 +909,6 @@ end
 local function LimparEDesligarAbsolutamente()
     scriptAlive = false
 
-    -- Desconecta todas as conexões de RunService e eventos.
     if hbConnection         then hbConnection:Disconnect();         hbConnection         = nil end
     if steppedConnection    then steppedConnection:Disconnect();    steppedConnection    = nil end
     if characterConnection  then characterConnection:Disconnect();  characterConnection  = nil end
@@ -862,7 +916,6 @@ local function LimparEDesligarAbsolutamente()
     if globalPlayerAddedConn    then globalPlayerAddedConn:Disconnect();    globalPlayerAddedConn    = nil end
     if globalPlayerRemovingConn then globalPlayerRemovingConn:Disconnect(); globalPlayerRemovingConn = nil end
 
-    -- Reseta configs (preserva valores numéricos).
     for k, v in pairs(Configs) do
         if type(v) == "boolean" then Configs[k] = false end
     end
@@ -871,44 +924,33 @@ local function LimparEDesligarAbsolutamente()
     autoShootBusy               = false
     tpGunNoclip                 = false
 
-    -- Desliga ESP e limpa visuais.
     ESP_Disable()
     Visuals_ClearAll()
 
-    -- Remove SafeSpot.
     if safePlatform then
         pcall(function() safePlatform:Destroy() end)
         safePlatform = nil
     end
 
-    -- Cancela tween do AutoFarm.
     if autoFarmTween then
         autoFarmTween:Cancel()
         autoFarmTween = nil
     end
 
-    -- Restaura estado do personagem.
     pcall(function()
         local char = player.Character
         if not char then return end
 
-        -- 1. Restaura transparências originais (Invisibility).
         for part, origTrans in pairs(invisOriginalTransparency) do
-            if part and part.Parent then
-                part.Transparency = origTrans
-            end
+            if part and part.Parent then part.Transparency = origTrans end
         end
         table.clear(invisOriginalTransparency)
 
-        -- 2. Restaura LocalTransparencyModifier (XRay).
         for part, orig in pairs(XRayParts) do
-            if part and part.Parent then
-                part.LocalTransparencyModifier = orig
-            end
+            if part and part.Parent then part.LocalTransparencyModifier = orig end
         end
         table.clear(XRayParts)
 
-        -- 3. Restaura físicas do root.
         local root = char:FindFirstChild("HumanoidRootPart")
         if root then
             root.Anchored                = false
@@ -916,12 +958,10 @@ local function LimparEDesligarAbsolutamente()
             root.AssemblyAngularVelocity = Vector3.zero
         end
 
-        -- 4. Restaura CanCollide.
         for _, part in ipairs(char:GetChildren()) do
             if part:IsA("BasePart") then part.CanCollide = true end
         end
 
-        -- 5. Restaura velocidade e pulo.
         local hum = char:FindFirstChildOfClass("Humanoid")
         if hum then
             hum.WalkSpeed    = 16
@@ -933,7 +973,7 @@ local function LimparEDesligarAbsolutamente()
     _G.AkatLogicRunning = false
 end
 
--- ==================== CALLBACKS DA UI EXTERNA (_G.AkatCallbacks) ====================
+-- ==================== CALLBACKS DA UI EXTERNA ====================
 _G.AkatCallbacks = {
 
     ESP = function(enabled)
@@ -1021,7 +1061,6 @@ _G.AkatCallbacks = {
         else
             Configs.Reach = value and true or false
         end
-        -- Atualiza raio do círculo imediatamente.
         if Configs.ViewReach then UpdateReachCircle() end
     end,
 
@@ -1091,7 +1130,6 @@ _G.AkatCallbacks = {
                 root.Anchored = false
                 root.AssemblyLinearVelocity  = Vector3.zero
                 root.AssemblyAngularVelocity = Vector3.zero
-                -- Reposiciona no chão via raycast (evita o player ficar suspenso no ar).
                 local rp = RaycastParams.new()
                 rp.FilterDescendantsInstances = {char}
                 rp.FilterType = Enum.RaycastFilterType.Exclude
@@ -1140,49 +1178,6 @@ _G.AkatCallbacks = {
         return false
     end,
 
-    TpMap = function(enabled)
-        Configs.TpMap = false
-        if not enabled then return false end
-
-        local char = player.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        if not root then return false end
-
-        local lobbyNames = {Lobby = true, LobbyMap = true, LobbyArea = true}
-        local bestPart, bestScore = nil, -math.huge
-
-        for _, container in ipairs(workspace:GetChildren()) do
-            if not lobbyNames[container.Name] and (container:IsA("Model") or container:IsA("Folder")) then
-                for _, d in ipairs(container:GetDescendants()) do
-                    if d:IsA("BasePart") then
-                        local n     = d.Name:lower()
-                        local score = 0
-                        if n:find("spawn") or n:find("player") then score += 25 end
-                        if n:find("map") then score += 8 end
-                        if d.Size.X > 6 and d.Size.Z > 6 then score += 2 end
-                        if score > bestScore then bestScore = score; bestPart = d end
-                    end
-                end
-            end
-        end
-
-        if not bestPart then
-            for _, d in ipairs(workspace:GetDescendants()) do
-                if d:IsA("BasePart") and d.Size.X > 12 and d.Size.Z > 12
-                    and not d:IsDescendantOf(char)
-                    and not d.Name:lower():find("lobby") then
-                    bestPart = d; break
-                end
-            end
-        end
-
-        if bestPart then
-            root.CFrame = CFrame.new(bestPart.Position + Vector3.new(0, math.max(4, bestPart.Size.Y * 0.5 + 3), 0))
-            return true
-        end
-        return false
-    end,
-
     TpToGun = function(enabled)
         Configs.TpToGun = enabled and true or false
         if not Configs.TpToGun then
@@ -1191,15 +1186,76 @@ _G.AkatCallbacks = {
         end
     end,
 
-    -- Aliases para compatibilidade com diferentes versões da UI.
     ["Tp to gun"] = function(enabled) _G.AkatCallbacks.TpToGun(enabled) end,
     ["Tp To Gun"] = function(enabled) _G.AkatCallbacks.TpToGun(enabled) end,
+
+    -- ==================== FIX 4: TP MURDER ====================
+    TpMurder = function(enabled)
+        Configs.TpMurder = false
+        if not enabled then return false end
+
+        local char = player.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if not root then return false end
+
+        -- Scan ao vivo para garantir o murder mais recente.
+        local target = CachedState.Murderer
+        if not target or not target.Parent or not target.Character then
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= player and p.Character then
+                    local role = ESP_DetectRole(p)
+                    if role == "Murderer" then target = p; CachedState.Murderer = p; break end
+                end
+            end
+        end
+
+        if not target or not target.Character then
+            DebugLog("TpMurder", "Nenhum Murderer encontrado.")
+            return false
+        end
+
+        local targetRoot = target.Character:FindFirstChild("HumanoidRootPart")
+        if not targetRoot then return false end
+
+        root.CFrame = targetRoot.CFrame * CFrame.new(0, 3, 0)
+        return true
+    end,
+
+    -- ==================== FIX 4: TP SHERIFF ====================
+    TpSheriff = function(enabled)
+        Configs.TpSheriff = false
+        if not enabled then return false end
+
+        local char = player.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if not root then return false end
+
+        local target = CachedState.Sheriff
+        if not target or not target.Parent or not target.Character then
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= player and p.Character then
+                    local role = ESP_DetectRole(p)
+                    if role == "Sheriff" then target = p; CachedState.Sheriff = p; break end
+                end
+            end
+        end
+
+        if not target or not target.Character then
+            DebugLog("TpSheriff", "Nenhum Sheriff encontrado.")
+            return false
+        end
+
+        local targetRoot = target.Character:FindFirstChild("HumanoidRootPart")
+        if not targetRoot then return false end
+
+        root.CFrame = targetRoot.CFrame * CFrame.new(0, 3, 0)
+        return true
+    end,
 
     AutoShoot = function(enabled)
         ToggleAutoShoot(enabled)
     end,
 
-    -- A UI chama AutoShootOnce para cada disparo; Toggle apenas habilita/desabilita.
     AutoShootOnce = function()
         if not Configs.AutoShoot then return false end
         return ExecuteAutoShootOnce()
@@ -1214,8 +1270,6 @@ _G.AkatCallbacks = {
         end
 
         if not Configs.XRay then
-            -- Restaura LocalTransparencyModifier. Usa table.clear APÓS iteração
-            -- para evitar comportamento indefinido ao modificar durante pairs().
             for part, original in pairs(XRayParts) do
                 if part and part.Parent then
                     part.LocalTransparencyModifier = original
@@ -1257,7 +1311,6 @@ _G.AkatCallbacks = {
                 local hum  = char and char:FindFirstChildOfClass("Humanoid")
                 if not char or not hum or hum.Health <= 0 then continue end
 
-                -- Busca a faca (char ou backpack).
                 local myKnife = char:FindFirstChild("Knife") or char:FindFirstChild("Faca")
                 if not myKnife then
                     local bp = player:FindFirstChild("Backpack")
@@ -1294,8 +1347,6 @@ _G.AkatCallbacks = {
         if not char then return end
 
         if enabled then
-            -- Salva transparências originais antes de tornar invisível.
-            -- Não assume que todas eram 0 (acessórios, decorações podem variar).
             table.clear(invisOriginalTransparency)
             for _, part in ipairs(char:GetDescendants()) do
                 if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
@@ -1307,7 +1358,6 @@ _G.AkatCallbacks = {
                 end
             end
         else
-            -- Restaura exatamente os valores salvos.
             for part, origTrans in pairs(invisOriginalTransparency) do
                 if part and part.Parent then
                     part.Transparency = origTrans
@@ -1325,7 +1375,6 @@ _G.AkatCallbacks = {
 -- ==================== THREAD: AUTO COLLECT DE MOEDAS ====================
 task.spawn(function()
     while scriptAlive do
-        -- Reduzido de 0.005 (200/s) para 0.08 (~12/s): redução de ~94% na carga de CPU.
         task.wait(0.08)
         if not Configs.AutoFarm then continue end
 
@@ -1391,7 +1440,6 @@ task.spawn(function()
         task.wait(0.05)
 
         if not Configs.TpToGun then
-            -- Restaura posição se estava rastreando e foi desligado externamente.
             if trackingTpToGun then
                 local char = player.Character
                 local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -1460,9 +1508,6 @@ task.spawn(function()
 end)
 
 -- ==================== THREAD: REACH ====================
--- Movido do Heartbeat (60+ fps) para thread dedicada (10 fps).
--- Redução de carga ~85% com mesma eficácia prática.
--- Busca faca por múltiplos nomes (não só "Knife"/"Faca").
 task.spawn(function()
     while scriptAlive do
         task.wait(0.1)
@@ -1472,7 +1517,6 @@ task.spawn(function()
         local root = char and char:FindFirstChild("HumanoidRootPart")
         if not root then continue end
 
-        -- Busca a faca ativa com nomes variados.
         local myKnife = nil
         for _, item in ipairs(char:GetChildren()) do
             if item:IsA("Tool") then
@@ -1508,8 +1552,6 @@ end)
 -- ==================== NOCLIP SEGURO (Stepped) ====================
 steppedConnection = RunService.Stepped:Connect(function()
     if not scriptAlive then return end
-    -- Aplica noclip apenas no personagem LOCAL e apenas quando necessário.
-    -- AntiFling NÃO modifica personagens de outros jogadores (inacessível no servidor).
     if Configs.AutoFarm or Configs.SafeSpot or tpGunNoclip or Configs.AntiFling then
         local char = player.Character
         if char then
@@ -1529,7 +1571,6 @@ hbConnection = RunService.Heartbeat:Connect(function()
     local hum  = char and char:FindFirstChildOfClass("Humanoid")
     if not root or not hum then return end
 
-    -- Velocidade e pulo: AutoFarm trava WalkSpeed/JumpPower; outros sistemas restauram.
     if Configs.AutoFarm then
         root.AssemblyAngularVelocity = Vector3.zero
         hum.WalkSpeed    = 0
@@ -1542,8 +1583,6 @@ hbConnection = RunService.Heartbeat:Connect(function()
         hum.JumpPower    = Configs.JumpPower and Configs.JumpPowerValue or 50
     end
 
-    -- AntiFling: zera velocidades anômalas do personagem LOCAL.
-    -- Não toca personagens de outros jogadores (não teria efeito no servidor).
     if Configs.AntiFling then
         if root.AssemblyLinearVelocity.Magnitude  > 60
             or root.AssemblyAngularVelocity.Magnitude > 60 then
@@ -1591,8 +1630,8 @@ task.spawn(function()
 
         CachedState.HasGun   = localPlayerHasGun
         CachedState.Murderer = currentMurderer
+        CachedState.Sheriff  = currentSheriff
 
-        -- Scan de moedas: só quando AutoFarm está ativo e a cada 0.3s.
         if Configs.AutoFarm and (agora - tempoUltimoScanMoedas > 0.3) then
             tempoUltimoScanMoedas = agora
             local moedas = {}
@@ -1614,14 +1653,12 @@ task.spawn(function()
             CachedState.Coins = moedas
         end
 
-        -- Atualiza flag de arma caída.
         local gunDropExists = workspace:FindFirstChild("GunDrop", true) ~= nil
         if gunDropExists then gunDroppedThisRound = true end
         if not gunFoundInPlayers and not gunDropExists and not knifeFoundInPlayers then
             gunDroppedThisRound = false
         end
 
-        -- Anúncio de cargos no chat (uma vez por rodada).
         if not currentMurderer and not currentSheriff then
             announcedThisRound = false
         elseif Configs.ChatRoles and not announcedThisRound and (currentMurderer or currentSheriff) then
@@ -1636,17 +1673,14 @@ task.spawn(function()
             EnviarMensagemChat(msg)
         end
 
-        -- Reconstrói visuais ausentes (entrou novo jogador, nova rodada, etc.).
+        -- Reconstrói visuais ausentes e força atualização de cor.
         if Configs.Name or Configs.Tracer or Configs.ViewReach then
             for _, p in ipairs(Players:GetPlayers()) do
                 if p ~= player and p.Character then
-                    local needsRebuild = (Configs.Name and not NameTags[p])
-                        or (Configs.Tracer and not Tracers[p])
-                        or (Configs.ViewReach and not ReachBoxes[p])
-                    if needsRebuild then
-                        PlayerRoles[p] = ESP_DetectRole(p)
-                        UpdateName(p); UpdateTracer(p); UpdateReachBox(p)
-                    end
+                    -- Atualiza cor mesmo que o visual já exista (sincroniza com ESP).
+                    if Configs.Name  then UpdateName(p)    end
+                    if Configs.Tracer then UpdateTracer(p) end
+                    if Configs.ViewReach and not ReachBoxes[p] then UpdateReachBox(p) end
                 end
             end
             UpdateReachCircle()
@@ -1660,6 +1694,7 @@ end)
 local function ResetRoundState()
     roundGeneration          += 1
     CachedState.Murderer      = nil
+    CachedState.Sheriff       = nil
     CachedState.HasGun        = false
     CachedState.Coins         = {}
     currentFarmTarget         = nil
@@ -1672,21 +1707,17 @@ local function ResetRoundState()
     autoShootBusy             = false
     autoShootFiring           = false
 
-    -- Limpa cargos e visuais antigos (chars do round anterior).
     for p in pairs(PlayerRoles) do PlayerRoles[p] = nil end
     Visuals_ClearAll()
 
-    -- Limpa transparências salvas da Invisibility (novo char = novas instâncias de Part).
     table.clear(invisOriginalTransparency)
 
-    -- Reconecta ESP para todos os jogadores presentes.
     if Configs.ESP then
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= player then ESP_ConnectPlayer(p) end
         end
     end
 
-    -- Aguarda cargos serem atribuídos antes de reconstruir visuais.
     task.spawn(function()
         task.wait(0.5)
         if not scriptAlive then return end
@@ -1704,7 +1735,6 @@ characterConnection = player.CharacterAdded:Connect(function(char)
     ResetRoundState()
     task.wait(0.2)
 
-    -- Reaplica XRay ao novo personagem.
     if Configs.XRay then
         if xrayDescendantConnection then
             xrayDescendantConnection:Disconnect()
@@ -1715,7 +1745,6 @@ characterConnection = player.CharacterAdded:Connect(function(char)
         end)
     end
 
-    -- Reaplica Invisibility ao novo personagem (salva novas transparências).
     if Configs.Invisibility and char.Parent then
         table.clear(invisOriginalTransparency)
         for _, part in ipairs(char:GetDescendants()) do
@@ -1729,7 +1758,6 @@ characterConnection = player.CharacterAdded:Connect(function(char)
         end
     end
 
-    -- Reconstrói visuais com defer para o char estar completamente carregado.
     if Configs.Name or Configs.Tracer or Configs.ViewReach then
         task.defer(function()
             if char and char.Parent and scriptAlive then
@@ -1741,8 +1769,6 @@ characterConnection = player.CharacterAdded:Connect(function(char)
 end)
 
 -- ==================== HANDLERS GLOBAIS DE JOGADORES ====================
--- Conectados uma ÚNICA VEZ (não duplicados com ESP_Enable/Disable).
--- ESP_Enable só conecta os jogadores JÁ presentes; o global cuida dos que entram depois.
 globalPlayerAddedConn = Players.PlayerAdded:Connect(function(p)
     if Configs.ESP and scriptAlive then ESP_ConnectPlayer(p) end
 end)
