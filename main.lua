@@ -66,7 +66,7 @@ local Configs = {
     JumpPower      = false,
     JumpPowerValue = 50,
     Reach          = false,
-    ReachValue     = 18,
+    ReachValue     = 5,
     AntiFling      = false,
     TpToGun        = false,
     TpLobby        = false,
@@ -660,30 +660,31 @@ local function Visuals_ClearAll()
     DestroyReachSphere()
 end
 
--- ==================== FIX v6.7: AUTO SHOOT REESCRITO ====================
--- Estratégia principal:
---   1. Localiza a arma (no char ou mochila) e o murder
---   2. Gira o personagem para encarar o alvo (CFrame lookAt)
---   3. Equipa a arma via hum:EquipTool()
---   4. Ativa Silent Aim (autoShootFiring = true) para que o hook redirecione
---      mouse.Hit para a cabeça do murder ANTES do disparo
---   5. Dispara via gun:Activate() — método primário
---   6. Fallback: VirtualInputManager na posição da cabeça na tela
---   7. Desequipa a arma após o disparo
---
--- Por que isso garante que a bala vá ao murder:
---   - gun:Activate() usa internamente mouse.Hit para definir o alvo do raycast
---   - Como o hook __index sobrescreve mouse.Hit com CFrame.lookAt(cabeça),
---     o raycast da arma aponta exatamente para a cabeça do murder
---   - A pré-rotação do personagem garante compatibilidade com armas que
---     usam a orientação do HumanoidRootPart como vetor de disparo
+-- ==================== AUTO SHOOT: LÓGICA RECONSTRUÍDA + CORRIGIDA ====================
+-- Fluxo:
+--   1. Localiza e valida o Murderer
+--   2. Valida personagem/vida/arma
+--   3. Verifica distância, FOV e linha de visão real via Raycast
+--   4. Equipa a arma somente se necessário
+--   5. Revalida alvo e condições após equipar
+--   6. Pré-rotaciona o personagem
+--   7. Ativa o Silent Aim apenas durante UMA tentativa de disparo
+--   8. Usa gun:Activate() como método primário
+--   9. Só tenta UM fallback se o método primário falhar
+--  10. Nunca dispara por vários métodos na mesma iteração
+--  11. Mantém cooldown e um único loop ativo
 
 local autoShootBusy       = false
+local autoShootRunning    = false
 local lastAutoShot        = 0
-local AUTO_SHOOT_COOLDOWN = 0.25  -- cooldown ligeiramente maior para estabilidade
+local AUTO_SHOOT_COOLDOWN = 0.28
+local AUTO_SHOOT_INTERVAL = 0.05
+local AUTO_SHOOT_MAX_DIST = 1500
+local AUTO_SHOOT_FOV      = 180 -- graus; 180 = sem restrição prática de FOV
+local AUTO_SHOOT_PREDICTION = 0.045
 
 local function AutoShoot_FindGun()
-    local char     = player.Character
+    local char = player.Character
     local backpack = player:FindFirstChildOfClass("Backpack")
     if not char then return nil, nil end
 
@@ -702,161 +703,217 @@ local function AutoShoot_FindGun()
         return nil
     end
 
-    -- Prioridade: arma já equipada no char > arma na mochila
     local gun = findGun(char) or findGun(backpack)
     local hum = char:FindFirstChildOfClass("Humanoid")
     return gun, hum
 end
 
-local function AutoShoot_GetValidTarget()
-    local murderer = CachedState.Murderer
-    if not murderer or murderer == player or not murderer.Parent then
-        murderer = nil
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= player and p.Character then
-                local role = ESP_DetectRole(p)
-                PlayerRoles[p] = role
-                if role == "Murderer" then murderer = p; CachedState.Murderer = p; break end
-            end
+local function AutoShoot_FindValidMurderer()
+    local cached = CachedState.Murderer
+
+    local function validate(p)
+        if not p or p == player or not p.Parent or not p.Character then return false end
+        local char = p.Character
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        local head = char:FindFirstChild("Head")
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not hum or hum.Health <= 0 or not head or not root then return false end
+        local role = ESP_DetectRole(p)
+        PlayerRoles[p] = role
+        return role == "Murderer"
+    end
+
+    if validate(cached) then
+        return cached, cached.Character:FindFirstChild("Head")
+    end
+
+    CachedState.Murderer = nil
+    for _, p in ipairs(Players:GetPlayers()) do
+        if validate(p) then
+            CachedState.Murderer = p
+            return p, p.Character:FindFirstChild("Head")
         end
     end
-    if not murderer or not murderer.Parent then return nil end
 
-    local char = murderer.Character
-    local hum  = char and char:FindFirstChildOfClass("Humanoid")
-    local head = char and char:FindFirstChild("Head")
-    if not char or not hum or hum.Health <= 0 or not head then return nil end
-
-    local freshRole = ESP_DetectRole(murderer)
-    PlayerRoles[murderer] = freshRole
-    if freshRole ~= "Murderer" then return nil end
-
-    return murderer, head
+    return nil, nil
 end
 
-local function TryFireBullet(gun, murderer, head)
+local function AutoShoot_CheckTarget(murderer, head)
     local myChar = player.Character
     local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    if not myRoot then return false end
-
-    local fired = false
-
-    -- Passo 1: Rotaciona o personagem para encarar a cabeça do murder.
-    -- Isso é essencial para armas que calculam a direção do disparo
-    -- com base na orientação do HumanoidRootPart.
-    pcall(function()
-        local aimDir  = (head.Position - myRoot.Position).Unit
-        local flatDir = Vector3.new(aimDir.X, 0, aimDir.Z)
-        if flatDir.Magnitude > 0.01 then
-            myRoot.CFrame = CFrame.new(myRoot.Position, myRoot.Position + flatDir)
-        end
-    end)
-
-    -- Passo 2: Ativa Silent Aim e dispara via gun:Activate().
-    -- O hook __index vai interceptar mouse.Hit e retornar CFrame da cabeça.
-    autoShootFiring = true
-    local ok1 = pcall(function() gun:Activate() end)
-    task.wait(0.04)
-    autoShootFiring = false
-    if ok1 then fired = true end
-
-    -- Passo 3: Fallback para mobile — VirtualInputManager na posição da cabeça.
-    -- Usamos WorldToScreenPoint para clicar exatamente onde a cabeça aparece na tela.
-    if VirtualInputManager then
-        pcall(function()
-            local screenPos, onScreen = Camera:WorldToScreenPoint(head.Position)
-            -- Evita zona do analógico mobile (esquerda da tela)
-            if onScreen and screenPos.X > 230 then
-                autoShootFiring = true
-                VirtualInputManager:SendMouseButtonEvent(
-                    math.floor(screenPos.X),
-                    math.floor(screenPos.Y),
-                    0, true, game, 1
-                )
-                task.wait(0.025)
-                VirtualInputManager:SendMouseButtonEvent(
-                    math.floor(screenPos.X),
-                    math.floor(screenPos.Y),
-                    0, false, game, 1
-                )
-                autoShootFiring = false
-                fired = true
-            end
-        end)
+    local camera = workspace.CurrentCamera or Camera
+    if not myChar or not myRoot or not murderer or not head or not camera then
+        return false, "missing_parts"
     end
 
-    -- Passo 4: Fallback mouse1click
-    pcall(function()
-        if mouse1click then
-            autoShootFiring = true
-            mouse1click()
-            autoShootFiring = false
-            fired = true
-        elseif click then
-            autoShootFiring = true
-            click()
-            autoShootFiring = false
-            fired = true
+    local mChar = murderer.Character
+    local mHum = mChar and mChar:FindFirstChildOfClass("Humanoid")
+    local mRoot = mChar and mChar:FindFirstChild("HumanoidRootPart")
+    if not mChar or not mHum or mHum.Health <= 0 or not mRoot then
+        return false, "target_dead"
+    end
+
+    local offset = head.Position - myRoot.Position
+    local distance = offset.Magnitude
+    if distance <= 0.01 or distance > AUTO_SHOOT_MAX_DIST then
+        return false, "distance"
+    end
+
+    -- FOV real baseado na direção da câmera.
+    if AUTO_SHOOT_FOV < 180 then
+        local camLook = camera.CFrame.LookVector
+        local direction = (head.Position - camera.CFrame.Position).Unit
+        local dot = math.clamp(camLook:Dot(direction), -1, 1)
+        local angle = math.deg(math.acos(dot))
+        if angle > (AUTO_SHOOT_FOV * 0.5) then
+            return false, "fov"
+        end
+    end
+
+    -- Linha de visão real: a primeira colisão precisa pertencer ao personagem alvo.
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = {myChar, Camera}
+    params.IgnoreWater = true
+
+    local result = workspace:Raycast(
+        camera.CFrame.Position,
+        head.Position - camera.CFrame.Position,
+        params
+    )
+
+    if result and not result.Instance:IsDescendantOf(mChar) then
+        return false, "blocked"
+    end
+
+    return true, "ok"
+end
+
+local function AutoShoot_Predict(head, root)
+    local vel = root and (root.AssemblyLinearVelocity or Vector3.zero) or Vector3.zero
+    if vel.Magnitude > 80 then vel = Vector3.zero end
+    return head.Position + vel * AUTO_SHOOT_PREDICTION
+end
+
+local function AutoShoot_AimCharacter(head)
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root or not head then return false end
+
+    return pcall(function()
+        local dir = head.Position - root.Position
+        local flat = Vector3.new(dir.X, 0, dir.Z)
+        if flat.Magnitude > 0.01 then
+            root.CFrame = CFrame.new(root.Position, root.Position + flat.Unit)
         end
     end)
+end
 
-    -- Passo 5: RemoteEvent interno da arma (caso a arma use servidor para registrar o hit)
-    pcall(function()
-        local shootRE = gun:FindFirstChild("ShootEvent")
-            or gun:FindFirstChild("Fire")
-            or gun:FindFirstChildOfClass("RemoteEvent")
-        if shootRE and shootRE:IsA("RemoteEvent") then
-            -- Envia a posição PREVISTA da cabeça (com compensação de velocidade)
-            local rootMur = murderer.Character:FindFirstChild("HumanoidRootPart")
-            local vel = rootMur and (rootMur.AssemblyLinearVelocity or Vector3.zero) or Vector3.zero
-            if vel.Magnitude > 80 then vel = Vector3.zero end
-            local targetPos = head.Position + vel * 0.045
-            shootRE:FireServer(targetPos)
-            fired = true
-        end
+local function AutoShoot_PrimaryFire(gun)
+    if not gun or gun.Parent ~= player.Character then return false end
+
+    -- Silent Aim só fica ativo durante esta única chamada.
+    autoShootFiring = true
+    local ok = pcall(function()
+        gun:Activate()
     end)
-
     autoShootFiring = false
-    return fired
+
+    return ok
+end
+
+local function AutoShoot_FallbackFire(gun, head)
+    -- Fallback único: input virtual. Ele só é executado se o método primário
+    -- não puder ser chamado. Não combina fallback + Activate + Remote na mesma tentativa.
+    if not VirtualInputManager or not gun or gun.Parent ~= player.Character or not head then
+        return false
+    end
+
+    local camera = workspace.CurrentCamera or Camera
+    local screenPos, onScreen = camera:WorldToScreenPoint(head.Position)
+    if not onScreen or screenPos.X <= 230 then return false end
+
+    autoShootFiring = true
+    local ok = pcall(function()
+        VirtualInputManager:SendMouseButtonEvent(
+            math.floor(screenPos.X), math.floor(screenPos.Y), 0, true, game, 1
+        )
+        task.wait(0.025)
+        VirtualInputManager:SendMouseButtonEvent(
+            math.floor(screenPos.X), math.floor(screenPos.Y), 0, false, game, 1
+        )
+    end)
+    autoShootFiring = false
+    return ok
+end
+
+local function AutoShoot_Fire(gun, murderer, head)
+    if not gun or not murderer or not head then return false end
+    if gun.Parent ~= player.Character then return false end
+
+    AutoShoot_AimCharacter(head)
+
+    -- Método primário: uma única tentativa.
+    local primaryOK = AutoShoot_PrimaryFire(gun)
+    if primaryOK then return true end
+
+    -- Fallback: somente se o primário falhar.
+    return AutoShoot_FallbackFire(gun, head)
 end
 
 local function ExecuteAutoShootOnce()
-    if not Configs.AutoShoot or autoShootBusy then return false end
+    if not Configs.AutoShoot or autoShootBusy or not scriptAlive then return false end
 
     local now = tick()
     if now - lastAutoShot < AUTO_SHOOT_COOLDOWN then return false end
 
-    local murderer, head = AutoShoot_GetValidTarget()
-    if not murderer then
-        DebugLog("AutoShoot", "Nenhum alvo válido.")
+    local murderer, head = AutoShoot_FindValidMurderer()
+    if not murderer or not head then
+        DebugLog("AutoShoot", "Nenhum Murderer válido.")
         return false
     end
 
-    local gun, hum = AutoShoot_FindGun()
-    if not gun or not hum or hum.Health <= 0 then
-        DebugLog("AutoShoot", "Sem arma ou sem vida.")
+    local myChar = player.Character
+    local hum = myChar and myChar:FindFirstChildOfClass("Humanoid")
+    if not myChar or not hum or hum.Health <= 0 then return false end
+
+    local gun = AutoShoot_FindGun()
+    if not gun then
+        DebugLog("AutoShoot", "Nenhuma arma encontrada.")
+        return false
+    end
+
+    local valid, reason = AutoShoot_CheckTarget(murderer, head)
+    if not valid then
+        DebugLog("AutoShoot", "Alvo recusado: " .. tostring(reason))
         return false
     end
 
     autoShootBusy = true
-    lastAutoShot  = now
+    local fired = false
 
     local ok, err = pcall(function()
-        -- Equipa a arma se ainda não estiver no character
         if gun.Parent ~= player.Character then
             hum:EquipTool(gun)
-            task.wait(0.10)  -- aguarda a arma ser equipada pelo servidor
+            task.wait(0.10)
         end
 
-        -- Verifica se ainda é para atirar após o equipamento
-        if not Configs.AutoShoot or gun.Parent ~= player.Character then return end
+        if not Configs.AutoShoot or not scriptAlive then return end
+        if gun.Parent ~= player.Character then return end
 
-        -- Confirma que o alvo ainda é válido após o tempo de equipamento
-        local mur2, head2 = AutoShoot_GetValidTarget()
+        -- Revalida tudo depois de equipar, pois o estado da rodada pode ter mudado.
+        local mur2, head2 = AutoShoot_FindValidMurderer()
         if not mur2 or not head2 then return end
 
-        TryFireBullet(gun, mur2, head2)
-        task.wait(0.05)
+        local valid2, reason2 = AutoShoot_CheckTarget(mur2, head2)
+        if not valid2 then
+            DebugLog("AutoShoot", "Revalidação recusada: " .. tostring(reason2))
+            return
+        end
+
+        -- Atualiza o instante do disparo somente quando vamos realmente tentar atirar.
+        lastAutoShot = tick()
+        fired = AutoShoot_Fire(gun, mur2, head2)
     end)
 
     autoShootFiring = false
@@ -865,22 +922,36 @@ local function ExecuteAutoShootOnce()
         DebugLog("AutoShoot", "Erro: " .. tostring(err))
     end
 
-    -- Desequipa após o disparo para não deixar a arma exposta
-    pcall(function()
-        if hum and hum.Parent and gun and gun.Parent == player.Character then
-            hum:UnequipTools()
-        end
-    end)
-
+    -- Não desequipa imediatamente: deixar a Tool equipada evita falhas de ativação
+    -- em armas que precisam permanecer no Character entre tiros.
     autoShootBusy = false
-    return ok
+    return fired
+end
+
+local function StartAutoShootLoop()
+    if autoShootRunning then return end
+    autoShootRunning = true
+
+    task.spawn(function()
+        while Configs.AutoShoot and scriptAlive do
+            task.wait(AUTO_SHOOT_INTERVAL)
+            if Configs.AutoShoot and scriptAlive then
+                ExecuteAutoShootOnce()
+            end
+        end
+
+        autoShootRunning = false
+        autoShootBusy = false
+        autoShootFiring = false
+    end)
 end
 
 local function ToggleAutoShoot(enabled)
-    Configs.AutoShoot = enabled
-    if not enabled then
-        autoShootBusy   = false
-        autoShootFiring = false
+    Configs.AutoShoot = enabled and true or false
+    autoShootFiring = false
+
+    if Configs.AutoShoot then
+        StartAutoShootLoop()
     end
 end
 
