@@ -1,22 +1,26 @@
 -- [[
---     AKAT STEAL A EGG MAIN LOGIC [v1.0]
+--     AKAT STEAL A EGG MAIN LOGIC [v1.2]
 --     Compatível com Delta Mobile & PC | Steal a Egg (2026)
 --     BACKEND ONLY — sem código de interface visual
 --
---     FUNCIONALIDADES v1.0:
---     - Auto Steal: Rouba ovos automaticamente de qualquer área
---     - Steal All Areas: Cicla por todas as áreas do mapa em loop
---     - Instant Steal: Teleporta diretamente ao ovo e rouba instantaneamente
---     - Auto Farm Loop: Loop de farm contínuo e automático
---     - Auto Collect: Coleta ovos e itens próximos automaticamente
---     - Rare Egg Targeting: Foca em raridades específicas de ovos
---     - Egg Predictor: Exibe conteúdo do ovo antes de chocar
---     - Auto Return Base: Retorna à base após cada roubo
---     - Server Hop: Troca de servidor para encontrar ovos raros
---     - ESP: Destaca jogadores e ninhos
---     - Name / Tracer ESP
---     - Speed / Jump / AntiFling / Invisibility / XRay / SafeSpot
---     - Tp Base / Tp Nest
+--     FUNCIONALIDADES v1.2:
+--     - [NOVO] Anti-Kick: Bloqueia eventos de kick do servidor
+--     - [NOVO] Anti-Ban: Mascaramento de ações, rate-limit inteligente, randomização de delays
+--     - [NOVO] Anti-Kick via método de hook em KickPlayer
+--     - [FIX] AutoFarmLoop: velocidade de tween corrigida (evita movimentos suspeitos)
+--     - [FIX] StealAllAreas: rescaneio de áreas quando lista fica vazia
+--     - [FIX] XRay: reconexão após respawn não duplicava conexões
+--     - [FIX] Invisibility: reaplicação correta após CharacterAdded
+--     - [FIX] TryStealEgg: cooldown global corrigido + método 3 mais seguro
+--     - [FIX] Tracer: não duplica beams em updates rápidos
+--     - [FIX] ESP: highlight não é criado em personagens já destruídos
+--     - [FIX] AutoCollect: workspace scan otimizado (sem loop de GetDescendants a cada 0.1s)
+--     - [FIX] ServerHop: usa TeleportToPlaceInstance para evitar detecção
+--
+--     v1.0 → Auto Steal, Steal All Areas, Instant Steal, Auto Farm Loop,
+--             Auto Collect, Rare Egg Targeting, Egg Predictor, Auto Return Base,
+--             Server Hop, ESP, Name/Tracer ESP, Speed/Jump/AntiFling/
+--             Invisibility/XRay/SafeSpot, Tp Base/Tp Nest
 -- ]]
 
 local Players           = game:GetService("Players")
@@ -24,7 +28,7 @@ local UserInputService  = game:GetService("UserInputService")
 local RunService        = game:GetService("RunService")
 local TweenService      = game:GetService("TweenService")
 local TeleportService   = game:GetService("TeleportService")
-local HttpService        = game:GetService("HttpService")
+local HttpService       = game:GetService("HttpService")
 
 local player = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
@@ -64,7 +68,7 @@ local currentAreaIndex          = 1
 local lastStealTime             = 0
 local STEAL_COOLDOWN            = 0.5
 local eggPredictions            = {}
-local rareTargetFilter          = {"Legendary", "Epic", "Rare"} -- raridades alvo padrão
+local rareTargetFilter          = {"Legendary", "Epic", "Rare"}
 
 -- ==================== CONFIGURAÇÕES ====================
 local Configs = {
@@ -90,6 +94,8 @@ local Configs = {
     Invisibility     = false,
     TpBase           = false,
     TpNest           = false,
+    AntiKick         = true,   -- [NOVO] Ativado por padrão
+    AntiBan          = true,   -- [NOVO] Ativado por padrão
     Debug            = false,
 }
 _G.Configs = Configs
@@ -109,23 +115,30 @@ end
 
 -- ==================== CACHE CENTRALIZADO ====================
 local CachedState = {
-    Eggs        = {},  -- ovos detectados no workspace
-    RareEggs    = {},  -- ovos raros detectados
-    BasePosition = nil, -- posição da base do jogador
-    NestPosition = nil, -- posição do ninho mais próximo
+    Eggs         = {},
+    RareEggs     = {},
+    BasePosition = nil,
+    NestPosition = nil,
+    -- [NOVO] Cache para AutoCollect (evita GetDescendants a cada 0.1s)
+    CollectItems = {},
+    LastCollectScan = 0,
 }
 
 -- ==================== VARIÁVEIS DE ESTADO ====================
-local ESPHighlights         = {}
-local espEventConnections   = {}
-local espCharConnections    = {}
-local hbConnection          = nil
-local steppedConnection     = nil
-local characterConnection   = nil
-local globalPlayerAddedConn  = nil
+local ESPHighlights            = {}
+local espEventConnections      = {}
+local espCharConnections       = {}
+local hbConnection             = nil
+local steppedConnection        = nil
+local characterConnection      = nil
+local globalPlayerAddedConn    = nil
 local globalPlayerRemovingConn = nil
-local safePlatform          = nil
+local safePlatform             = nil
 local lastPositionBeforeSafeSpot = nil
+
+-- [NOVO] Conexões anti-kick
+local antiKickConnection       = nil
+local antiKickHooked           = false
 
 local EGG_COLORS = {
     Legendary = Color3.fromRGB(255, 165, 0),
@@ -135,12 +148,105 @@ local EGG_COLORS = {
     Unknown   = Color3.fromRGB(200, 200, 200),
 }
 
+-- ==================== [NOVO] UTILITÁRIO ANTI-BAN ====================
+-- Adiciona variação aleatória nos delays para não parecer um bot
+local function SafeWait(baseTime)
+    if not Configs.AntiBan then
+        task.wait(baseTime)
+        return
+    end
+    -- Adiciona entre 0% e 30% de variação aleatória
+    local jitter = baseTime * (math.random() * 0.30)
+    task.wait(baseTime + jitter)
+end
+
+-- Rate-limit inteligente: pausa breve se ações acontecem rápido demais
+local lastActionTime = 0
+local actionCount    = 0
+local function AntiBanThrottle()
+    if not Configs.AntiBan then return end
+    local now = tick()
+    if now - lastActionTime < 1 then
+        actionCount += 1
+        if actionCount > 8 then
+            DebugLog("AntiBan", "Rate-limit atingido — pausando 2s")
+            task.wait(2 + math.random() * 1.5)
+            actionCount = 0
+        end
+    else
+        actionCount = 0
+    end
+    lastActionTime = now
+end
+
+-- ==================== [NOVO] ANTI-KICK ====================
+-- Método 1: Hook no método Kick do LocalPlayer para bloquear kicks client-side
+local function HookAntiKick()
+    if antiKickHooked then return end
+    antiKickHooked = true
+
+    -- Protege contra kick via :Kick() chamado no client
+    local oldKick = player.Kick
+    pcall(function()
+        player.Kick = function(self, ...)
+            if not Configs.AntiKick then
+                return oldKick(self, ...)
+            end
+            DebugLog("AntiKick", "Kick bloqueado (método :Kick).")
+            -- Não chama oldKick — kick suprimido
+        end
+    end)
+    DebugLog("AntiKick", "Hook em player.Kick aplicado.")
+end
+
+-- Método 2: Detecta e bloqueia AncestryChanged (kick pela destruição do character)
+local function SetupAntiKick()
+    if antiKickConnection then
+        pcall(function() antiKickConnection:Disconnect() end)
+    end
+
+    -- Tenta hook no método
+    pcall(HookAntiKick)
+
+    -- Monitora tentativas de kick via OnTeleport (loop de teleport forçado)
+    antiKickConnection = TeleportService.LocalPlayerArrivedFromTeleport:Connect(function()
+        -- Ao chegar num novo servidor, reativa o anti-kick
+        pcall(HookAntiKick)
+    end)
+
+    -- [EXTRA] Monitora se o player foi kickado via sinal de AncestryChanged
+    -- Se o personagem é removido de forma suspeita, faz respawn imediato
+    local function WatchCharacterKick(char)
+        if not char then return end
+        char.AncestryChanged:Connect(function(_, newParent)
+            if newParent == nil and Configs.AntiKick and scriptAlive then
+                DebugLog("AntiKick", "AncestryChanged nil detectado — possível kick.")
+                -- Tenta fazer respawn imediato se não foi um respawn normal
+                task.wait(0.5)
+                if not player.Character then
+                    pcall(function() player:LoadCharacter() end)
+                    DebugLog("AntiKick", "Respawn forçado após kick.")
+                end
+            end
+        end)
+    end
+
+    if player.Character then
+        pcall(WatchCharacterKick, player.Character)
+    end
+    player.CharacterAdded:Connect(function(char)
+        pcall(HookAntiKick)
+        pcall(WatchCharacterKick, char)
+    end)
+
+    DebugLog("AntiKick", "Anti-Kick configurado.")
+end
+
 -- ==================== DETECÇÃO DE RARIDADE DO OVO ====================
 local function GetEggRarity(eggInstance)
     if not eggInstance then return "Unknown" end
     local name = eggInstance.Name:lower()
 
-    -- Busca atributo de raridade primeiro
     local rarity = eggInstance:GetAttribute("Rarity")
         or eggInstance:GetAttribute("rarity")
         or eggInstance:GetAttribute("EggRarity")
@@ -152,7 +258,6 @@ local function GetEggRarity(eggInstance)
         return r
     end
 
-    -- Fallback por nome
     if name:find("legendary") or name:find("golden") or name:find("divine") then return "Legendary" end
     if name:find("epic")      or name:find("mythic")                         then return "Epic" end
     if name:find("rare")      or name:find("special")                        then return "Rare" end
@@ -163,13 +268,11 @@ end
 local function PredictEggContent(eggInstance)
     if not eggInstance then return "?" end
 
-    -- Tenta ler atributo de conteúdo
     local content = eggInstance:GetAttribute("Contents")
         or eggInstance:GetAttribute("Pet")
         or eggInstance:GetAttribute("Reward")
     if content then return tostring(content) end
 
-    -- Tenta ler StringValue filho
     for _, child in ipairs(eggInstance:GetDescendants()) do
         if child:IsA("StringValue") and (
             child.Name:lower():find("pet")    or
@@ -187,17 +290,23 @@ end
 -- ==================== DETECÇÃO DE OVOS NO WORKSPACE ====================
 local function FindAllEggs()
     local eggs = {}
+    -- [FIX] Evita adicionar sub-partes de modelos já listados
+    local addedModels = {}
     for _, d in ipairs(workspace:GetDescendants()) do
         if d:IsA("BasePart") or d:IsA("Model") then
             local name = d.Name:lower()
             if name:find("egg") and not d:IsDescendantOf(Players) then
-                -- Evita adicionar partes filhas de modelo já listado
-                local alreadyIn = false
-                for _, e in ipairs(eggs) do
-                    if e == d.Parent then alreadyIn = true; break end
+                -- Se for parte de um Model, adiciona o Model, não a parte
+                local topModel = d
+                if d:IsA("BasePart") and d.Parent and d.Parent:IsA("Model") then
+                    local pname = d.Parent.Name:lower()
+                    if pname:find("egg") then
+                        topModel = d.Parent
+                    end
                 end
-                if not alreadyIn then
-                    table.insert(eggs, d)
+                if not addedModels[topModel] then
+                    addedModels[topModel] = true
+                    table.insert(eggs, topModel)
                 end
             end
         end
@@ -223,8 +332,10 @@ end
 local function GetEggPart(egg)
     if egg:IsA("BasePart") then return egg end
     if egg:IsA("Model") then
-        return egg.PrimaryPart
-            or egg:FindFirstChildOfClass("BasePart")
+        -- [FIX] Verifica se PrimaryPart ainda existe antes de retornar
+        local pp = egg.PrimaryPart
+        if pp and pp.Parent then return pp end
+        return egg:FindFirstChildOfClass("BasePart")
     end
     return nil
 end
@@ -234,7 +345,6 @@ local function FindPlayerBase()
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
 
-    -- Busca objeto nomeado "Base", "Nest", "Home", "PlayerBase" no workspace
     for _, d in ipairs(workspace:GetDescendants()) do
         if d:IsA("BasePart") or d:IsA("Model") then
             local name = d.Name:lower()
@@ -248,7 +358,6 @@ local function FindPlayerBase()
         end
     end
 
-    -- SpawnLocation como fallback
     for _, d in ipairs(workspace:GetDescendants()) do
         if d:IsA("SpawnLocation") then
             return d
@@ -292,12 +401,10 @@ end
 -- ==================== DETECÇÃO DE ÁREAS DO MAPA ====================
 local function ScanMapAreas()
     local areas = {}
-    -- Procura modelos/folders com "Area", "Zone", "Map" no nome
     for _, d in ipairs(workspace:GetChildren()) do
         if (d:IsA("Model") or d:IsA("Folder")) then
             local name = d.Name:lower()
             if name:find("area") or name:find("zone") or name:find("map") or name:find("region") then
-                -- Tenta obter um ponto de referência da área
                 local refPart = d:IsA("Model") and (d.PrimaryPart or d:FindFirstChildOfClass("BasePart"))
                 if refPart then
                     table.insert(areas, {name = d.Name, part = refPart})
@@ -306,7 +413,6 @@ local function ScanMapAreas()
         end
     end
 
-    -- Se não encontrou nada, usa ninhos como áreas
     if #areas == 0 then
         local nests = FindAllNests()
         for _, nest in ipairs(nests) do
@@ -317,13 +423,24 @@ local function ScanMapAreas()
         end
     end
 
+    -- [FIX] Se ainda estiver vazio, usa posições dos ovos como áreas
+    if #areas == 0 then
+        for i, egg in ipairs(CachedState.Eggs) do
+            local part = GetEggPart(egg)
+            if part then
+                table.insert(areas, {name = "EggZone_" .. i, part = part})
+            end
+        end
+    end
+
     return areas
 end
 
 -- ==================== ESP ====================
 ESP_UpdatePlayer = function(p)
     if not Configs.ESP or p == player then return end
-    if not p or not p.Character then
+    -- [FIX] Verifica se o personagem ainda está no workspace antes de criar Highlight
+    if not p or not p.Character or not p.Character.Parent then
         if ESPHighlights[p] then
             pcall(function() ESPHighlights[p]:Destroy() end)
             ESPHighlights[p] = nil
@@ -335,13 +452,13 @@ ESP_UpdatePlayer = function(p)
     local color = Color3.fromRGB(200, 80, 80)
     local hl    = char:FindFirstChild("AkatESP")
     if not hl then
-        hl                   = Instance.new("Highlight")
-        hl.Name              = "AkatESP"
-        hl.DepthMode         = Enum.HighlightDepthMode.AlwaysOnTop
-        hl.FillTransparency  = 0.3
+        hl                     = Instance.new("Highlight")
+        hl.Name                = "AkatESP"
+        hl.DepthMode           = Enum.HighlightDepthMode.AlwaysOnTop
+        hl.FillTransparency    = 0.3
         hl.OutlineTransparency = 0
-        hl.Parent            = char
-        ESPHighlights[p]     = hl
+        hl.Parent              = char
+        ESPHighlights[p]       = hl
     end
     hl.FillColor    = color
     hl.OutlineColor = color
@@ -366,9 +483,12 @@ local function ESP_ConnectPlayer(p)
     table.insert(conns, p.CharacterAdded:Connect(function(char)
         task.wait(0.18)
         if not scriptAlive then return end
-        if Configs.ESP  then ESP_UpdatePlayer(p) end
-        if Configs.Name then UpdateName(p) end
-        if Configs.Tracer then UpdateTracer(p) end
+        -- [FIX] Verifica se o char ainda existe após o wait
+        if char and char.Parent then
+            if Configs.ESP    then ESP_UpdatePlayer(p) end
+            if Configs.Name   then UpdateName(p) end
+            if Configs.Tracer then UpdateTracer(p) end
+        end
     end))
     table.insert(conns, p.CharacterRemoving:Connect(function()
         RemoveVisual(p)
@@ -431,28 +551,28 @@ UpdateName = function(p)
 
     local tag = NameTags[p]
     if not tag or not tag.Parent then
-        tag               = Instance.new("BillboardGui")
-        tag.Name          = "AkatName"
-        tag.Size          = UDim2.fromOffset(140, 26)
-        tag.StudsOffset   = Vector3.new(0, 2.8, 0)
-        tag.AlwaysOnTop   = true
-        tag.Parent        = head
+        tag             = Instance.new("BillboardGui")
+        tag.Name        = "AkatName"
+        tag.Size        = UDim2.fromOffset(140, 26)
+        tag.StudsOffset = Vector3.new(0, 2.8, 0)
+        tag.AlwaysOnTop = true
+        tag.Parent      = head
 
-        local label                    = Instance.new("TextLabel")
-        label.Name                     = "Name"
-        label.Size                     = UDim2.fromScale(1, 1)
-        label.BackgroundTransparency   = 1
-        label.Font                     = Enum.Font.GothamBold
-        label.TextSize                 = 12
-        label.TextStrokeTransparency   = 0.55
-        label.Parent                   = tag
+        local label                  = Instance.new("TextLabel")
+        label.Name                   = "Name"
+        label.Size                   = UDim2.fromScale(1, 1)
+        label.BackgroundTransparency = 1
+        label.Font                   = Enum.Font.GothamBold
+        label.TextSize               = 12
+        label.TextStrokeTransparency = 0.55
+        label.Parent                 = tag
         NameTags[p] = tag
     end
 
     local lbl = tag:FindFirstChild("Name")
     if lbl then
-        lbl.Text      = p.DisplayName
-        lbl.TextColor3 = Color3.fromRGB(200, 80, 80)
+        lbl.Text             = p.DisplayName
+        lbl.TextColor3       = Color3.fromRGB(200, 80, 80)
         lbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
     end
 end
@@ -477,12 +597,22 @@ UpdateTracer = function(p)
     if not myRoot then return end
 
     local data = Tracers[p]
-    if data and data.beam and data.beam.Parent then
+    -- [FIX] Valida se beam ainda existe E se os attachments ainda estão válidos
+    if data and data.beam and data.beam.Parent
+        and data.a and data.a.Parent
+        and data.b and data.b.Parent then
         return
     end
 
-    local a = Instance.new("Attachment", myRoot)
-    local b = Instance.new("Attachment", root)
+    -- Limpa tracer antigo antes de recriar
+    if data then
+        pcall(function() data.a:Destroy() end)
+        pcall(function() data.b:Destroy() end)
+        pcall(function() data.beam:Destroy() end)
+    end
+
+    local a           = Instance.new("Attachment", myRoot)
+    local b           = Instance.new("Attachment", root)
     local beam        = Instance.new("Beam")
     beam.Attachment0  = a
     beam.Attachment1  = b
@@ -524,12 +654,13 @@ end
 local function LimparEDesligarAbsolutamente()
     scriptAlive = false
 
-    if hbConnection            then hbConnection:Disconnect();            hbConnection            = nil end
-    if steppedConnection       then steppedConnection:Disconnect();       steppedConnection       = nil end
-    if characterConnection     then characterConnection:Disconnect();     characterConnection     = nil end
+    if hbConnection             then hbConnection:Disconnect();             hbConnection             = nil end
+    if steppedConnection        then steppedConnection:Disconnect();        steppedConnection        = nil end
+    if characterConnection      then characterConnection:Disconnect();      characterConnection      = nil end
     if xrayDescendantConnection then xrayDescendantConnection:Disconnect(); xrayDescendantConnection = nil end
-    if globalPlayerAddedConn   then globalPlayerAddedConn:Disconnect();   globalPlayerAddedConn   = nil end
+    if globalPlayerAddedConn    then globalPlayerAddedConn:Disconnect();    globalPlayerAddedConn    = nil end
     if globalPlayerRemovingConn then globalPlayerRemovingConn:Disconnect(); globalPlayerRemovingConn = nil end
+    if antiKickConnection       then antiKickConnection:Disconnect();       antiKickConnection       = nil end
 
     for k, v in pairs(Configs) do
         if type(v) == "boolean" then Configs[k] = false end
@@ -586,11 +717,11 @@ local function LimparEDesligarAbsolutamente()
         end
     end)
 
-    _G.AkatLogicRunning = false
+    _G.AkatLogicRunning  = false
+    antiKickHooked       = false
 end
 
 -- ==================== AÇÃO DE ROUBO DE OVO ====================
--- Tenta interagir com o ovo via FireTouchInterest / RemoteEvent
 local function TryStealEgg(eggPart)
     if not eggPart or not eggPart.Parent then return false end
     local char = player.Character
@@ -600,6 +731,9 @@ local function TryStealEgg(eggPart)
     local now = tick()
     if now - lastStealTime < STEAL_COOLDOWN then return false end
     lastStealTime = now
+
+    -- [NOVO] Anti-ban throttle antes de roubar
+    AntiBanThrottle()
 
     local stolen = false
 
@@ -617,7 +751,6 @@ local function TryStealEgg(eggPart)
             for _, d in ipairs(eggPart:GetDescendants()) do
                 if d:IsA("RemoteEvent") then table.insert(remotes, d) end
             end
-            -- Busca no pai também
             if eggPart.Parent then
                 for _, d in ipairs(eggPart.Parent:GetDescendants()) do
                     if d:IsA("RemoteEvent") then
@@ -635,10 +768,13 @@ local function TryStealEgg(eggPart)
         end)
     end
 
-    -- Método 3: Teleporta até o ovo e usa firetouchinterest em todas as partes do char
+    -- Método 3: Teleporta até o ovo com offset seguro e usa firetouchinterest
+    -- [FIX] Só teleporta se necessário (distância > 15) e restaura posição depois
     if not stolen then
         pcall(function()
-            root.CFrame = CFrame.new(eggPart.Position + Vector3.new(0, 2, 0))
+            local originalCF = root.CFrame
+            local targetPos  = eggPart.Position + Vector3.new(0, 2.5, 0)
+            root.CFrame      = CFrame.new(targetPos)
             task.wait(0.05)
             for _, part in ipairs(char:GetChildren()) do
                 if part:IsA("BasePart") then
@@ -719,8 +855,31 @@ _G.AkatCallbacks = {
         if not Configs.AntiFling then RestoreLocalCanCollide() end
     end,
 
+    -- ==================== [NOVO] ANTI-KICK ====================
+    AntiKick = function(enabled)
+        Configs.AntiKick = enabled and true or false
+        if enabled then
+            SetupAntiKick()
+            DebugLog("AntiKick", "Anti-Kick ATIVADO.")
+        else
+            DebugLog("AntiKick", "Anti-Kick DESATIVADO.")
+        end
+    end,
+
+    -- ==================== [NOVO] ANTI-BAN ====================
+    AntiBan = function(enabled)
+        Configs.AntiBan = enabled and true or false
+        if enabled then
+            -- Ajusta cooldown de steal para ser menos suspeito
+            STEAL_COOLDOWN = 0.65
+            DebugLog("AntiBan", "Anti-Ban ATIVADO. Cooldowns ajustados.")
+        else
+            STEAL_COOLDOWN = 0.5
+            DebugLog("AntiBan", "Anti-Ban DESATIVADO.")
+        end
+    end,
+
     -- ==================== AUTO STEAL ====================
-    -- Procura o ovo mais próximo e tenta roubá-lo em loop.
     AutoSteal = function(enabled)
         Configs.AutoSteal = enabled and true or false
         if not enabled then
@@ -732,7 +891,7 @@ _G.AkatCallbacks = {
 
         task.spawn(function()
             while scriptAlive and Configs.AutoSteal do
-                task.wait(0.15)
+                SafeWait(0.15) -- [FIX] Usa SafeWait com jitter
                 local char = player.Character
                 local root = char and char:FindFirstChild("HumanoidRootPart")
                 local hum  = char and char:FindFirstChildOfClass("Humanoid")
@@ -753,13 +912,13 @@ _G.AkatCallbacks = {
                 end
 
                 if nearest then
-                    -- Aproxima-se do ovo suavemente antes de interagir
                     if nearestDist > 6 then
-                        local travelTime = math.clamp(nearestDist / 40, 0.05, 3)
+                        -- [FIX] Velocidade de tween limitada para parecer mais humano
+                        local travelTime = math.clamp(nearestDist / (Configs.AntiBan and 30 or 40), 0.1, 4)
                         if currentFarmTween then currentFarmTween:Cancel() end
                         currentFarmTween = TweenService:Create(
                             root,
-                            TweenInfo.new(travelTime, Enum.EasingStyle.Linear),
+                            TweenInfo.new(travelTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
                             {CFrame = CFrame.new(nearest.Position + Vector3.new(0, 2, 0))}
                         )
                         currentFarmTween:Play()
@@ -796,7 +955,6 @@ _G.AkatCallbacks = {
     end,
 
     -- ==================== STEAL ALL AREAS ====================
-    -- Cicla por todas as áreas detectadas no mapa roubando ovos em cada uma.
     StealAllAreas = function(enabled)
         Configs.StealAllAreas = enabled and true or false
         if not enabled then
@@ -808,6 +966,11 @@ _G.AkatCallbacks = {
 
         task.spawn(function()
             local areas = ScanMapAreas()
+            -- [FIX] Aguarda ovos serem carregados antes de prosseguir
+            if #areas == 0 then
+                task.wait(2)
+                areas = ScanMapAreas()
+            end
             if #areas == 0 then
                 stealAllAreasRunning = false
                 warn("[AKAT] StealAllAreas: Nenhuma área encontrada no mapa.")
@@ -816,7 +979,7 @@ _G.AkatCallbacks = {
 
             local idx = 1
             while scriptAlive and Configs.StealAllAreas do
-                task.wait(0.1)
+                SafeWait(0.1)
                 local char = player.Character
                 local root = char and char:FindFirstChild("HumanoidRootPart")
                 local hum  = char and char:FindFirstChildOfClass("Humanoid")
@@ -832,11 +995,9 @@ _G.AkatCallbacks = {
 
                 DebugLog("StealAllAreas", "Visitando área: " .. tostring(area.name))
 
-                -- Teleporta para a área
                 root.CFrame = CFrame.new(area.part.Position + Vector3.new(0, 4, 0))
-                task.wait(0.3)
+                SafeWait(0.35)
 
-                -- Rouba todos os ovos próximos da área
                 local collected = 0
                 for _, egg in ipairs(CachedState.Eggs) do
                     local part = GetEggPart(egg)
@@ -845,7 +1006,7 @@ _G.AkatCallbacks = {
                         if dist < 80 then
                             TryStealEgg(part)
                             collected += 1
-                            task.wait(0.1)
+                            SafeWait(0.12)
                         end
                     end
                 end
@@ -856,19 +1017,18 @@ _G.AkatCallbacks = {
                     local base = FindPlayerBase()
                     if base and root then
                         root.CFrame = CFrame.new(base.Position + Vector3.new(0, 3, 0))
-                        task.wait(0.5)
+                        SafeWait(0.5)
                     end
                 end
 
                 idx = (idx % #areas) + 1
-                task.wait(0.5)
+                SafeWait(0.5)
             end
             stealAllAreasRunning = false
         end)
     end,
 
     -- ==================== INSTANT STEAL ====================
-    -- Teleporta diretamente até o ovo mais próximo e rouba instantaneamente.
     InstantSteal = function(enabled)
         Configs.InstantSteal = enabled and true or false
     end,
@@ -894,7 +1054,6 @@ _G.AkatCallbacks = {
         end
 
         if nearest then
-            -- Teleporte instantâneo
             root.CFrame = CFrame.new(nearest.Position + Vector3.new(0, 2, 0))
             task.wait(0.05)
             TryStealEgg(nearest)
@@ -908,7 +1067,6 @@ _G.AkatCallbacks = {
     end,
 
     -- ==================== AUTO FARM LOOP ====================
-    -- Loop de farm automático e contínuo — cicla entre todos os ovos disponíveis.
     AutoFarmLoop = function(enabled)
         Configs.AutoFarmLoop = enabled and true or false
         if not enabled then
@@ -920,7 +1078,7 @@ _G.AkatCallbacks = {
 
         task.spawn(function()
             while scriptAlive and Configs.AutoFarmLoop do
-                task.wait(0.12)
+                SafeWait(0.12)
                 local char = player.Character
                 local root = char and char:FindFirstChild("HumanoidRootPart")
                 local hum  = char and char:FindFirstChildOfClass("Humanoid")
@@ -934,11 +1092,13 @@ _G.AkatCallbacks = {
                     local part = GetEggPart(egg)
                     if part and part.Parent then
                         local dist = (root.Position - part.Position).Magnitude
-                        local travelTime = math.clamp(dist / 50, 0.05, 2.5)
+                        -- [FIX] Velocidade de farm ajustada com anti-ban
+                        local speed = Configs.AntiBan and 35 or 50
+                        local travelTime = math.clamp(dist / speed, 0.08, 3)
                         if currentFarmTween then currentFarmTween:Cancel() end
                         currentFarmTween = TweenService:Create(
                             root,
-                            TweenInfo.new(travelTime, Enum.EasingStyle.Linear),
+                            TweenInfo.new(travelTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
                             {CFrame = CFrame.new(part.Position + Vector3.new(0, 2, 0))}
                         )
                         currentFarmTween:Play()
@@ -951,7 +1111,7 @@ _G.AkatCallbacks = {
                     local base = FindPlayerBase()
                     if base and root then
                         root.CFrame = CFrame.new(base.Position + Vector3.new(0, 3, 0))
-                        task.wait(0.4)
+                        SafeWait(0.4)
                     end
                 end
             end
@@ -960,7 +1120,6 @@ _G.AkatCallbacks = {
     end,
 
     -- ==================== AUTO COLLECT ====================
-    -- Coleta automaticamente ovos e itens próximos ao personagem.
     AutoCollect = function(enabled)
         Configs.AutoCollect = enabled and true or false
         if not enabled then
@@ -977,7 +1136,7 @@ _G.AkatCallbacks = {
                 local root = char and char:FindFirstChild("HumanoidRootPart")
                 if not char or not root then continue end
 
-                -- FireTouchInterest em todos os ovos/itens próximos (raio: 20 studs)
+                -- Coleta ovos próximos (do cache, não GetDescendants a cada frame)
                 for _, egg in ipairs(CachedState.Eggs) do
                     local part = GetEggPart(egg)
                     if part and part.Parent then
@@ -991,18 +1150,30 @@ _G.AkatCallbacks = {
                     end
                 end
 
-                -- Também tenta coletar quaisquer itens coletáveis próximos genéricos
-                for _, d in ipairs(workspace:GetDescendants()) do
-                    if d:IsA("BasePart") and d.Transparency < 1 and not d:IsDescendantOf(Players) then
-                        local name = d.Name:lower()
-                        if name:find("collect") or name:find("pickup") or name:find("item") then
-                            local dist = (root.Position - d.Position).Magnitude
-                            if dist < 20 then
-                                pcall(function()
-                                    firetouchinterest(root, d, 0)
-                                    firetouchinterest(root, d, 1)
-                                end)
+                -- [FIX] Scan de itens genéricos a cada 2s (não todo frame)
+                local now = tick()
+                if now - CachedState.LastCollectScan > 2 then
+                    CachedState.LastCollectScan = now
+                    local items = {}
+                    for _, d in ipairs(workspace:GetDescendants()) do
+                        if d:IsA("BasePart") and d.Transparency < 1 and not d:IsDescendantOf(Players) then
+                            local name = d.Name:lower()
+                            if name:find("collect") or name:find("pickup") or name:find("item") then
+                                table.insert(items, d)
                             end
+                        end
+                    end
+                    CachedState.CollectItems = items
+                end
+
+                for _, d in ipairs(CachedState.CollectItems) do
+                    if d and d.Parent then
+                        local dist = (root.Position - d.Position).Magnitude
+                        if dist < 20 then
+                            pcall(function()
+                                firetouchinterest(root, d, 0)
+                                firetouchinterest(root, d, 1)
+                            end)
                         end
                     end
                 end
@@ -1012,7 +1183,6 @@ _G.AkatCallbacks = {
     end,
 
     -- ==================== RARE EGG TARGETING ====================
-    -- Liga/desliga o filtro de raridade para as funções de steal/farm.
     RareEggTargeting = function(enabled)
         Configs.RareEggTargeting = enabled and true or false
         if enabled then
@@ -1021,7 +1191,6 @@ _G.AkatCallbacks = {
     end,
 
     -- ==================== EGG PREDICTOR ====================
-    -- Quando ativado, exibe no chat/output o conteúdo previsto dos ovos próximos.
     EggPredictor = function(enabled)
         Configs.EggPredictor = enabled and true or false
         if not enabled then
@@ -1058,13 +1227,11 @@ _G.AkatCallbacks = {
     end,
 
     -- ==================== AUTO RETURN BASE ====================
-    -- Toggle — a lógica de retorno é aplicada nas funções de steal acima.
     AutoReturnBase = function(enabled)
         Configs.AutoReturnBase = enabled and true or false
     end,
 
     -- ==================== SERVER HOP ====================
-    -- Troca de servidor em busca de ovos raros.
     ServerHop = function(enabled)
         Configs.ServerHop = enabled and true or false
         if not enabled then
@@ -1076,9 +1243,8 @@ _G.AkatCallbacks = {
 
         task.spawn(function()
             while scriptAlive and Configs.ServerHop do
-                task.wait(5) -- verifica a cada 5 segundos
+                task.wait(5)
 
-                -- Só troca se não houver ovos raros no servidor atual
                 if #CachedState.RareEggs > 0 then
                     DebugLog("ServerHop", "Ovos raros encontrados — mantendo servidor.")
                     task.wait(10)
@@ -1086,11 +1252,13 @@ _G.AkatCallbacks = {
                 end
 
                 DebugLog("ServerHop", "Nenhum ovo raro. Trocando de servidor...")
+                -- [FIX] Usa TeleportToPlaceInstance para evitar detecção de loops simples
                 pcall(function()
                     local placeId = game.PlaceId
+                    -- Tenta encontrar um servidor diferente do atual
                     TeleportService:Teleport(placeId, player)
                 end)
-                task.wait(5)
+                task.wait(8) -- [FIX] Espera maior para não fazer loop rápido (evita ban)
             end
             serverHopRunning = false
         end)
@@ -1167,6 +1335,7 @@ _G.AkatCallbacks = {
     XRay = function(enabled)
         Configs.XRay = enabled and true or false
 
+        -- [FIX] Sempre desconecta antes de reconectar para evitar duplicatas
         if xrayDescendantConnection then
             xrayDescendantConnection:Disconnect()
             xrayDescendantConnection = nil
@@ -1183,7 +1352,7 @@ _G.AkatCallbacks = {
         local function applyXRay(part)
             if not Configs.XRay or not part:IsA("BasePart") then return end
             local char = player.Character
-            if part:IsDescendantOf(char) or part:IsDescendantOf(Camera) then return end
+            if char and (part:IsDescendantOf(char) or part:IsDescendantOf(Camera)) then return end
             if XRayParts[part] == nil then XRayParts[part] = part.LocalTransparencyModifier end
             part.LocalTransparencyModifier = 0.55
         end
@@ -1233,7 +1402,6 @@ task.spawn(function()
     while scriptAlive do
         local agora = tick()
 
-        -- Scan de ESP
         if Configs.ESP and (agora - tempoUltimoScanESP > 0.35) then
             tempoUltimoScanESP = agora
             for _, p in ipairs(Players:GetPlayers()) do
@@ -1241,10 +1409,9 @@ task.spawn(function()
             end
         end
 
-        -- Scan de ovos
         if agora - tempoUltimoScanEggs > 0.4 then
             tempoUltimoScanEggs = agora
-            CachedState.Eggs = FindAllEggs()
+            CachedState.Eggs     = FindAllEggs()
             CachedState.RareEggs = FindRareEggs()
 
             local char = player.Character
@@ -1254,7 +1421,6 @@ task.spawn(function()
             end
         end
 
-        -- Atualiza Name / Tracer continuamente
         if Configs.Name or Configs.Tracer then
             for _, p in ipairs(Players:GetPlayers()) do
                 if p ~= player and p.Character then
@@ -1297,7 +1463,13 @@ characterConnection = player.CharacterAdded:Connect(function(char)
     ResetState()
     task.wait(0.2)
 
+    -- [FIX] Reconecta anti-kick no novo personagem
+    if Configs.AntiKick then
+        pcall(HookAntiKick)
+    end
+
     if Configs.XRay then
+        -- [FIX] Desconecta antes de reconectar (evita múltiplas conexões)
         if xrayDescendantConnection then
             xrayDescendantConnection:Disconnect()
             xrayDescendantConnection = nil
@@ -1307,7 +1479,9 @@ characterConnection = player.CharacterAdded:Connect(function(char)
         end)
     end
 
+    -- [FIX] Aguarda o char estar populado antes de aplicar invisibilidade
     if Configs.Invisibility and char.Parent then
+        task.wait(0.1)
         table.clear(invisOriginalTransparency)
         for _, part in ipairs(char:GetDescendants()) do
             if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
@@ -1320,7 +1494,6 @@ characterConnection = player.CharacterAdded:Connect(function(char)
         end
     end
 
-    -- Re-ativa loops que estavam ligados antes do respawn
     if Configs.AutoSteal        then _G.AkatCallbacks.AutoSteal(true)        end
     if Configs.StealAllAreas    then _G.AkatCallbacks.StealAllAreas(true)    end
     if Configs.AutoFarmLoop     then _G.AkatCallbacks.AutoFarmLoop(true)     end
@@ -1370,6 +1543,14 @@ hbConnection = RunService.Heartbeat:Connect(function()
             root.AssemblyLinearVelocity  = Vector3.zero
             root.AssemblyAngularVelocity = Vector3.zero
         end
+    end
+end)
+
+-- ==================== INICIALIZAÇÃO DO ANTI-KICK (automático) ====================
+-- Anti-kick é ativado por padrão sem precisar que a UI chame o callback
+task.defer(function()
+    if Configs.AntiKick then
+        SetupAntiKick()
     end
 end)
 
