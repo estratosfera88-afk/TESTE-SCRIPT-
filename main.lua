@@ -1504,3 +1504,33 @@ _G.AkatBFGetConfig = function()
 end
 
 DebugLog("System", "Backend pronto. A UI pode conectar pelos callbacks globais.")
+
+-- ==================== INICIALIZADOR DA UI EXTERNA ====================
+task.spawn(function()
+    local uiRawUrl = "https://raw.githubusercontent.com/estratosfera88-afk/Ui-do-teste/refs/heads/main/bf_ui.lua"
+
+    local rawContent = nil
+    local fetchOk, fetchErr = pcall(function()
+        rawContent = game:HttpGet(uiRawUrl, true)
+    end)
+
+    if not fetchOk then
+        warn("[AKAT BF LOGIC] HttpGet falhou: " .. tostring(fetchErr))
+        return
+    end
+    if not rawContent or rawContent == "" then
+        warn("[AKAT BF LOGIC] HttpGet retornou vazio. Verifique a URL.")
+        return
+    end
+
+    local fn, compileErr = loadstring(rawContent)
+    if not fn then
+        warn("[AKAT BF LOGIC] loadstring falhou: " .. tostring(compileErr))
+        return
+    end
+
+    local runOk, runErr = pcall(fn)
+    if not runOk then
+        warn("[AKAT BF LOGIC] Erro ao executar a UI: " .. tostring(runErr))
+    end
+end)
