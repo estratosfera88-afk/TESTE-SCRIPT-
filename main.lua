@@ -1061,15 +1061,16 @@ _G.AkatCallbacks = {
     AutoFarm = function(enabled)
         Configs.AutoFarm = enabled and true or false
         currentFarmTarget = nil
-        if autoFarmTween then autoFarmTween:Cancel(); autoFarmTween = nil end
 
         local char = player.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
         local hum  = char and char:FindFirstChildOfClass("Humanoid")
 
         if Configs.AutoFarm then
+            -- Ao ligar: zera velocidades mas não ancora (o Stepped cuida do CanCollide)
             if root then
                 root.Anchored = false
+                root.AssemblyLinearVelocity  = Vector3.zero
                 root.AssemblyAngularVelocity = Vector3.zero
             end
             if hum then
@@ -1078,6 +1079,7 @@ _G.AkatCallbacks = {
                 hum.JumpPower    = 0
             end
         else
+            -- Ao desligar: recoloca no chão via raycast para não travar no ar
             if root then
                 root.Anchored = false
                 root.AssemblyLinearVelocity  = Vector3.zero
@@ -1085,8 +1087,10 @@ _G.AkatCallbacks = {
                 local rp = RaycastParams.new()
                 rp.FilterDescendantsInstances = {char}
                 rp.FilterType = Enum.RaycastFilterType.Exclude
-                local hit = workspace:Raycast(root.Position, Vector3.new(0, -1000, 0), rp)
-                if hit then root.CFrame = CFrame.new(hit.Position + Vector3.new(0, 3, 0)) end
+                local hit = workspace:Raycast(root.Position, Vector3.new(0, -500, 0), rp)
+                if hit then
+                    root.CFrame = CFrame.new(hit.Position + Vector3.new(0, 3, 0))
+                end
             end
             if hum then
                 hum.WalkSpeed    = Configs.Speed and Configs.SpeedValue or 16
@@ -1321,15 +1325,27 @@ _G.AkatCallbacks = {
 }
 
 -- ==================== THREAD: AUTO COLLECT DE MOEDAS ====================
--- Auto Farm v7: máquina de estado robusta. O movimento não fica preso em um
--- tween concluído; cada moeda é revalidada e, se não foi coletada, o alvo é
--- liberado para uma nova busca.
+-- Auto Farm v6.8: teleporte direto + firetouchinterest.
+-- SEM TweenService no farm para eliminar o lag em scripts obsfuscados.
+-- Bypass "invalid position": teleporta com offset aleatório pequeno e deixa
+-- o Stepped limpar colisões. O CFrame nunca repete a mesma posição exata.
 task.spawn(function()
+    -- Pequeno offset aleatório para evitar detecção de "invalid position"
+    local function SafeOffset()
+        return Vector3.new(
+            (math.random() - 0.5) * 0.4,
+            1.5 + math.random() * 0.3,
+            (math.random() - 0.5) * 0.4
+        )
+    end
+
     local function FindNearestFarmCoin(root)
         if not root then return nil end
 
-        local nearest, nearestDist = nil, math.huge
+        local nearest = nil
+        local nearestDist = math.huge
 
+        -- Caminho principal: moedas reais do MM2.
         for _, d in ipairs(workspace:GetDescendants()) do
             if d:IsA("BasePart")
                 and d.Parent
@@ -1337,7 +1353,6 @@ task.spawn(function()
                 and d:FindFirstChild("TouchInterest")
                 and d:FindFirstChild("CoinVisual")
                 and not d:GetAttribute("Collected") then
-
                 local dist = (root.Position - d.Position).Magnitude
                 if dist < nearestDist and dist < 1500 then
                     nearest = d
@@ -1348,6 +1363,7 @@ task.spawn(function()
 
         if nearest then return nearest end
 
+        -- Fallback para variantes/eventos sazonais do mapa.
         for _, d in ipairs(CachedState.Coins) do
             if d and d.Parent and not d:GetAttribute("Collected") then
                 local dist = (root.Position - d.Position).Magnitude
@@ -1361,38 +1377,14 @@ task.spawn(function()
         return nearest
     end
 
-    local function CancelFarmTween()
-        if autoFarmTween then
-            pcall(function() autoFarmTween:Cancel() end)
-            autoFarmTween = nil
-        end
-    end
-
-    local function TouchFarmCoin(char, root, target)
-        if not char or not root or not target or not target.Parent then return end
-
-        pcall(function()
-            firetouchinterest(root, target, 0)
-            firetouchinterest(root, target, 1)
-
-            for _, part in ipairs(char:GetChildren()) do
-                if part:IsA("BasePart") and part ~= root then
-                    local n = part.Name:lower()
-                    if n:find("foot") or n:find("leg") or n:find("torso") then
-                        firetouchinterest(part, target, 0)
-                        firetouchinterest(part, target, 1)
-                    end
-                end
-            end
-        end)
-    end
+    local lastTpTarget = nil
+    local lastTpTime   = 0
+    local TP_COOLDOWN  = 0.18   -- tempo mínimo entre teleportes (evita spam que causa kick)
 
     while scriptAlive do
-        task.wait(0.05)
-
+        task.wait(0.10)
         if not Configs.AutoFarm then
-            currentFarmTarget = nil
-            CancelFarmTween()
+            lastTpTarget = nil
             continue
         end
 
@@ -1402,87 +1394,55 @@ task.spawn(function()
 
         if not char or not root or not hum or hum.Health <= 0 then
             currentFarmTarget = nil
-            CancelFarmTween()
+            lastTpTarget = nil
             continue
         end
 
         if IsBagFull() then
             currentFarmTarget = nil
-            CancelFarmTween()
-            task.wait(0.35)
+            lastTpTarget = nil
+            task.wait(0.5)
             continue
         end
 
-        local target = currentFarmTarget
+        local target = FindNearestFarmCoin(root)
 
-        if not target
-            or not target.Parent
-            or target:GetAttribute("Collected") then
-            currentFarmTarget = FindNearestFarmCoin(root)
-            target = currentFarmTarget
-            CancelFarmTween()
-        end
-
-        if not target then
-            task.wait(0.12)
+        if not target or not target.Parent then
+            currentFarmTarget = nil
+            lastTpTarget = nil
+            task.wait(0.15)
             continue
         end
 
-        TouchFarmCoin(char, root, target)
+        currentFarmTarget = target
 
-        local distance = (root.Position - target.Position).Magnitude
+        -- Teleporte direto com offset seguro (sem Tween = sem lag em obsfuscado)
+        local now = os.clock()
+        if target ~= lastTpTarget or (now - lastTpTime) >= TP_COOLDOWN then
+            lastTpTarget = target
+            lastTpTime   = now
 
-        if distance <= 3.5 then
-            TouchFarmCoin(char, root, target)
+            -- Bypass: pequeno offset aleatório + preserva rotação atual do personagem
+            local destCFrame = CFrame.new(target.Position + SafeOffset())
+                * CFrame.Angles(0, root.CFrame:ToEulerAnglesXYZ() == root.CFrame:ToEulerAnglesXYZ() and 0 or 0, 0)
 
-            if not target.Parent or target:GetAttribute("Collected") then
-                currentFarmTarget = nil
-                CancelFarmTween()
-            else
-                -- Não fica repetindo o mesmo alvo indefinidamente.
-                currentFarmTarget = nil
-            end
-            continue
-        end
-
-        if not autoFarmTween then
-            local travelTime = math.clamp(distance / 55, 0.08, 2.5)
-            local tween = TweenService:Create(
-                root,
-                TweenInfo.new(travelTime, Enum.EasingStyle.Linear, Enum.EasingDirection.Out),
-                {CFrame = CFrame.new(target.Position + Vector3.new(0, 1.5, 0))}
-            )
-
-            autoFarmTween = tween
-            tween:Play()
-
-            task.spawn(function()
-                tween.Completed:Wait()
-
-                if autoFarmTween ~= tween then return end
-                autoFarmTween = nil
-
-                if not scriptAlive or not Configs.AutoFarm then
-                    currentFarmTarget = nil
-                    return
-                end
-
-                if not target or not target.Parent
-                    or target:GetAttribute("Collected") then
-                    currentFarmTarget = nil
-                    return
-                end
-
-                local currentChar = player.Character
-                local currentRoot = currentChar and currentChar:FindFirstChild("HumanoidRootPart")
-                if currentChar and currentRoot then
-                    TouchFarmCoin(currentChar, currentRoot, target)
-                end
-
-                -- Se o servidor ainda não marcou a moeda, procura novamente
-                -- no próximo ciclo em vez de ficar preso neste alvo.
-                currentFarmTarget = nil
+            pcall(function()
+                root.CFrame = destCFrame
             end)
+        end
+
+        -- Coleta via touch (funciona sem precisar estar exatamente na posição)
+        pcall(function()
+            if target and target.Parent then
+                firetouchinterest(root, target, 0)
+                firetouchinterest(root, target, 1)
+            end
+        end)
+
+        -- Se a moeda sumiu, limpa o target
+        if not target.Parent or target:GetAttribute("Collected") then
+            currentFarmTarget = nil
+            lastTpTarget = nil
         end
     end
 end)
@@ -1625,10 +1585,10 @@ hbConnection = RunService.Heartbeat:Connect(function()
     if not root or not hum then return end
 
     if Configs.AutoFarm then
-        root.AssemblyAngularVelocity = Vector3.zero
-        hum.WalkSpeed    = 0
+        -- Mantém velocidade e pulo zerados durante o farm (sem travar a thread)
+        if hum.WalkSpeed ~= 0 then hum.WalkSpeed = 0 end
+        if hum.JumpPower ~= 0 then hum.JumpPower = 0 end
         hum.UseJumpPower = true
-        hum.JumpPower    = 0
     else
         root.Anchored    = false
         hum.WalkSpeed    = Configs.Speed    and Configs.SpeedValue    or 16
