@@ -33,7 +33,7 @@ local Configs = {
     AutoFarm        = false,
     FightingStyle   = "Current",
     FarmPosition    = "Above NPC",
-    FarmHeightValue = 20,
+    FarmHeightValue = 15,
 
     -- Mastery
     AutoMastery     = false,
@@ -1766,7 +1766,7 @@ createTabBtn("Status")
 createToggle(togglesContainer,        "AutoFarm",      "Farm")
 createDropdown(togglesContainer,      "FightingStyle", "Farm", {"Current","Melee"}, "Current")
 createDropdown(togglesContainer,      "FarmPosition",  "Farm", {"Above NPC","Behind NPC","Front of NPC","Near NPC"}, "Above NPC")
-createCompactSlider(togglesContainer, "FarmHeight",    "Farm", 12, 40, 20)
+createCompactSlider(togglesContainer, "FarmHeight",    "Farm", 5, 40, 8)
 
 -- Mastery
 createToggle(togglesContainer,        "AutoMastery",   "Mastery")
@@ -2215,16 +2215,15 @@ end
 -- ==================== POSICIONAMENTO ====================
 local function GetPositionRelativeToNPC(npcRoot)
     local base = npcRoot.Position
-    local h    = math.clamp(tonumber(Configs.FarmHeightValue) or 20, 12, 40)
+    local h    = math.clamp(tonumber(Configs.FarmHeightValue) or 8, 5, 40)
     local mode = NormalizeFarmPosition(Configs.FarmPosition)
     if mode == "Behind" then
-        return CFrame.new(base - npcRoot.CFrame.LookVector * 7 + Vector3.new(0, h, 0))
+        return CFrame.new(base - npcRoot.CFrame.LookVector * 4 + Vector3.new(0, 3, 0))
     elseif mode == "Front" then
-        return CFrame.new(base + npcRoot.CFrame.LookVector * 7 + Vector3.new(0, h, 0))
+        return CFrame.new(base + npcRoot.CFrame.LookVector * 4 + Vector3.new(0, 3, 0))
     elseif mode == "Near" then
-        return CFrame.new(base + Vector3.new(7, h, 0))
+        return CFrame.new(base + Vector3.new(3, 3, 0))
     else
-        -- Above NPC: keep a fixed vertical offset and never sit on the NPC's head.
         return CFrame.new(base + Vector3.new(0, h, 0))
     end
 end
@@ -2232,33 +2231,30 @@ end
 local function MaintainPositionAboveNPC(force)
     local target = FarmManager.CurrentTarget
     if not IsValidNPC(target) then return false end
+
     local npcRoot = target:FindFirstChild("HumanoidRootPart")
-    local myRoot  = GetRoot()
+    local myRoot = GetRoot()
     if not npcRoot or not myRoot then return false end
 
     local targetCF = GetPositionRelativeToNPC(npcRoot)
     local distance = (myRoot.Position - targetCF.Position).Magnitude
+    local threshold = force and 0 or 6
 
-    -- Only reposition when necessary. While farming, the character remains
-    -- anchored at the high offset instead of repeatedly teleporting every tick.
-    if force or distance > 3 then
+    if distance > threshold then
         pcall(function()
             myRoot.Anchored = false
             myRoot.CFrame = targetCF
             myRoot.AssemblyLinearVelocity = Vector3.zero
             myRoot.AssemblyAngularVelocity = Vector3.zero
-            myRoot.Anchored = true
         end)
     else
         pcall(function()
-            myRoot.Anchored = true
             myRoot.AssemblyLinearVelocity = Vector3.zero
             myRoot.AssemblyAngularVelocity = Vector3.zero
         end)
     end
     return true
 end
-
 local function TravelToPosition(targetCF, label)
     local root = GetRoot()
     if not root then return false end
@@ -2319,18 +2315,8 @@ local function GetCombatRemotes()
     local modules = ReplicatedStorage:FindFirstChild("Modules")
     local net = modules and modules:FindFirstChild("Net")
     if not net then return nil, nil end
-
     local registerAttack = net:FindFirstChild("RE/RegisterAttack")
     local registerHit    = net:FindFirstChild("RE/RegisterHit")
-
-    -- Some revisions expose the remotes nested under Net instead of as direct children.
-    if not registerAttack then
-        registerAttack = net:FindFirstChild("RegisterAttack", true)
-    end
-    if not registerHit then
-        registerHit = net:FindFirstChild("RegisterHit", true)
-    end
-
     if not registerAttack or not registerHit then return nil, nil end
     return registerAttack, registerHit
 end
@@ -2341,49 +2327,75 @@ local function ExecuteKillAura()
 
     local char = GetCharacter()
     local hum = char and char:FindFirstChildOfClass("Humanoid")
-    local root = char and char:FindFirstChild("HumanoidRootPart")
+    local myRoot = char and char:FindFirstChild("HumanoidRootPart")
     local npcHum = target:FindFirstChildOfClass("Humanoid")
     local npcRoot = target:FindFirstChild("HumanoidRootPart")
-    local hitPart = target:FindFirstChild("Head") or npcRoot
-    if not char or not hum or not root or not npcHum or not npcRoot or not hitPart or npcHum.Health <= 0 then
-        return false
-    end
 
-    -- Auto Farm always owns combat now. The Fighting Style is equipped once,
-    -- then RegisterAttack/RegisterHit are fired repeatedly while the character
-    -- remains stationary above the target.
-    EquipFightingStyle()
+    if not char or not hum or not myRoot or not npcHum or not npcRoot then return false end
+    if npcHum.Health <= 0 then return false end
+
     local tool = char:FindFirstChildOfClass("Tool")
-    if not tool then return false end
+    local handle = tool and (tool:FindFirstChild("Handle") or tool:FindFirstChildWhichIsA("BasePart"))
 
-    local attackRemote, hitRemote = GetCombatRemotes()
-    if attackRemote and hitRemote then
+    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+    local commF = remotes and remotes:FindFirstChild("CommF_")
+
+    if commF and commF:IsA("RemoteFunction") then
         local ok = pcall(function()
-            attackRemote:FireServer(0)
-            hitRemote:FireServer(hitPart, {hitPart})
+            commF:InvokeServer("DoDamage", {
+                Target = npcRoot,
+                Humanoid = npcHum,
+                Damage = 1,
+            })
         end)
-        if ok then
-            pcall(function() tool:Activate() end)
-            return true
-        end
 
-        -- Alternate hit payload used by some game revisions.
-        ok = pcall(function()
-            attackRemote:FireServer(0)
-            hitRemote:FireServer(hitPart, {hitPart})
-        end)
-        if ok then
-            pcall(function() tool:Activate() end)
-            return true
+        if not ok then
+            pcall(function()
+                commF:InvokeServer("Combat", npcRoot, npcHum)
+            end)
         end
     end
 
-    -- Last fallback: activate the equipped fighting-style tool.
-    pcall(function() tool:Activate() end)
+    if remotes then
+        local hitEvents = {
+            remotes:FindFirstChild("RE/Attacked"),
+            remotes:FindFirstChild("RE/DoDamage"),
+            remotes:FindFirstChild("RE/Combat"),
+            remotes:FindFirstChild("HitEvent"),
+            remotes:FindFirstChild("Combat"),
+        }
+
+        for _, ev in ipairs(hitEvents) do
+            if ev and ev:IsA("RemoteEvent") then
+                pcall(function()
+                    ev:FireServer(npcRoot, npcHum, 1)
+                end)
+            end
+        end
+    end
+
+    if tool then
+        pcall(function()
+            tool:Activate()
+        end)
+
+        if handle and typeof(firetouchinterest) == "function" then
+            pcall(function()
+                firetouchinterest(handle, npcRoot, 0)
+                firetouchinterest(handle, npcRoot, 1)
+            end)
+        end
+    end
+
+    pcall(function()
+        myRoot.CFrame = CFrame.new(
+            myRoot.Position,
+            Vector3.new(npcRoot.Position.X, myRoot.Position.Y, npcRoot.Position.Z)
+        )
+    end)
+
     return true
 end
-
-
 local function DistributeStats()
     if not Configs.AutoStats then return end
     local pts = GetStatPoints()
@@ -2419,32 +2431,49 @@ local function DistributeStats()
 end
 
 -- ==================== BOSS DETECTION ====================
-local function IsPlayerCharacter(model)
-    if not model or not model:IsA("Model") then return false end
-    return Players:GetPlayerFromCharacter(model) ~= nil
-end
-
 local function FindBoss(bossName)
+    local myChar = player.Character
+    local wantedName = tostring(bossName or "Any"):lower()
+    local searchFolders = {}
     local enemies = workspace:FindFirstChild("Enemies")
-    if not enemies then return nil end
+    if enemies then table.insert(searchFolders, enemies) end
+    table.insert(searchFolders, workspace)
 
-    local wanted = tostring(bossName or "Any"):lower()
-    local root = GetRoot()
-    local best, bestDist = nil, math.huge
+    local best, bestHP = nil, 0
+    local seen = {}
 
-    -- Bosses are searched only inside workspace.Enemies. This prevents the
-    -- selected Boss routine from ever locking onto a player character.
-    for _, model in ipairs(enemies:GetChildren()) do
-        if model:IsA("Model") and not IsPlayerCharacter(model) then
-            local hum = model:FindFirstChildOfClass("Humanoid")
-            local npcRoot = model:FindFirstChild("HumanoidRootPart")
-            local nameMatch = wanted == "any" or model.Name:lower() == wanted or model.Name:lower():find(wanted, 1, true) ~= nil
+    for _, folder in ipairs(searchFolders) do
+        local children = (folder == workspace) and workspace:GetChildren() or folder:GetChildren()
+        for _, model in ipairs(children) do
+            if model:IsA("Model") and not seen[model] then
+                seen[model] = true
+                if model == myChar then continue end
 
-            if nameMatch and hum and hum.Health > 0 and hum.MaxHealth >= 1000 and npcRoot then
-                local dist = root and (root.Position - npcRoot.Position).Magnitude or 0
-                if dist < bestDist then
+                local isPlayer = false
+                for _, p in ipairs(Players:GetPlayers()) do
+                    if p.Character == model then isPlayer = true; break end
+                end
+                if isPlayer then continue end
+
+                local modelNameLower = model.Name:lower()
+                local nameMatch = (wantedName == "any") or modelNameLower:find(wantedName, 1, true)
+                if not nameMatch then continue end
+
+                local hum = model:FindFirstChildOfClass("Humanoid")
+                if not hum or hum.Health <= 0 then continue end
+                if not model:FindFirstChild("HumanoidRootPart") then continue end
+
+                local isBoss = hum.MaxHealth >= 5000
+                if not isBoss then
+                    isBoss = model:GetAttribute("IsBoss") == true
+                        or model:FindFirstChild("BossHealthBar") ~= nil
+                        or model:FindFirstChild("Boss") ~= nil
+                end
+                if not isBoss then continue end
+
+                if hum.Health > bestHP then
+                    bestHP = hum.Health
                     best = model
-                    bestDist = dist
                 end
             end
         end
@@ -2668,11 +2697,8 @@ local function FarmLoop(generation)
             task.wait(0.10)
 
         elseif state == FM_STATES.BOSS_FARM then
-            local bossMode = NormalizeBossMode(Configs.BossSelection)
             local bossName = NormalizeBossName(Configs.BossName or "Any")
-            if bossMode == "Available" or bossMode == "Boss Rotation" then
-                bossName = "Any"
-            end
+            if NormalizeBossMode(Configs.BossSelection) == "Available" then bossName = "Any" end
             local boss = FindBoss(bossName)
             if boss then
                 FarmManager.CurrentTarget = boss
@@ -2805,7 +2831,7 @@ end
 _G.AkatCallbacks.AutoFarm      = function(v) Configs.AutoFarm = v == true; SetFarmModeState() end
 _G.AkatCallbacks.FightingStyle = function(v) Configs.FightingStyle = tostring(v); EquipFightingStyle() end
 _G.AkatCallbacks.FarmPosition  = function(v) Configs.FarmPosition = tostring(v) end
-_G.AkatCallbacks.FarmHeight    = function(v) Configs.FarmHeightValue = math.clamp(tonumber(v) or 20, 12, 40) end
+_G.AkatCallbacks.FarmHeight    = function(v) Configs.FarmHeightValue = math.clamp(tonumber(v) or 8, 5, 40) end
 _G.AkatCallbacks.AutoMastery   = function(v) Configs.AutoMastery = v == true; SetFarmModeState() end
 _G.AkatCallbacks.MasteryType   = function(v) Configs.MasteryType = tostring(v) end
 _G.AkatCallbacks.TargetMastery = function(v) Configs.TargetMastery = math.clamp(math.floor(tonumber(v) or 300), 1, 600) end
