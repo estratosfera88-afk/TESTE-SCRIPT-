@@ -31,9 +31,6 @@ _G.AkatBFLogicRunning = true
 local Configs = {
     -- Farm
     AutoFarm        = false,
-    AutoQuest       = false,
-    AutoLevel       = false,
-    KillAura        = false,
     FightingStyle   = "Current",
     FarmPosition    = "Above NPC",
     FarmHeightValue = 8,
@@ -49,21 +46,8 @@ local Configs = {
     BossName        = "Any",
     BossQuest       = false,
 
-    -- Material
-    AutoMaterial    = false,
-    MaterialSelection = "Any",
-    MaterialAmount  = 100,
 
-    -- Fruit
-    DetectFruit     = false,
-    FruitNotification = true,
-    FruitFilter     = "Any",
-    SelectedFruit   = "Any",
 
-    -- Sea Event
-    AutoSeaEvent    = false,
-    EventSelection  = "Any",
-    SelectedEvent   = "Any",
 
     -- Stats
     AutoStats       = false,
@@ -71,20 +55,7 @@ local Configs = {
     SecondaryStat   = "Defense",
     TertiaryStat    = "Melee",
 
-    -- Server
-    AutoServerSearch = false,
-    ServerReason    = "Boss",
 
-    -- Player
-    Speed           = false,
-    SpeedValue      = 16,
-    JumpPower       = false,
-    JumpPowerValue  = 50,
-    AntiFling       = false,
-    ESP             = false,
-    Name            = false,
-    Tracer          = false,
-    ViewReach       = false,
     Debug           = false,
 }
 _G.Configs = Configs
@@ -100,20 +71,12 @@ local UI_TEXT = {
         Farm     = "Farm",
         Mastery  = "Mastery",
         Boss     = "Boss",
-        Material = "Material",
-        Fruit    = "Fruit",
-        Events   = "Sea Events",
         Stats    = "Stats",
-        Server   = "Server",
         Status   = "Status",
-        Player   = "Player",
     },
     Options = {
         AutoFarm        = {Title="Auto Farm",       Desc="Farm Manager central: coordena Quest, alvo, combate e progressão."},
-        AutoQuest       = {Title="Auto Quest",      Desc="Obtém e renova automaticamente a Quest usada pelo Farm Manager."},
-        AutoLevel       = {Title="Auto Level",      Desc="Atualiza área e Quest quando o Level do jogador muda."},
         FightingStyle   = {Title="Fighting Style",  Desc="Estilo de combate utilizado. 'Current' mantém o equipado."},
-        KillAura        = {Title="Kill Aura",       Desc="Ataca o alvo automaticamente enquanto o Farm Manager posiciona."},
         FarmPosition    = {Title="Farm Position",   Desc="Posição relativa ao NPC: Above, Behind, Front ou Near."},
         FarmHeight      = {Title="Farm Height",     Desc="Distância vertical usada quando a posição é Above NPC."},
         AutoMastery     = {Title="Auto Mastery",    Desc="Farma até atingir a Mastery configurada."},
@@ -123,29 +86,10 @@ local UI_TEXT = {
         BossSelection   = {Title="Boss Mode",       Desc="Boss selecionado, qualquer Boss disponível ou rotação."},
         BossName        = {Title="Boss",            Desc="Nome do Boss quando o modo Selected Boss for usado."},
         BossQuest       = {Title="Boss Quest",      Desc="Prioriza a Quest do Boss quando disponível."},
-        AutoMaterial    = {Title="Auto Material",   Desc="Farma o material selecionado até atingir a quantidade."},
-        MaterialSelection = {Title="Material",      Desc="Material desejado; Any usa a melhor fonte detectável."},
-        MaterialAmount  = {Title="Amount",          Desc="Quantidade desejada no inventário."},
-        DetectFruit     = {Title="Detect Fruit",    Desc="Monitora frutas no ambiente."},
-        FruitNotification = {Title="Fruit Notif",  Desc="Notifica quando uma fruta relevante for detectada."},
-        FruitFilter     = {Title="Fruit Filter",    Desc="Any ou uma fruta específica."},
-        SelectedFruit   = {Title="Selected Fruit",  Desc="Fruta específica a ser procurada."},
-        AutoSeaEvent    = {Title="Auto Sea Event",  Desc="Monitora e enfrenta eventos de mar detectados."},
-        EventSelection  = {Title="Event Selection", Desc="Any ou evento selecionado."},
-        SelectedEvent   = {Title="Selected Event",  Desc="Evento específico quando disponível."},
         AutoStats       = {Title="Auto Stats",      Desc="Distribui pontos conforme as três prioridades."},
         PrimaryStat     = {Title="Primary",         Desc="Primeira prioridade de distribuição."},
         SecondaryStat   = {Title="Secondary",       Desc="Segunda prioridade de distribuição."},
         TertiaryStat    = {Title="Tertiary",        Desc="Terceira prioridade de distribuição."},
-        AutoServerSearch = {Title="Auto Server",   Desc="Solicita troca de servidor quando a condição exigir."},
-        ServerReason    = {Title="Reason",          Desc="Boss, Event, Material, Fruit ou Other."},
-        Speed           = {Title="Speed",           Desc="Velocidade do personagem quando o Farm não estiver ativo."},
-        JumpPower       = {Title="Jump Power",      Desc="Força de pulo quando o Farm não estiver ativo."},
-        AntiFling       = {Title="Anti-Fling",      Desc="Reduz impulsos físicos excessivos no personagem."},
-        ESP             = {Title="Player ESP",      Desc="Destaca jogadores visíveis."},
-        Name            = {Title="Name ESP",        Desc="Exibe nomes acima dos jogadores."},
-        Tracer          = {Title="Tracer ESP",      Desc="Mostra linhas até jogadores."},
-        ViewReach       = {Title="View Reach",      Desc="Visualização local do alcance configurado."},
         CurrentTask     = {Title="Current Task",    Desc="Tarefa atual do Farm Manager."},
         CurrentTarget   = {Title="Current Target",  Desc="NPC ou objetivo atual."},
         CurrentQuest    = {Title="Current Quest",   Desc="Quest atual."},
@@ -1166,11 +1110,12 @@ local function filterToggles(currentActiveTab, query)
     for _, child in ipairs(togglesContainer:GetChildren()) do
         if child:IsA("Frame") and child.Name ~= "UIListLayout" and child.Name ~= "UIPadding" then
             local itemTab     = child:GetAttribute("Tab") or "Farm"
+            local validTab = tabButtons[itemTab] ~= nil
             local visible
             if searchQuery ~= "" then
                 local t = child:FindFirstChild("Title")
                 local d = child:FindFirstChild("Description")
-                visible = (t and t.Text:lower():find(searchQuery) ~= nil) or (d and d.Text:lower():find(searchQuery) ~= nil)
+                visible = validTab and ((t and t.Text:lower():find(searchQuery) ~= nil) or (d and d.Text:lower():find(searchQuery) ~= nil))
             else
                 visible = (itemTab == currentActiveTab)
             end
@@ -1813,60 +1758,32 @@ end)
 createTabBtn("Farm")
 createTabBtn("Mastery")
 createTabBtn("Boss")
-createTabBtn("Material")
-createTabBtn("Fruit")
-createTabBtn("Events")
 createTabBtn("Stats")
-createTabBtn("Server")
 createTabBtn("Status")
-createTabBtn("Player")
 
 -- ==================== CONTEÚDO DAS ABAS ====================
--- Farm
-createToggle(togglesContainer,        "AutoFarm",        "Farm")
-createToggle(togglesContainer,        "AutoQuest",       "Farm")
-createToggle(togglesContainer,        "AutoLevel",       "Farm")
-createDropdown(togglesContainer,      "FightingStyle",   "Farm", {"Current","Melee","Fighting Style"}, "Current")
-createToggle(togglesContainer,        "KillAura",        "Farm")
-createDropdown(togglesContainer,      "FarmPosition",    "Farm", {"Above NPC","Behind NPC","Front of NPC","Near NPC"}, "Above NPC")
-createCompactSlider(togglesContainer, "FarmHeight",      "Farm", 3, 30, 8)
+-- Farm: Quest, Level e ataque são internos ao Auto Farm.
+createToggle(togglesContainer,        "AutoFarm",      "Farm")
+createDropdown(togglesContainer,      "FightingStyle", "Farm", {"Current","Melee"}, "Current")
+createDropdown(togglesContainer,      "FarmPosition",  "Farm", {"Above NPC","Behind NPC","Front of NPC","Near NPC"}, "Above NPC")
+createCompactSlider(togglesContainer, "FarmHeight",    "Farm", 5, 40, 8)
 
 -- Mastery
-createToggle(togglesContainer,        "AutoMastery",     "Mastery")
-createDropdown(togglesContainer,      "MasteryType",     "Mastery", {"Fighting Style","Sword","Gun","Blox Fruit"}, "Fighting Style")
-createCompactSlider(togglesContainer, "TargetMastery",   "Mastery", 1, 600, 300)
+createToggle(togglesContainer,        "AutoMastery",   "Mastery")
+createDropdown(togglesContainer,      "MasteryType",   "Mastery", {"Fighting Style","Sword","Gun","Blox Fruit"}, "Fighting Style")
+createCompactSlider(togglesContainer, "TargetMastery", "Mastery", 1, 600, 300)
 
 -- Boss
-createToggle(togglesContainer,        "AutoBoss",        "Boss")
-createDropdown(togglesContainer,      "BossSelection",   "Boss", {"Available Boss","Selected Boss","Boss Rotation"}, "Available Boss")
-createDropdown(togglesContainer,      "BossName",        "Boss", {"Any Boss","Saber Expert","Mob Leader","Vice Admiral","Warden","Chief Warden","Swan","Don Swan","Diamond","Jeremy","Smoke Admiral","Cursed Captain","Awakened Ice Admiral","Tide Keeper","Stone","Island Empress","Beautiful Pirate","Longma","Cake Queen","Cake Prince","Rip Indra"}, "Any Boss")
-createToggle(togglesContainer,        "BossQuest",       "Boss")
-
--- Material
-createToggle(togglesContainer,        "AutoMaterial",    "Material")
-createDropdown(togglesContainer,      "MaterialSelection","Material", {"Any","Scrap Metal","Leather","Angel Wings","Magma Ore","Mystic Droplet","Radioactive Material","Vampire Fang","Ectoplasm"}, "Any")
-createCompactSlider(togglesContainer, "MaterialAmount",  "Material", 1, 10000, 100)
-
--- Fruit
-createToggle(togglesContainer,        "DetectFruit",     "Fruit")
-createToggle(togglesContainer,        "FruitNotification","Fruit")
-createDropdown(togglesContainer,      "FruitFilter",     "Fruit", {"Any","Selected Fruit"}, "Any")
-createDropdown(togglesContainer,      "SelectedFruit",   "Fruit", {"Any","Rocket Fruit","Spin Fruit","Chop Fruit","Spring Fruit","Bomb Fruit","Smoke Fruit","Flame Fruit","Ice Fruit","Sand Fruit","Dark Fruit","Light Fruit","Magma Fruit","Quake Fruit","Buddha Fruit","Love Fruit","Spider Fruit","Phoenix Fruit","Portal Fruit","Rumble Fruit","Pain Fruit","Blizzard Fruit","Gravity Fruit","Mammoth Fruit","T-Rex Fruit","Dough Fruit","Kitsune Fruit","Yeti Fruit"}, "Any")
-
--- Events
-createToggle(togglesContainer,        "AutoSeaEvent",    "Events")
-createDropdown(togglesContainer,      "EventSelection",  "Events", {"Any","Selected Event"}, "Any")
-createDropdown(togglesContainer,      "SelectedEvent",   "Events", {"Any","Mirage Island","Ship Raid","Sea Beast","Terrorshark","Leviathan"}, "Any")
+createToggle(togglesContainer,        "AutoBoss",      "Boss")
+createDropdown(togglesContainer,      "BossSelection", "Boss", {"Available Boss","Selected Boss","Boss Rotation"}, "Available Boss")
+createDropdown(togglesContainer,      "BossName",      "Boss", {"Any Boss","Saber Expert","Mob Leader","Vice Admiral","Warden","Chief Warden","Swan","Don Swan","Diamond","Jeremy","Smoke Admiral","Cursed Captain","Awakened Ice Admiral","Tide Keeper","Stone","Island Empress","Beautiful Pirate","Longma","Cake Queen","Cake Prince","Rip Indra"}, "Any Boss")
+createToggle(togglesContainer,        "BossQuest",     "Boss")
 
 -- Stats
-createToggle(togglesContainer,        "AutoStats",       "Stats")
-createDropdown(togglesContainer,      "PrimaryStat",     "Stats", {"Blox Fruit","Defense","Melee","Sword","Gun"}, "Blox Fruit")
-createDropdown(togglesContainer,      "SecondaryStat",   "Stats", {"Defense","Melee","Blox Fruit","Sword","Gun"}, "Defense")
-createDropdown(togglesContainer,      "TertiaryStat",    "Stats", {"Melee","Defense","Blox Fruit","Sword","Gun"}, "Melee")
-
--- Server
-createToggle(togglesContainer,        "AutoServerSearch","Server")
-createDropdown(togglesContainer,      "ServerReason",    "Server", {"Boss","Event","Material","Fruit","Other"}, "Boss")
+createToggle(togglesContainer,        "AutoStats",     "Stats")
+createDropdown(togglesContainer,      "PrimaryStat",   "Stats", {"Blox Fruit","Defense","Melee","Sword","Gun"}, "Blox Fruit")
+createDropdown(togglesContainer,      "SecondaryStat", "Stats", {"Defense","Melee","Blox Fruit","Sword","Gun"}, "Defense")
+createDropdown(togglesContainer,      "TertiaryStat",  "Stats", {"Melee","Defense","Blox Fruit","Sword","Gun"}, "Melee")
 
 -- Status
 createStatusRow(togglesContainer, "State",         "Status")
@@ -1876,15 +1793,6 @@ createStatusRow(togglesContainer, "CurrentQuest",  "Status")
 createStatusRow(togglesContainer, "CurrentArea",   "Status")
 createStatusRow(togglesContainer, "Level",         "Status")
 createStatusRow(togglesContainer, "Progress",      "Status")
-
--- Player
-createCompactSlider(togglesContainer, "Speed",      "Player", 16, 100, 16)
-createCompactSlider(togglesContainer, "JumpPower",  "Player", 50, 150, 50)
-createCompactToggle(togglesContainer, "AntiFling",  "Player")
-createCompactToggle(togglesContainer, "ESP",        "Player")
-createCompactToggle(togglesContainer, "Name",       "Player")
-createCompactToggle(togglesContainer, "Tracer",     "Player")
-createCompactToggle(togglesContainer, "ViewReach",  "Player")
 
 -- ==================== STATUS LIVE ====================
 task.spawn(function()
@@ -1916,7 +1824,7 @@ end)
 
 -- ==================== HELPERS DE COMPATIBILIDADE ====================
 local function IsAnyFarmModeEnabled()
-    return Configs.AutoFarm or Configs.AutoMastery or Configs.AutoBoss or Configs.AutoMaterial
+    return Configs.AutoFarm or Configs.AutoMastery or Configs.AutoBoss
 end
 
 local function NormalizeFarmPosition(value)
@@ -1957,10 +1865,6 @@ local function NormalizeStat(value)
     return "Melee"
 end
 
-local function NormalizeMaterial(value)
-    local v = tostring(value or "Any")
-    return (v == "" or v == "nil") and "Any" or v
-end
 
 -- ==================== ESTADOS DA MÁQUINA ====================
 local FM_STATES = {
@@ -1979,7 +1883,6 @@ local FM_STATES = {
     CHANGE_AREA    = "Area Changed",
     MASTERY_FARM   = "Mastery Farm",
     BOSS_FARM      = "Boss Farm",
-    MATERIAL_FARM  = "Material Farm",
     ERROR_RECOVERY = "Error Recovery",
     COMPLETED      = "Completed",
     STOPPED        = "Stopped",
@@ -2050,11 +1953,15 @@ end
 
 local function GetStatPoints()
     local ok, pts = pcall(function()
-        local ls = player:FindFirstChild("leaderstats")
-        if ls then
-            local sp = ls:FindFirstChild("StatPoints") or ls:FindFirstChild("Stat Points")
-            if sp then return sp.Value end
+        local containers = {player:FindFirstChild("leaderstats"), player:FindFirstChild("Data"), player:FindFirstChild("PlayerData")}
+        for _, container in ipairs(containers) do
+            if container then
+                local sp = container:FindFirstChild("StatPoints") or container:FindFirstChild("Stat Points") or container:FindFirstChild("Points")
+                if sp and (sp:IsA("IntValue") or sp:IsA("NumberValue")) then return sp.Value end
+            end
         end
+        local attrs = {player:GetAttribute("StatPoints"), player:GetAttribute("Stat Points"), player:GetAttribute("Points")}
+        for _, value in ipairs(attrs) do if type(value) == "number" then return value end end
         return 0
     end)
     return ok and pts or 0
@@ -2063,11 +1970,25 @@ end
 local function GetMastery(itemType)
     local ok, m = pcall(function()
         local char = GetCharacter()
-        if not char then return 0 end
-        for _, obj in ipairs(char:GetChildren()) do
-            if obj:IsA("Tool") then
-                local v = obj:GetAttribute("Mastery") or obj:GetAttribute("Level") or obj:GetAttribute("MasteryLevel")
-                if type(v) == "number" then return v end
+        local bp = player:FindFirstChildOfClass("Backpack")
+        local requested = NormalizeMasteryType(itemType)
+        local function readTool(tool)
+            if not tool or not tool:IsA("Tool") then return nil end
+            local n = tool.Name:lower()
+            local tip = tostring(tool.ToolTip or ""):lower()
+            if requested == "Sword" and not (tip == "sword" or n:find("sword", 1, true)) then return nil end
+            if requested == "Gun" and not (tip == "gun" or n:find("gun", 1, true)) then return nil end
+            if requested == "BloxFruit" and not (tip:find("blox", 1, true) or tip:find("fruit", 1, true) or n:find("fruit", 1, true)) then return nil end
+            if requested == "FightingStyle" and not (tip == "melee" or n:find("fighting", 1, true) or n:find("combat", 1, true)) then return nil end
+            local v = tool:GetAttribute("Mastery") or tool:GetAttribute("MasteryLevel") or tool:GetAttribute("Level")
+            return type(v) == "number" and v or nil
+        end
+        for _, container in ipairs({char, bp}) do
+            if container then
+                for _, obj in ipairs(container:GetChildren()) do
+                    local value = readTool(obj)
+                    if value ~= nil then return value end
+                end
             end
         end
         return 0
@@ -2153,16 +2074,31 @@ end
 local function FindBestNPC(npcName, maxDistance)
     local root = GetRoot()
     if not root then return nil end
-    maxDistance = maxDistance or 600
+    maxDistance = maxDistance or 800
+
+    local folders = {}
+    local enemies = workspace:FindFirstChild("Enemies")
+    if enemies then table.insert(folders, enemies) end
+    table.insert(folders, workspace) -- fallback for revisions that do not expose workspace.Enemies
+
     local best, bestDist = nil, math.huge
-    for _, model in ipairs(workspace:GetDescendants()) do
-        if model:IsA("Model") then
-            local nameMatch = (not npcName or npcName == "Any") or model.Name:lower():find(npcName:lower(), 1, true)
-            if nameMatch and IsValidNPC(model) then
-                local r = model:FindFirstChild("HumanoidRootPart")
-                if r then
-                    local dist = (root.Position - r.Position).Magnitude
-                    if dist < bestDist and dist < maxDistance then bestDist = dist; best = model end
+    local seen = {}
+    local wanted = tostring(npcName or "Any"):lower()
+
+    for _, folder in ipairs(folders) do
+        for _, model in ipairs(folder:GetChildren()) do
+            if model:IsA("Model") and not seen[model] then
+                seen[model] = true
+                local nameMatch = (wanted == "any") or model.Name:lower():find(wanted, 1, true) ~= nil
+                if nameMatch and IsValidNPC(model) then
+                    local r = model:FindFirstChild("HumanoidRootPart")
+                    if r then
+                        local dist = (root.Position - r.Position).Magnitude
+                        if dist < bestDist and dist <= maxDistance then
+                            bestDist = dist
+                            best = model
+                        end
+                    end
                 end
             end
         end
@@ -2187,17 +2123,38 @@ end
 local function FindQuestGiver(npcName)
     local myRoot = GetRoot()
     if not myRoot then return nil end
-    local best, bestDist = nil, math.huge
     local wanted = tostring(npcName or ""):lower()
-    for _, model in ipairs(workspace:GetDescendants()) do
-        if model:IsA("Model") then
-            local n = model.Name:lower()
-            local isCandidate = n:find("quest") or (wanted ~= "" and n:find(wanted, 1, true))
-            local root = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Head")
-            if isCandidate and root then
-                local dist = (myRoot.Position - root.Position).Magnitude
-                if dist < bestDist then best = model; bestDist = dist end
-            end
+    local best, bestScore = nil, -math.huge
+
+    local function scoreCandidate(model)
+        if not model or not model:IsA("Model") then return end
+        local n = model.Name:lower()
+        local root = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Head")
+        if not root then return end
+        local hasPrompt, hasClick = false, false
+        for _, obj in ipairs(model:GetDescendants()) do
+            if obj:IsA("ProximityPrompt") then hasPrompt = true elseif obj:IsA("ClickDetector") then hasClick = true end
+            if hasPrompt and hasClick then break end
+        end
+        local hasQuestWord = n:find("quest", 1, true) ~= nil
+        local hasNpcName = wanted ~= "" and n:find(wanted, 1, true) ~= nil
+        if not hasQuestWord and not (hasNpcName and (hasPrompt or hasClick)) then return end
+        local dist = (myRoot.Position - root.Position).Magnitude
+        local score = 0
+        if hasQuestWord then score += 100000 end
+        if hasNpcName then score += 20000 end
+        if hasPrompt then score += 5000 end
+        if hasClick then score += 2500 end
+        score -= dist
+        if score > bestScore then best, bestScore = model, score end
+    end
+
+    local enemies = workspace:FindFirstChild("Enemies")
+    for _, model in ipairs(workspace:GetDescendants()) do scoreCandidate(model) end
+    if enemies then
+        for _, model in ipairs(enemies:GetChildren()) do
+            -- Never prefer a combat NPC over a real quest giver.
+            if model:IsA("Model") and model.Name:lower():find("quest", 1, true) then scoreCandidate(model) end
         end
     end
     return best
@@ -2206,6 +2163,9 @@ end
 local function HasActiveQuest()
     local ok, result = pcall(function()
         local gui = player:FindFirstChild("PlayerGui")
+        local main = gui and gui:FindFirstChild("Main")
+        local quest = main and main:FindFirstChild("Quest")
+        if quest and quest.Visible then return true end
         if gui then
             local qFrame = gui:FindFirstChild("QuestFrame", true)
             if qFrame and qFrame.Visible then return true end
@@ -2233,14 +2193,14 @@ local function AcceptQuest(questGiver)
     end
     if not interacted then
         pcall(function()
-            local re = ReplicatedStorage:FindFirstChild("Remotes", true) or ReplicatedStorage:FindFirstChild("Events", true)
-            if re then
-                local ev = re:FindFirstChild("QuestAccept") or re:FindFirstChild("AcceptQuest") or re:FindFirstChild("Quest")
-                if ev then
-                    if ev:IsA("RemoteEvent") then ev:FireServer(questGiver)
-                    elseif ev:IsA("RemoteFunction") then ev:InvokeServer(questGiver) end
-                    interacted = true
-                end
+            local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+            local commF = remotes and remotes:FindFirstChild("CommF_")
+            local areaData = GetAreaData(FarmManager.Level)
+            if commF and areaData and commF:IsA("RemoteFunction") then
+                -- The quest giver name is retained as the primary locator; StartQuest is a fallback only.
+                local questName = areaData.questName or tostring(areaData.area):gsub("[%s%-]", "") .. "Quest"
+                commF:InvokeServer("StartQuest", questName, areaData.questIndex or 1)
+                interacted = true
             end
         end)
     end
@@ -2255,29 +2215,42 @@ end
 -- ==================== POSICIONAMENTO ====================
 local function GetPositionRelativeToNPC(npcRoot)
     local base = npcRoot.Position
-    local h    = Configs.FarmHeightValue or 8
+    local h    = math.clamp(tonumber(Configs.FarmHeightValue) or 8, 5, 40)
     local mode = NormalizeFarmPosition(Configs.FarmPosition)
     if mode == "Behind" then
-        return CFrame.new(base + npcRoot.CFrame.LookVector * -3 + Vector3.new(0, 2, 0))
+        return CFrame.new(base - npcRoot.CFrame.LookVector * 4 + Vector3.new(0, 3, 0))
     elseif mode == "Front" then
-        return CFrame.new(base + npcRoot.CFrame.LookVector * 3 + Vector3.new(0, 2, 0))
+        return CFrame.new(base + npcRoot.CFrame.LookVector * 4 + Vector3.new(0, 3, 0))
     elseif mode == "Near" then
-        return CFrame.new(base + Vector3.new(2, 2, 2))
-    else -- Above
+        return CFrame.new(base + Vector3.new(3, 3, 0))
+    else
         return CFrame.new(base + Vector3.new(0, h, 0))
     end
 end
 
-local function MaintainPositionAboveNPC()
+local function MaintainPositionAboveNPC(force)
     local target = FarmManager.CurrentTarget
-    if not target or not target.Parent then return false end
+    if not IsValidNPC(target) then return false end
     local npcRoot = target:FindFirstChild("HumanoidRootPart")
-    if not npcRoot then return false end
-    local myRoot = GetRoot()
-    if not myRoot then return false end
+    local myRoot  = GetRoot()
+    if not npcRoot or not myRoot then return false end
+
     local targetCF = GetPositionRelativeToNPC(npcRoot)
-    if (myRoot.Position - targetCF.Position).Magnitude > 4 then
-        pcall(function() myRoot.CFrame = targetCF end)
+    local distance = (myRoot.Position - targetCF.Position).Magnitude
+    if force or distance > 2.5 then
+        pcall(function()
+            myRoot.Anchored = false
+            myRoot.CFrame = targetCF
+            myRoot.AssemblyLinearVelocity = Vector3.zero
+            myRoot.AssemblyAngularVelocity = Vector3.zero
+            myRoot.Anchored = true
+        end)
+    else
+        pcall(function()
+            myRoot.Anchored = true
+            myRoot.AssemblyLinearVelocity = Vector3.zero
+            myRoot.AssemblyAngularVelocity = Vector3.zero
+        end)
     end
     return true
 end
@@ -2285,72 +2258,149 @@ end
 local function TravelToPosition(targetCF, label)
     local root = GetRoot()
     if not root then return false end
-    FarmManager.State = FM_STATES.TRAVEL
-    FarmManager.Task  = "Traveling" .. (label and (" to " .. label) or "")
-    pcall(function() root.CFrame = targetCF end)
-    task.wait(0.35)
-    return true
+    pcall(function() root.Anchored = false end)
+    FarmManager.Task = "Traveling" .. (label and (" to " .. label) or "")
+    local ok = pcall(function()
+        root.CFrame = targetCF
+        root.AssemblyLinearVelocity = Vector3.zero
+        root.AssemblyAngularVelocity = Vector3.zero
+    end)
+    task.wait(0.20)
+    return ok
 end
 
 -- ==================== FIGHTING STYLE ====================
-local function EquipFightingStyle()
-    if Configs.FightingStyle == "Current" then return true end
-    pcall(function()
-        local char = GetCharacter()
-        local hum  = char and char:FindFirstChildOfClass("Humanoid")
-        local bp   = player:FindFirstChildOfClass("Backpack")
-        if not hum or not bp then return end
-        local styleName = Configs.FightingStyle:lower()
-        for _, tool in ipairs(bp:GetChildren()) do
-            if tool:IsA("Tool") and tool.Name:lower():find(styleName, 1, true) then
-                hum:EquipTool(tool); task.wait(0.15); break
+local function FindToolMatchingStyle(char, bp, requested)
+    requested = tostring(requested or "Current"):lower()
+    local candidates = {}
+    local function inspect(container)
+        if not container then return end
+        for _, tool in ipairs(container:GetChildren()) do
+            if tool:IsA("Tool") then
+                local n = tool.Name:lower()
+                local tip = tostring(tool.ToolTip or ""):lower()
+                if requested == "melee" then
+                    if tip == "melee" or n:find("fighting", 1, true) or n:find("combat", 1, true) then
+                        table.insert(candidates, tool)
+                    end
+                elseif n:find(requested, 1, true) then
+                    table.insert(candidates, tool)
+                end
             end
         end
-    end)
+    end
+    inspect(char); inspect(bp)
+    return candidates[1]
 end
 
--- ==================== KILL AURA ====================
+local function EquipFightingStyle()
+    local requested = tostring(Configs.FightingStyle or "Current")
+    if requested == "Current" then
+        return GetCharacter() and GetCharacter():FindFirstChildOfClass("Tool") ~= nil
+    end
+    local char = GetCharacter()
+    local hum  = char and char:FindFirstChildOfClass("Humanoid")
+    local bp   = player:FindFirstChildOfClass("Backpack")
+    if not char or not hum then return false end
+    local tool = FindToolMatchingStyle(char, bp, requested)
+    if not tool then return false end
+    if tool.Parent ~= char then
+        pcall(function() hum:EquipTool(tool) end)
+    end
+    return true
+end
+
+-- ==================== KILL AURA / COMBAT ====================
+local function GetCombatRemotes()
+    local modules = ReplicatedStorage:FindFirstChild("Modules")
+    local net = modules and modules:FindFirstChild("Net")
+    if not net then return nil, nil end
+    local registerAttack = net:FindFirstChild("RE/RegisterAttack")
+    local registerHit    = net:FindFirstChild("RE/RegisterHit")
+    if not registerAttack or not registerHit then return nil, nil end
+    return registerAttack, registerHit
+end
+
 local function ExecuteKillAura()
-    if not Configs.KillAura then return end
     local target = FarmManager.CurrentTarget
-    if not target or not target.Parent then return end
-    local char   = GetCharacter()
-    if not char then return end
+    if not IsValidNPC(target) then return false end
+    local char = GetCharacter()
+    local hum  = char and char:FindFirstChildOfClass("Humanoid")
+    local root = char and char:FindFirstChild("HumanoidRootPart")
     local npcHum  = target:FindFirstChildOfClass("Humanoid")
     local npcRoot = target:FindFirstChild("HumanoidRootPart")
-    if not npcHum or npcHum.Health <= 0 or not npcRoot then FarmManager.CurrentTarget = nil; return end
-    pcall(function()
-        for _, tool in ipairs(char:GetChildren()) do
-            if tool:IsA("Tool") then
-                local handle = tool:FindFirstChild("Handle") or tool:FindFirstChildOfClass("BasePart")
-                if handle then
-                    firetouchinterest(npcRoot, handle, 0)
-                    firetouchinterest(npcRoot, handle, 1)
-                end
+    local head    = target:FindFirstChild("Head") or npcRoot
+    local tool    = char and char:FindFirstChildOfClass("Tool")
+    if not char or not hum or not root or not npcHum or not npcRoot or not head or npcHum.Health <= 0 then
+        return false
+    end
+
+    -- Preferred path: Blox Fruits' combat net remotes.
+    local attackRemote, hitRemote = GetCombatRemotes()
+    if attackRemote and hitRemote and head:IsA("BasePart") then
+        local hitList = {{target, head}}
+        local ok = pcall(function()
+            attackRemote:FireServer(0)
+            hitRemote:FireServer(head, hitList)
+        end)
+        if ok then
+            if tool and tool:IsDescendantOf(char) then
                 pcall(function() tool:Activate() end)
-                break
             end
+            return true
         end
-    end)
+    end
+
+    -- Fallback for executors / game revisions exposing touch helpers.
+    if tool then
+        local handle = tool:FindFirstChild("Handle") or tool:FindFirstChildWhichIsA("BasePart")
+        if handle and typeof(firetouchinterest) == "function" then
+            pcall(function()
+                firetouchinterest(handle, npcRoot, 0)
+                firetouchinterest(handle, npcRoot, 1)
+            end)
+            pcall(function() tool:Activate() end)
+            return true
+        end
+    end
+
+    if tool then
+        pcall(function() tool:Activate() end)
+        return true
+    end
+    return false
 end
 
--- ==================== AUTO STATS ====================
+
 local function DistributeStats()
     if not Configs.AutoStats then return end
     local pts = GetStatPoints()
     if pts <= 0 then return end
-    local priority = {Configs.PrimaryStat, Configs.SecondaryStat, Configs.TertiaryStat}
-    local statMap  = {BloxFruit="Fruit", Defense="Defense", Melee="Melee", Sword="Sword", Gun="Gun"}
+
+    local priority = {NormalizeStat(Configs.PrimaryStat), NormalizeStat(Configs.SecondaryStat), NormalizeStat(Configs.TertiaryStat)}
+    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+    local commF = remotes and remotes:FindFirstChild("CommF_")
+
+    if commF and commF:IsA("RemoteFunction") then
+        pcall(function()
+            for i = 1, pts do
+                local stat = priority[(i - 1) % #priority + 1]
+                commF:InvokeServer("AddPoint", stat, 1)
+                task.wait(0.06)
+            end
+        end)
+        return
+    end
+
     pcall(function()
         local re = ReplicatedStorage:FindFirstChild("Remotes", true)
         if not re then return end
         local ev = re:FindFirstChild("StatUpdate") or re:FindFirstChild("AddStat") or re:FindFirstChild("DistributeStat")
         if not ev then return end
         for i = 1, pts do
-            local key    = priority[(i - 1) % #priority + 1]
-            local mapped = statMap[NormalizeStat(key)] or "Melee"
-            if ev:IsA("RemoteEvent") then ev:FireServer(mapped)
-            elseif ev:IsA("RemoteFunction") then ev:InvokeServer(mapped) end
+            local stat = priority[(i - 1) % #priority + 1]
+            if ev:IsA("RemoteEvent") then ev:FireServer(stat)
+            elseif ev:IsA("RemoteFunction") then ev:InvokeServer(stat) end
             task.wait(0.1)
         end
     end)
@@ -2368,46 +2418,6 @@ local function FindBoss(bossName)
         end
     end
     return nil
-end
-
--- ==================== FRUIT / SEA EVENT SCAN ====================
-local fruitNotifCooldown = {}
-
-local function ScanFruits()
-    if not Configs.DetectFruit then return end
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart") and obj.Transparency < 0.5 then
-            local n = obj.Name:lower()
-            if n:find("fruit") or n:find("devil") then
-                local filter  = tostring(Configs.FruitFilter or "Any")
-                local matches = filter == "Any" or obj.Name:lower():find(filter:lower(), 1, true) ~= nil
-                if matches and not fruitNotifCooldown[obj] then
-                    fruitNotifCooldown[obj] = true
-                    if Configs.FruitNotification then
-                        CriarNotificacao("FRUIT DETECTED", obj.Name .. " encontrada próxima!")
-                    end
-                    task.delay(30, function() fruitNotifCooldown[obj] = nil end)
-                end
-            end
-        end
-    end
-end
-
-local function ScanSeaEvents()
-    if not Configs.AutoSeaEvent then return end
-    local keywords = {"Raid","Kitsune","Ship","Tide","Storm","Leviathan","Terrorshark"}
-    for _, model in ipairs(workspace:GetDescendants()) do
-        if model:IsA("Model") then
-            for _, kw in ipairs(keywords) do
-                if model.Name:lower():find(kw:lower(), 1, true) then
-                    local wanted = Configs.SelectedEvent or "Any"
-                    if wanted == "Any" or model.Name:lower():find(wanted:lower(), 1, true) then
-                        FarmManager.Task = "Sea Event: " .. model.Name
-                    end
-                end
-            end
-        end
-    end
 end
 
 -- ==================== STOP FARM ====================
@@ -2432,7 +2442,6 @@ local function StopFarm()
         local char = GetCharacter()
         local hum  = char and char:FindFirstChildOfClass("Humanoid")
         local root = char and char:FindFirstChild("HumanoidRootPart")
-        if hum  then hum.WalkSpeed = 16; hum.UseJumpPower = true; hum.JumpPower = 50 end
         if root then root.Anchored = false; root.AssemblyLinearVelocity = Vector3.zero; root.AssemblyAngularVelocity = Vector3.zero end
     end)
     UpdateFarmStatus()
@@ -2474,7 +2483,6 @@ local function FarmLoop(generation)
             end
             if    Configs.AutoBoss     then FarmManager.Mode = "Boss";     FarmManager.State = FM_STATES.BOSS_FARM
             elseif Configs.AutoMastery then FarmManager.Mode = "Mastery";  FarmManager.State = FM_STATES.MASTERY_FARM
-            elseif Configs.AutoMaterial then FarmManager.Mode = "Material"; FarmManager.State = FM_STATES.MATERIAL_FARM
             else                             FarmManager.Mode = "Level";   FarmManager.State = FM_STATES.FIND_QUEST
             end
             EquipFightingStyle()
@@ -2482,7 +2490,7 @@ local function FarmLoop(generation)
             task.wait(0.2)
 
         elseif state == FM_STATES.FIND_QUEST then
-            if not Configs.AutoQuest or HasActiveQuest() then
+            if HasActiveQuest() then
                 FarmManager.State = FM_STATES.FIND_TARGET
             else
                 local areaData = GetAreaData(FarmManager.Level)
@@ -2549,22 +2557,32 @@ local function FarmLoop(generation)
                 FarmManager.Progress = math.floor((FarmManager.KillCount / math.max(1, FarmManager.KillRequired)) * 100)
                 FarmManager.State = FM_STATES.TARGET_DEAD
             else
-                MaintainPositionAboveNPC()
-                ExecuteKillAura()
-                local newLv = GetLevel()
-                if newLv ~= FarmManager.Level then
-                    FarmManager.Level = newLv
-                    local newArea = GetAreaData(newLv)
-                    if not newArea or newArea.area ~= FarmManager.Area then
-                        FarmManager.State = FM_STATES.CHANGE_AREA
+                -- Auto Quest/Auto Level/Combat are intentionally part of Auto Farm now.
+                if not HasActiveQuest() then
+                    pcall(function() local r = GetRoot(); if r then r.Anchored = false end end)
+                    FarmManager.State = FM_STATES.FIND_QUEST
+                else
+                    EquipFightingStyle()
+                    MaintainPositionAboveNPC(false)
+                    ExecuteKillAura()
+
+                    local newLv = GetLevel()
+                    if newLv ~= FarmManager.Level then
+                        FarmManager.Level = newLv
+                        local newArea = GetAreaData(newLv)
+                        if not newArea or newArea.area ~= FarmManager.Area then
+                            FarmManager.CurrentTarget = nil
+                            FarmManager.State = FM_STATES.CHECK_LEVEL
+                        end
                     end
+                    DistributeStats()
                 end
-                DistributeStats()
             end
             UpdateFarmStatus()
-            task.wait(0.08)
+            task.wait(0.10)
 
         elseif state == FM_STATES.TARGET_DEAD then
+            pcall(function() local r = GetRoot(); if r then r.Anchored = false end end)
             FarmManager.CurrentTarget = nil
             FarmManager.Target        = "None"
             FarmManager.State = IsQuestComplete() and FM_STATES.QUEST_COMPLETE or FM_STATES.FIND_TARGET
@@ -2573,7 +2591,7 @@ local function FarmLoop(generation)
         elseif state == FM_STATES.QUEST_COMPLETE then
             FarmManager.Task = "Quest Complete!"
             UpdateFarmStatus()
-            if Configs.AutoQuest and FarmManager.CurrentQuestGiver then
+            if FarmManager.CurrentQuestGiver then
                 local qg = FarmManager.CurrentQuestGiver
                 local qRoot = qg:FindFirstChild("HumanoidRootPart") or qg:FindFirstChild("Head")
                 if qRoot and qRoot.Parent then
@@ -2589,6 +2607,7 @@ local function FarmLoop(generation)
             UpdateFarmStatus()
 
         elseif state == FM_STATES.CHANGE_AREA then
+            pcall(function() local r = GetRoot(); if r then r.Anchored = false end end)
             FarmManager.CurrentTarget = nil
             FarmManager.KillCount     = 0
             FarmManager.Progress      = 0
@@ -2611,7 +2630,7 @@ local function FarmLoop(generation)
                 local areaData = GetAreaData(FarmManager.Level)
                 local npcName  = areaData and areaData.npcName or "Any"
                 if not IsValidNPC(FarmManager.CurrentTarget) then SelectNextTarget(npcName) end
-                if FarmManager.CurrentTarget then MaintainPositionAboveNPC(); ExecuteKillAura()
+                if FarmManager.CurrentTarget then MaintainPositionAboveNPC(false); ExecuteKillAura()
                 else task.wait(0.5) end
             end
             UpdateFarmStatus()
@@ -2629,7 +2648,7 @@ local function FarmLoop(generation)
                 if bossHum then
                     FarmManager.Progress = math.floor(((bossHum.MaxHealth - bossHum.Health) / math.max(1, bossHum.MaxHealth)) * 100)
                 end
-                MaintainPositionAboveNPC()
+                MaintainPositionAboveNPC(false)
                 ExecuteKillAura()
                 if not IsValidNPC(boss) then
                     FarmManager.Task  = "Boss Defeated!"
@@ -2643,27 +2662,6 @@ local function FarmLoop(generation)
             end
             UpdateFarmStatus()
             task.wait(0.10)
-
-        elseif state == FM_STATES.MATERIAL_FARM then
-            local matName  = NormalizeMaterial(Configs.MaterialSelection)
-            local current  = GetMaterialCount(matName)
-            local target   = Configs.MaterialAmount or 100
-            FarmManager.Task     = ("Material %s: %d/%d"):format(matName, current, target)
-            FarmManager.Progress = math.floor((current / math.max(1, target)) * 100)
-            if current >= target then
-                FarmManager.Task    = "Material Goal Reached!"
-                Configs.AutoMaterial = false
-                FarmManager.State   = FM_STATES.COMPLETED
-            else
-                local areaData = GetAreaData(FarmManager.Level)
-                local npcName  = areaData and areaData.npcName or "Any"
-                if not IsValidNPC(FarmManager.CurrentTarget) then SelectNextTarget(npcName) end
-                if FarmManager.CurrentTarget then MaintainPositionAboveNPC(); ExecuteKillAura()
-                else task.wait(0.5) end
-            end
-            UpdateFarmStatus()
-            task.wait(0.10)
-
         elseif state == FM_STATES.ERROR_RECOVERY then
             FarmManager.Task = "Recovering: " .. FarmManager.LastError
             UpdateFarmStatus()
@@ -2734,38 +2732,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- ==================== HEARTBEAT: WALK/JUMP SPEED ====================
-RunService.Heartbeat:Connect(function()
-    if not scriptAlive then return end
-    local char = GetCharacter()
-    local hum  = char and char:FindFirstChildOfClass("Humanoid")
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if not hum or not root then return end
-
-    if IsAnyFarmModeEnabled() then
-        root.Anchored = false
-        if hum.WalkSpeed ~= 0  then hum.WalkSpeed  = 0 end
-        hum.UseJumpPower = true
-        if hum.JumpPower ~= 0  then hum.JumpPower   = 0 end
-    else
-        hum.WalkSpeed    = math.clamp(tonumber(Configs.SpeedValue)     or 16, 1,   100)
-        hum.UseJumpPower = true
-        hum.JumpPower    = math.clamp(tonumber(Configs.JumpPowerValue) or 50, 0,   150)
-    end
-
-    if Configs.AntiFling then
-        root.AssemblyAngularVelocity = Vector3.zero
-        if root.AssemblyLinearVelocity.Magnitude > 80 then
-            root.AssemblyLinearVelocity = Vector3.zero
-        end
-    end
-end)
-
 -- ==================== THREADS SECUNDÁRIAS ====================
-task.spawn(function()
-    while scriptAlive do task.wait(2); pcall(ScanFruits); pcall(ScanSeaEvents) end
-end)
-
 player.CharacterAdded:Connect(function()
     if IsAnyFarmModeEnabled() then
         FarmManager.CurrentTarget = nil
@@ -2788,7 +2755,6 @@ local function LimparEDesligar()
         local root = char:FindFirstChild("HumanoidRootPart")
         local hum  = char:FindFirstChildOfClass("Humanoid")
         if root then root.Anchored = false; root.AssemblyLinearVelocity = Vector3.zero; root.AssemblyAngularVelocity = Vector3.zero end
-        if hum  then hum.WalkSpeed = 16; hum.UseJumpPower = true; hum.JumpPower = 50 end
     end)
     _G.AkatBFLogicRunning = false
 end
@@ -2802,55 +2768,23 @@ _G.AkatUIShutdown = function()
 end
 
 -- ==================== CALLBACKS ====================
-_G.AkatCallbacks.AutoFarm        = function(v) Configs.AutoFarm = v == true; SetFarmModeState() end
-_G.AkatCallbacks.AutoQuest       = function(v) Configs.AutoQuest = v == true end
-_G.AkatCallbacks.AutoLevel       = function(v) Configs.AutoLevel = v == true end
-_G.AkatCallbacks.KillAura        = function(v) Configs.KillAura  = v == true end
-_G.AkatCallbacks.FightingStyle   = function(v) Configs.FightingStyle = tostring(v); EquipFightingStyle() end
-_G.AkatCallbacks.FarmPosition    = function(v) Configs.FarmPosition  = tostring(v) end
-_G.AkatCallbacks.FarmHeight      = function(v) Configs.FarmHeightValue = math.clamp(tonumber(v) or 8, 1, 30) end
-_G.AkatCallbacks.AutoMastery     = function(v) Configs.AutoMastery  = v == true; SetFarmModeState() end
-_G.AkatCallbacks.MasteryType     = function(v) Configs.MasteryType  = tostring(v) end
-_G.AkatCallbacks.TargetMastery   = function(v) Configs.TargetMastery = math.max(1, tonumber(v) or 300) end
-_G.AkatCallbacks.AutoBoss        = function(v) Configs.AutoBoss     = v == true; SetFarmModeState() end
-_G.AkatCallbacks.BossSelection   = function(v) Configs.BossSelection = tostring(v); if IsAnyFarmModeEnabled() then FarmManager.State = FM_STATES.CHECK_LEVEL end end
-_G.AkatCallbacks.BossName        = function(v) Configs.BossName     = NormalizeBossName(v) end
-_G.AkatCallbacks.BossQuest       = function(v) Configs.BossQuest    = v == true end
-_G.AkatCallbacks.AutoMaterial    = function(v) Configs.AutoMaterial  = v == true; SetFarmModeState() end
-_G.AkatCallbacks.MaterialSelection = function(v) Configs.MaterialSelection = tostring(v) end
-_G.AkatCallbacks.MaterialAmount  = function(v) Configs.MaterialAmount = math.max(1, tonumber(v) or 100) end
-_G.AkatCallbacks.DetectFruit     = function(v) Configs.DetectFruit  = v == true end
-_G.AkatCallbacks.FruitNotification = function(v) Configs.FruitNotification = v == true end
-_G.AkatCallbacks.FruitFilter     = function(v) Configs.FruitFilter  = tostring(v) end
-_G.AkatCallbacks.SelectedFruit   = function(v) Configs.SelectedFruit = tostring(v) end
-_G.AkatCallbacks.AutoSeaEvent    = function(v) Configs.AutoSeaEvent  = v == true end
-_G.AkatCallbacks.EventSelection  = function(v) Configs.EventSelection = tostring(v) end
-_G.AkatCallbacks.SelectedEvent   = function(v) Configs.SelectedEvent = tostring(v) end
-_G.AkatCallbacks.AutoStats       = function(v) Configs.AutoStats     = v == true end
-_G.AkatCallbacks.PrimaryStat     = function(v) Configs.PrimaryStat   = tostring(v) end
-_G.AkatCallbacks.SecondaryStat   = function(v) Configs.SecondaryStat = tostring(v) end
-_G.AkatCallbacks.TertiaryStat    = function(v) Configs.TertiaryStat  = tostring(v) end
-_G.AkatCallbacks.AutoServerSearch = function(v)
-    Configs.AutoServerSearch = v == true
-    if v then
-        task.spawn(function()
-            pcall(function()
-                local TS = game:GetService("TeleportService")
-                TS:Teleport(game.PlaceId, player)
-            end)
-        end)
-    end
-end
-_G.AkatCallbacks.ServerReason    = function(v) Configs.ServerReason  = tostring(v) end
-_G.AkatCallbacks.Speed           = function(v) Configs.SpeedValue     = math.clamp(tonumber(v) or 16, 1, 100) end
-_G.AkatCallbacks.JumpPower       = function(v) Configs.JumpPowerValue = math.clamp(tonumber(v) or 50, 0, 150) end
-_G.AkatCallbacks.AntiFling       = function(v) Configs.AntiFling      = v == true end
-_G.AkatCallbacks.ESP             = function(v) Configs.ESP            = v == true end
-_G.AkatCallbacks.Name            = function(v) Configs.Name           = v == true end
-_G.AkatCallbacks.Tracer          = function(v) Configs.Tracer         = v == true end
-_G.AkatCallbacks.ViewReach       = function(v) Configs.ViewReach      = v == true end
-_G.AkatCallbacks.Debug           = function(v) Configs.Debug          = v == true end
-_G.AkatCallbacks.ShutdownAll     = LimparEDesligar
+_G.AkatCallbacks.AutoFarm      = function(v) Configs.AutoFarm = v == true; SetFarmModeState() end
+_G.AkatCallbacks.FightingStyle = function(v) Configs.FightingStyle = tostring(v); EquipFightingStyle() end
+_G.AkatCallbacks.FarmPosition  = function(v) Configs.FarmPosition = tostring(v) end
+_G.AkatCallbacks.FarmHeight    = function(v) Configs.FarmHeightValue = math.clamp(tonumber(v) or 8, 5, 40) end
+_G.AkatCallbacks.AutoMastery   = function(v) Configs.AutoMastery = v == true; SetFarmModeState() end
+_G.AkatCallbacks.MasteryType   = function(v) Configs.MasteryType = tostring(v) end
+_G.AkatCallbacks.TargetMastery = function(v) Configs.TargetMastery = math.clamp(math.floor(tonumber(v) or 300), 1, 600) end
+_G.AkatCallbacks.AutoBoss      = function(v) Configs.AutoBoss = v == true; SetFarmModeState() end
+_G.AkatCallbacks.BossSelection = function(v) Configs.BossSelection = tostring(v); if IsAnyFarmModeEnabled() then FarmManager.State = FM_STATES.CHECK_LEVEL end end
+_G.AkatCallbacks.BossName      = function(v) Configs.BossName = NormalizeBossName(v) end
+_G.AkatCallbacks.BossQuest     = function(v) Configs.BossQuest = v == true end
+_G.AkatCallbacks.AutoStats     = function(v) Configs.AutoStats = v == true end
+_G.AkatCallbacks.PrimaryStat   = function(v) Configs.PrimaryStat = tostring(v) end
+_G.AkatCallbacks.SecondaryStat = function(v) Configs.SecondaryStat = tostring(v) end
+_G.AkatCallbacks.TertiaryStat  = function(v) Configs.TertiaryStat = tostring(v) end
+_G.AkatCallbacks.Debug         = function(v) Configs.Debug = v == true end
+_G.AkatCallbacks.ShutdownAll   = LimparEDesligar
 
 _G.AkatBFLogicReady = true
 
@@ -2939,7 +2873,7 @@ local function ExecutarIntroAkat()
         MainScale:Destroy()
         pcall(function() Blur:Destroy() end)
         IntroFrame:Destroy()
-        task.defer(function() selectTab("Farm") end)
+        task.defer(function() if screenGui and screenGui.Parent then selectTab("Farm") end end)
     end)
 end
 
