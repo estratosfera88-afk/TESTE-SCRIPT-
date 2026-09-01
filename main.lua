@@ -7,9 +7,20 @@ local RunService         = game:GetService("RunService")
 local TweenService       = game:GetService("TweenService")
 local Lighting           = game:GetService("Lighting")
 local ContentProvider    = game:GetService("ContentProvider")
-local HttpService        = game:GetService("HttpService")
 
 local player             = Players.LocalPlayer
+
+-- Estado compartilhado: declarado antes de qualquer callback que possa acessá-lo.
+local localChar  = player.Character
+local localHRP   = localChar and localChar:FindFirstChild("HumanoidRootPart")
+local farmLevelThread = nil
+
+-- Estado compartilhado: declarado antes de qualquer callback que possa acessá-lo.
+local localChar  = player.Character
+local localHRP   = localChar and localChar:FindFirstChild("HumanoidRootPart")
+local farmBossThread = nil
+local farmAllBossesThread = nil
+local farmChestThread = nil
 
 if _G.AkatUIShutdown then
 	pcall(_G.AkatUIShutdown)
@@ -99,11 +110,13 @@ screenGui.ResetOnSpawn   = false
 screenGui.IgnoreGuiInset = true
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
-local uiParent = player:FindFirstChild("PlayerGui")
-if gethui then
-	uiParent = gethui()
-else
-	pcall(function() uiParent = game:GetService("CoreGui") end)
+local uiParent = player:WaitForChild("PlayerGui")
+local gethuiFn = rawget(_G, "gethui")
+if type(gethuiFn) == "function" then
+	local ok, result = pcall(gethuiFn)
+	if ok and typeof(result) == "Instance" then
+		uiParent = result
+	end
 end
 
 if uiParent:FindFirstChild("DeltaAkatUniversalUI") then
@@ -1491,8 +1504,6 @@ createToggle(togglesContainer, "AutoFarmChest",      "AutoFarm")
 -- ============================ LÓGICA BLOX FRUITS ==================================
 -- ==================================================================================
 
-local localChar  = nil
-local localHRP   = nil
 
 -- Atualiza referência ao personagem
 local function AtualizarPersonagem()
@@ -1531,7 +1542,7 @@ local function ObterHRP(model)
 	return model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("RootPart") or model:FindFirstChild("Torso")
 end
 
-local function AlvoEstáVivo(model)
+local function AlvoEstaVivo(model)
 	if not model or not model.Parent then return false end
 	local hum = ObterHumanoid(model)
 	return hum and hum.Health > 0
@@ -1666,67 +1677,44 @@ end
 
 -- Kill Aura: expande hitbox local e ativa clique contínuo para causar dano
 local function AtacarAlvo(alvo, condicao)
-	local char = player.Character; if not char then return end
-	local hum  = char:FindFirstChildOfClass("Humanoid"); if not hum then return end
+	local char = player.Character
+	if not char then return end
 
-	-- Expande temporariamente a hitbox do personagem para atingir alvos abaixo
-	local hrp  = char:FindFirstChild("HumanoidRootPart"); if not hrp then return end
-
-	local oldSize = hrp.Size
-	hrp.Size = Vector3.new(oldSize.X, ALTURA_ACIMA * 2.2, oldSize.Z)
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	if not hum or not hrp then return end
 
 	while condicao() do
-		if not alvo or not alvo.Parent or not AlvoEstáVivo(alvo) then break end
-		local alvHRP = ObterHRP(alvo)
-		if not alvHRP then break end
+		if not alvo or not alvo.Parent or not AlvoEstaVivo(alvo) then break end
 
-		-- Simula click de ataque via RemoteEvent (padrão Blox Fruits)
+		-- Mantém o personagem sem velocidade acumulada enquanto ataca.
 		pcall(function()
-			local re = workspace:FindFirstChild("ReplicatedStorage") and game:GetService("ReplicatedStorage")
-			if re then
-				local dmg = re:FindFirstChild("Damage", true) or re:FindFirstChild("Hit", true)
-				if dmg and dmg:IsA("RemoteEvent") then
-					dmg:FireServer(alvo, 0)
-				end
-			end
+			hrp.AssemblyLinearVelocity = Vector3.zero
+			hrp.AssemblyAngularVelocity = Vector3.zero
 		end)
 
-		-- Usa tool equipada (ativa se disponível)
-		pcall(function()
-			local tool = char:FindFirstChildOfClass("Tool")
-			if tool then
-				local activate = tool:FindFirstChild("Activate") or tool:FindFirstChild("Handle")
-				-- Dispara o evento de uso da tool via UserInputService simulado
-				-- (compatível com Delta executor)
-				local conn = RunService.Heartbeat:Connect(function()
-					if tool and tool.Parent == char then
-						local mouse = player:GetMouse()
-						mouse.Target = ObterHRP(alvo)
-					end
-				end)
-				task.wait(0.1)
-				conn:Disconnect()
-			end
-		end)
+		local tool = char:FindFirstChildOfClass("Tool")
+		if tool then
+			pcall(function()
+				tool:Activate()
+			end)
+		end
 
-		task.wait(0.15)
+		task.wait(0.12)
 	end
-
-	-- Restaura hitbox
-	pcall(function() hrp.Size = oldSize end)
 end
 
 -- ==================== FUNÇÃO GENÉRICA DE FARM DE ALVO ====================
 local function FarmarAlvo(alvo, condicaoToggle)
 	if not alvo or not alvo.Parent then return false end
-	if not AlvoEstáVivo(alvo) then return false end
+	if not AlvoEstaVivo(alvo) then return false end
 
 	EquiparMelee()
 	local ok = TeleportarParaCima(alvo)
 	if not ok then return false end
 
 	local function deveAtacar()
-		return condicaoToggle() and alvo.Parent ~= nil and AlvoEstáVivo(alvo)
+		return condicaoToggle() and alvo.Parent ~= nil and AlvoEstaVivo(alvo)
 	end
 
 	-- Posicionamento e ataque em paralelo
@@ -1820,6 +1808,7 @@ end
 local farmLevelThread = nil
 
 local function IniciarAutoFarmLevel()
+	if farmLevelThread then return end
 	farmLevelThread = task.spawn(function()
 		while Configs.AutoFarmLevel do
 			local ok, err = pcall(function()
@@ -1842,7 +1831,7 @@ local function IniciarAutoFarmLevel()
 				for _, entry in ipairs(npcs) do
 					if not Configs.AutoFarmLevel then break end
 					if not entry.model or not entry.model.Parent then continue end
-					if not AlvoEstáVivo(entry.model) then continue end
+					if not AlvoEstaVivo(entry.model) then continue end
 					FarmarAlvo(entry.model, function() return Configs.AutoFarmLevel end)
 					task.wait(0.5)
 				end
@@ -1857,7 +1846,7 @@ end
 
 local function PararAutoFarmLevel()
 	Configs.AutoFarmLevel = false
-	if farmLevelThread then task.cancel(farmLevelThread); farmLevelThread = nil end
+	if farmLevelThread then pcall(task.cancel, farmLevelThread); farmLevelThread = nil end
 end
 
 -- ==================== AUTO FARM BOSS ====================
@@ -1881,6 +1870,7 @@ local function EncontrarBossDoLevel()
 end
 
 local function IniciarAutoFarmBoss()
+	if farmBossThread then return end
 	farmBossThread = task.spawn(function()
 		while Configs.AutoFarmBoss do
 			local ok, err = pcall(function()
@@ -1902,7 +1892,7 @@ end
 
 local function PararAutoFarmBoss()
 	Configs.AutoFarmBoss = false
-	if farmBossThread then task.cancel(farmBossThread); farmBossThread = nil end
+	if farmBossThread then pcall(task.cancel, farmBossThread); farmBossThread = nil end
 end
 
 -- ==================== AUTO FARM ALL BOSSES ====================
@@ -1928,6 +1918,7 @@ local function ListarTodosBosses()
 end
 
 local function IniciarAutoFarmAllBosses()
+	if farmAllBossesThread then return end
 	farmAllBossesThread = task.spawn(function()
 		while Configs.AutoFarmAllBosses do
 			local ok, err = pcall(function()
@@ -1937,7 +1928,7 @@ local function IniciarAutoFarmAllBosses()
 				for _, entry in ipairs(lista) do
 					if not Configs.AutoFarmAllBosses then break end
 					if not entry.model or not entry.model.Parent then continue end
-					if not AlvoEstáVivo(entry.model) then continue end
+					if not AlvoEstaVivo(entry.model) then continue end
 					FarmarAlvo(entry.model, function() return Configs.AutoFarmAllBosses end)
 					task.wait(1)
 				end
@@ -1952,7 +1943,7 @@ end
 
 local function PararAutoFarmAllBosses()
 	Configs.AutoFarmAllBosses = false
-	if farmAllBossesThread then task.cancel(farmAllBossesThread); farmAllBossesThread = nil end
+	if farmAllBossesThread then pcall(task.cancel, farmAllBossesThread); farmAllBossesThread = nil end
 end
 
 -- ==================== AUTO FARM CHEST ====================
@@ -1990,7 +1981,10 @@ local function ColetarBau(entry)
 	pcall(function()
 		local pp = entry.obj:FindFirstChildOfClass("ProximityPrompt", true)
 		if pp then
-			game:GetService("ProximityPromptService"):PromptTriggered(pp, player)
+			local firePrompt = rawget(_G, "fireproximityprompt")
+			if type(firePrompt) == "function" then
+				pcall(function() firePrompt(pp) end)
+			end
 			return
 		end
 		-- Fallback: FireServer de coleta
@@ -2008,6 +2002,7 @@ local function ColetarBau(entry)
 end
 
 local function IniciarAutoFarmChest()
+	if farmChestThread then return end
 	farmChestThread = task.spawn(function()
 		while Configs.AutoFarmChest do
 			local ok, err = pcall(function()
@@ -2033,7 +2028,7 @@ end
 
 local function PararAutoFarmChest()
 	Configs.AutoFarmChest = false
-	if farmChestThread then task.cancel(farmChestThread); farmChestThread = nil end
+	if farmChestThread then pcall(task.cancel, farmChestThread); farmChestThread = nil end
 end
 
 -- ==================== PREVENÇÃO DE CONFLITO: MUTEX DE CONTROLE ====================
@@ -2094,25 +2089,33 @@ player.CharacterAdded:Connect(function(char)
 	task.wait(1)
 
 	if Configs.AutoFarmLevel then
-		if farmLevelThread then task.cancel(farmLevelThread); farmLevelThread = nil end
+		if farmLevelThread then pcall(task.cancel, farmLevelThread); farmLevelThread = nil end
 		IniciarAutoFarmLevel()
 	end
 	if Configs.AutoFarmBoss then
-		if farmBossThread then task.cancel(farmBossThread); farmBossThread = nil end
+		if farmBossThread then pcall(task.cancel, farmBossThread); farmBossThread = nil end
 		IniciarAutoFarmBoss()
 	end
 	if Configs.AutoFarmAllBosses then
-		if farmAllBossesThread then task.cancel(farmAllBossesThread); farmAllBossesThread = nil end
+		if farmAllBossesThread then pcall(task.cancel, farmAllBossesThread); farmAllBossesThread = nil end
 		IniciarAutoFarmAllBosses()
 	end
 	if Configs.AutoFarmChest then
-		if farmChestThread then task.cancel(farmChestThread); farmChestThread = nil end
+		if farmChestThread then pcall(task.cancel, farmChestThread); farmChestThread = nil end
 		IniciarAutoFarmChest()
 	end
 end)
 
 -- ==================== ANIMAÇÃO DE INTRODUÇÃO ====================
-local function ExecutarIntroAkat()
+local function local okStartup, startupErr = xpcall(ExecutarIntroAkat, debug.traceback)
+if not okStartup then
+	warn("[AKATSUKI V1.0] Falha ao iniciar: " .. tostring(startupErr))
+	pcall(function()
+		if screenGui and screenGui.Parent then
+			screenGui:Destroy()
+		end
+	end)
+end
 	local Blur    = Instance.new("BlurEffect"); Blur.Name = "IntroBlur"; Blur.Size = 0; Blur.Parent = Lighting
 	local IntroFrame = Instance.new("Frame", screenGui)
 	IntroFrame.Size  = UDim2.new(1, 0, 1, 0); IntroFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
