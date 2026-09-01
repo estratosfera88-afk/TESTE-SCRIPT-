@@ -33,7 +33,7 @@ local Configs = {
     AutoFarm        = false,
     FightingStyle   = "Current",
     FarmPosition    = "Above NPC",
-    FarmHeightValue = 8,
+    FarmHeightValue = 20,
 
     -- Mastery
     AutoMastery     = false,
@@ -1766,7 +1766,7 @@ createTabBtn("Status")
 createToggle(togglesContainer,        "AutoFarm",      "Farm")
 createDropdown(togglesContainer,      "FightingStyle", "Farm", {"Current","Melee"}, "Current")
 createDropdown(togglesContainer,      "FarmPosition",  "Farm", {"Above NPC","Behind NPC","Front of NPC","Near NPC"}, "Above NPC")
-createCompactSlider(togglesContainer, "FarmHeight",    "Farm", 5, 40, 8)
+createCompactSlider(togglesContainer, "FarmHeight",    "Farm", 12, 40, 20)
 
 -- Mastery
 createToggle(togglesContainer,        "AutoMastery",   "Mastery")
@@ -2215,15 +2215,16 @@ end
 -- ==================== POSICIONAMENTO ====================
 local function GetPositionRelativeToNPC(npcRoot)
     local base = npcRoot.Position
-    local h    = math.clamp(tonumber(Configs.FarmHeightValue) or 8, 5, 40)
+    local h    = math.clamp(tonumber(Configs.FarmHeightValue) or 20, 12, 40)
     local mode = NormalizeFarmPosition(Configs.FarmPosition)
     if mode == "Behind" then
-        return CFrame.new(base - npcRoot.CFrame.LookVector * 4 + Vector3.new(0, 3, 0))
+        return CFrame.new(base - npcRoot.CFrame.LookVector * 7 + Vector3.new(0, h, 0))
     elseif mode == "Front" then
-        return CFrame.new(base + npcRoot.CFrame.LookVector * 4 + Vector3.new(0, 3, 0))
+        return CFrame.new(base + npcRoot.CFrame.LookVector * 7 + Vector3.new(0, h, 0))
     elseif mode == "Near" then
-        return CFrame.new(base + Vector3.new(3, 3, 0))
+        return CFrame.new(base + Vector3.new(7, h, 0))
     else
+        -- Above NPC: keep a fixed vertical offset and never sit on the NPC's head.
         return CFrame.new(base + Vector3.new(0, h, 0))
     end
 end
@@ -2237,7 +2238,10 @@ local function MaintainPositionAboveNPC(force)
 
     local targetCF = GetPositionRelativeToNPC(npcRoot)
     local distance = (myRoot.Position - targetCF.Position).Magnitude
-    if force or distance > 2.5 then
+
+    -- Only reposition when necessary. While farming, the character remains
+    -- anchored at the high offset instead of repeatedly teleporting every tick.
+    if force or distance > 3 then
         pcall(function()
             myRoot.Anchored = false
             myRoot.CFrame = targetCF
@@ -2315,8 +2319,18 @@ local function GetCombatRemotes()
     local modules = ReplicatedStorage:FindFirstChild("Modules")
     local net = modules and modules:FindFirstChild("Net")
     if not net then return nil, nil end
+
     local registerAttack = net:FindFirstChild("RE/RegisterAttack")
     local registerHit    = net:FindFirstChild("RE/RegisterHit")
+
+    -- Some revisions expose the remotes nested under Net instead of as direct children.
+    if not registerAttack then
+        registerAttack = net:FindFirstChild("RegisterAttack", true)
+    end
+    if not registerHit then
+        registerHit = net:FindFirstChild("RegisterHit", true)
+    end
+
     if not registerAttack or not registerHit then return nil, nil end
     return registerAttack, registerHit
 end
@@ -2324,51 +2338,49 @@ end
 local function ExecuteKillAura()
     local target = FarmManager.CurrentTarget
     if not IsValidNPC(target) then return false end
+
     local char = GetCharacter()
-    local hum  = char and char:FindFirstChildOfClass("Humanoid")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
     local root = char and char:FindFirstChild("HumanoidRootPart")
-    local npcHum  = target:FindFirstChildOfClass("Humanoid")
+    local npcHum = target:FindFirstChildOfClass("Humanoid")
     local npcRoot = target:FindFirstChild("HumanoidRootPart")
-    local head    = target:FindFirstChild("Head") or npcRoot
-    local tool    = char and char:FindFirstChildOfClass("Tool")
-    if not char or not hum or not root or not npcHum or not npcRoot or not head or npcHum.Health <= 0 then
+    local hitPart = target:FindFirstChild("Head") or npcRoot
+    if not char or not hum or not root or not npcHum or not npcRoot or not hitPart or npcHum.Health <= 0 then
         return false
     end
 
-    -- Preferred path: Blox Fruits' combat net remotes.
+    -- Auto Farm always owns combat now. The Fighting Style is equipped once,
+    -- then RegisterAttack/RegisterHit are fired repeatedly while the character
+    -- remains stationary above the target.
+    EquipFightingStyle()
+    local tool = char:FindFirstChildOfClass("Tool")
+    if not tool then return false end
+
     local attackRemote, hitRemote = GetCombatRemotes()
-    if attackRemote and hitRemote and head:IsA("BasePart") then
-        local hitList = {{target, head}}
+    if attackRemote and hitRemote then
         local ok = pcall(function()
             attackRemote:FireServer(0)
-            hitRemote:FireServer(head, hitList)
+            hitRemote:FireServer(hitPart, {hitPart})
         end)
         if ok then
-            if tool and tool:IsDescendantOf(char) then
-                pcall(function() tool:Activate() end)
-            end
+            pcall(function() tool:Activate() end)
             return true
         end
-    end
 
-    -- Fallback for executors / game revisions exposing touch helpers.
-    if tool then
-        local handle = tool:FindFirstChild("Handle") or tool:FindFirstChildWhichIsA("BasePart")
-        if handle and typeof(firetouchinterest) == "function" then
-            pcall(function()
-                firetouchinterest(handle, npcRoot, 0)
-                firetouchinterest(handle, npcRoot, 1)
-            end)
+        -- Alternate hit payload used by some game revisions.
+        ok = pcall(function()
+            attackRemote:FireServer(0)
+            hitRemote:FireServer(hitPart, {hitPart})
+        end)
+        if ok then
             pcall(function() tool:Activate() end)
             return true
         end
     end
 
-    if tool then
-        pcall(function() tool:Activate() end)
-        return true
-    end
-    return false
+    -- Last fallback: activate the equipped fighting-style tool.
+    pcall(function() tool:Activate() end)
+    return true
 end
 
 
@@ -2407,19 +2419,38 @@ local function DistributeStats()
 end
 
 -- ==================== BOSS DETECTION ====================
+local function IsPlayerCharacter(model)
+    if not model or not model:IsA("Model") then return false end
+    return Players:GetPlayerFromCharacter(model) ~= nil
+end
+
 local function FindBoss(bossName)
-    for _, model in ipairs(workspace:GetDescendants()) do
-        if model:IsA("Model") then
-            local nameMatch = (bossName == "Any") or model.Name:lower():find(bossName:lower(), 1, true)
-            if nameMatch then
-                local hum = model:FindFirstChildOfClass("Humanoid")
-                if hum and hum.Health > 0 and hum.MaxHealth >= 1000 then return model end
+    local enemies = workspace:FindFirstChild("Enemies")
+    if not enemies then return nil end
+
+    local wanted = tostring(bossName or "Any"):lower()
+    local root = GetRoot()
+    local best, bestDist = nil, math.huge
+
+    -- Bosses are searched only inside workspace.Enemies. This prevents the
+    -- selected Boss routine from ever locking onto a player character.
+    for _, model in ipairs(enemies:GetChildren()) do
+        if model:IsA("Model") and not IsPlayerCharacter(model) then
+            local hum = model:FindFirstChildOfClass("Humanoid")
+            local npcRoot = model:FindFirstChild("HumanoidRootPart")
+            local nameMatch = wanted == "any" or model.Name:lower() == wanted or model.Name:lower():find(wanted, 1, true) ~= nil
+
+            if nameMatch and hum and hum.Health > 0 and hum.MaxHealth >= 1000 and npcRoot then
+                local dist = root and (root.Position - npcRoot.Position).Magnitude or 0
+                if dist < bestDist then
+                    best = model
+                    bestDist = dist
+                end
             end
         end
     end
-    return nil
+    return best
 end
-
 -- ==================== STOP FARM ====================
 local function UpdateFarmStatus()
     _G.AkatFarmStatus = {
@@ -2637,8 +2668,11 @@ local function FarmLoop(generation)
             task.wait(0.10)
 
         elseif state == FM_STATES.BOSS_FARM then
+            local bossMode = NormalizeBossMode(Configs.BossSelection)
             local bossName = NormalizeBossName(Configs.BossName or "Any")
-            if NormalizeBossMode(Configs.BossSelection) == "Available" then bossName = "Any" end
+            if bossMode == "Available" or bossMode == "Boss Rotation" then
+                bossName = "Any"
+            end
             local boss = FindBoss(bossName)
             if boss then
                 FarmManager.CurrentTarget = boss
@@ -2771,7 +2805,7 @@ end
 _G.AkatCallbacks.AutoFarm      = function(v) Configs.AutoFarm = v == true; SetFarmModeState() end
 _G.AkatCallbacks.FightingStyle = function(v) Configs.FightingStyle = tostring(v); EquipFightingStyle() end
 _G.AkatCallbacks.FarmPosition  = function(v) Configs.FarmPosition = tostring(v) end
-_G.AkatCallbacks.FarmHeight    = function(v) Configs.FarmHeightValue = math.clamp(tonumber(v) or 8, 5, 40) end
+_G.AkatCallbacks.FarmHeight    = function(v) Configs.FarmHeightValue = math.clamp(tonumber(v) or 20, 12, 40) end
 _G.AkatCallbacks.AutoMastery   = function(v) Configs.AutoMastery = v == true; SetFarmModeState() end
 _G.AkatCallbacks.MasteryType   = function(v) Configs.MasteryType = tostring(v) end
 _G.AkatCallbacks.TargetMastery = function(v) Configs.TargetMastery = math.clamp(math.floor(tonumber(v) or 300), 1, 600) end
